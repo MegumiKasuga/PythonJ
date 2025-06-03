@@ -530,28 +530,18 @@ public class Parser {
         Map<String, ASTNode> keywordArguments = new HashMap<>();
         boolean hasKeywordArg = false;  // 标记是否已经遇到了关键字参数
         
-        System.out.println("DEBUG PARSER: 开始解析函数调用参数");
-        
         if (!check(Token.Type.RIGHT_PAREN)) {
             do {                // 检查是否为关键字参数 (name=value)
                 if (check(Token.Type.IDENTIFIER) && checkNext(Token.Type.ASSIGN)) {
-                    System.out.println("DEBUG PARSER: 发现可能的关键字参数");
-                    System.out.println("DEBUG PARSER: 当前token: " + peek().getType() + " 值: " + peek().getValue());
-                    System.out.println("DEBUG PARSER: 下一个token: " + tokens.get(current + 1).getType() + " 值: " + tokens.get(current + 1).getValue());
-                    
                     hasKeywordArg = true;
                     String name = consume(Token.Type.IDENTIFIER, "Expected parameter name").getValue();
-                    System.out.println("DEBUG PARSER: 参数名: " + name);
                     
                     // 这里检查是否是赋值符号ASSIGN (=)，而不是比较符号EQUAL(==)
-                    System.out.println("DEBUG PARSER: 现在检查等号, 当前token: " + peek().getType() + " 值: " + peek().getValue());
                     consume(Token.Type.ASSIGN, "Expected '=' after parameter name");
                     
                     // 解析参数值
-                    System.out.println("DEBUG PARSER: 开始解析参数值");
                     ASTNode value = or();
                     keywordArguments.put(name, value);
-                    System.out.println("DEBUG PARSER: 关键字参数解析完成: " + name + "=...");
                 } else {
                     // 不允许位置参数出现在关键字参数之后
                     if (hasKeywordArg) {
@@ -559,15 +549,11 @@ public class Parser {
                     }
                     
                     // 位置参数
-                    System.out.println("DEBUG PARSER: 解析位置参数");
                     positionalArguments.add(or());
-                    System.out.println("DEBUG PARSER: 位置参数解析完成");
                 }
             } while (match(Token.Type.COMMA));
         }
         
-        System.out.println("DEBUG PARSER: 参数解析完成, 现在检查右括号");
-        System.out.println("DEBUG PARSER: 当前token: " + peek().getType() + " 值: " + peek().getValue());
         consume(Token.Type.RIGHT_PAREN, "Expected ')' after arguments");
         return new CallExpression(callee, positionalArguments, keywordArguments);
     }
