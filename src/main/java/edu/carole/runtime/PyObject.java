@@ -48,6 +48,13 @@ public abstract class PyObject {
     }
     
     /**
+     * 调用对象（带关键字参数和解释器上下文）
+     */
+    public PyObject call(List<PyObject> arguments, Map<String, PyObject> keywordArguments, edu.carole.interpreter.Interpreter interpreter) {
+        throw new RuntimeException("'" + getTypeName() + "' object doesn't support keyword arguments");
+    }
+    
+    /**
      * 获取索引
      */
     public PyObject getItem(PyObject key) {

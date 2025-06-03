@@ -3,6 +3,7 @@ package edu.carole.ast.statements;
 import edu.carole.ast.ASTNode;
 import edu.carole.ast.ast.ASTVisitor;
 import java.util.List;
+import java.util.ArrayList;
 
 /**
  * while语句
@@ -10,14 +11,21 @@ import java.util.List;
 public class WhileStatement extends ASTNode {
     private final ASTNode condition;
     private final List<ASTNode> body;
+    private final List<ASTNode> elseBody;
     
     public WhileStatement(ASTNode condition, List<ASTNode> body) {
+        this(condition, body, new ArrayList<>());
+    }
+    
+    public WhileStatement(ASTNode condition, List<ASTNode> body, List<ASTNode> elseBody) {
         this.condition = condition;
         this.body = body;
+        this.elseBody = elseBody;
     }
     
     public ASTNode getCondition() { return condition; }
     public List<ASTNode> getBody() { return body; }
+    public List<ASTNode> getElseBody() { return elseBody; }
     
     @Override
     public <T> T accept(ASTVisitor<T> visitor) {

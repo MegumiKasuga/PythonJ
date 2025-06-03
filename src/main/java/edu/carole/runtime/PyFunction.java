@@ -1,38 +1,144 @@
 package edu.carole.runtime;
 
 import edu.carole.ast.ASTNode;
+import edu.carole.ast.statements.FunctionParameter;
 import edu.carole.interpreter.Environment;
 import edu.carole.interpreter.Interpreter;
 
 import java.util.*;
+import java.util.stream.Collectors;
+import java.util.stream.Collectors;
 
 /**
  * Python函数对象
  */
 public class PyFunction extends PyObject {
     private final String name;
-    private final List<String> parameters;
+    private final List<String> parameters;  // 保留用于向后兼容
+    private final List<FunctionParameter> functionParameters;  // 新的参数结构
     private final List<ASTNode> body;
     private final Environment closure;
     private final Map<String, PyObject> attributes = new HashMap<>();
     private final String varargsParam; // *args parameter name
-    
-    public PyFunction(String name, List<String> parameters, List<ASTNode> body, Environment closure) {
+    private final String kwargsParam; // **kwargs parameter name
+    private final Map<String, ASTNode> defaultValues; // parameter name -> default value expression    
+      // 静态工厂方法用于向后兼容
+    public static PyFunction fromParameterNames(String name, List<String> parameters, List<ASTNode> body, Environment closure) {
+        List<FunctionParameter> functionParameters = parameters.stream()
+                .map(FunctionParameter::new)
+                .collect(java.util.stream.Collectors.toList());
+        return new PyFunction(name, functionParameters, body, closure);
+    }
+      // 主要构造器，使用 FunctionParameter 结构
+    public PyFunction(String name, List<FunctionParameter> functionParameters, List<ASTNode> body, Environment closure) {
         this.name = name;
-        this.parameters = parameters;
+        this.functionParameters = functionParameters;
+        this.parameters = extractParameterNames(functionParameters);
         this.body = body;
         this.closure = closure;
-        this.varargsParam = null;
+        this.varargsParam = extractVarargsParam(functionParameters);
+        this.kwargsParam = extractKwargsParam(functionParameters);
+        this.defaultValues = extractDefaultValues(functionParameters);
+        
+        // Debug output
+        System.out.println("DEBUG: Function " + name + " created with:");
+        System.out.println("  Regular parameters: " + parameters);
+        System.out.println("  Varargs param: " + varargsParam);
+        System.out.println("  Default values: " + defaultValues.keySet());
     }
-    
+
     public PyFunction(String name, List<String> parameters, List<ASTNode> body, Environment closure, String varargsParam) {
         this.name = name;
         this.parameters = parameters;
+        this.functionParameters = convertToFunctionParameters(parameters, varargsParam, null);
         this.body = body;
         this.closure = closure;
         this.varargsParam = varargsParam;
+        this.kwargsParam = null;
+        this.defaultValues = new HashMap<>();
     }
-      @Override
+    
+    public PyFunction(String name, List<String> parameters, List<ASTNode> body, Environment closure, 
+                      String varargsParam, String kwargsParam, Map<String, ASTNode> defaultValues) {
+        this.name = name;
+        this.parameters = parameters;
+        this.functionParameters = convertToFunctionParameters(parameters, varargsParam, kwargsParam, defaultValues);
+        this.body = body;
+        this.closure = closure;
+        this.varargsParam = varargsParam;
+        this.kwargsParam = kwargsParam;
+        this.defaultValues = defaultValues != null ? defaultValues : new HashMap<>();
+    }
+      // 转换工具方法
+    private List<FunctionParameter> convertToFunctionParameters(List<String> parameterNames) {
+        return parameterNames.stream()
+                .map(FunctionParameter::new)
+                .collect(Collectors.toList());
+    }
+    
+    private List<FunctionParameter> convertToFunctionParameters(List<String> parameterNames, String varargsParam, String kwargsParam) {
+        return convertToFunctionParameters(parameterNames, varargsParam, kwargsParam, null);
+    }
+    
+    private List<FunctionParameter> convertToFunctionParameters(List<String> parameterNames, 
+                                                               String varargsParam, String kwargsParam, 
+                                                               Map<String, ASTNode> defaultValues) {
+        List<FunctionParameter> result = new ArrayList<>();
+        
+        // 添加普通参数
+        for (String paramName : parameterNames) {
+            ASTNode defaultValue = (defaultValues != null) ? defaultValues.get(paramName) : null;
+            result.add(new FunctionParameter(paramName, defaultValue));
+        }
+        
+        // 添加 *args 参数
+        if (varargsParam != null) {
+            result.add(new FunctionParameter(varargsParam, FunctionParameter.ParameterType.VARARGS));
+        }
+        
+        // 添加 **kwargs 参数
+        if (kwargsParam != null) {
+            result.add(new FunctionParameter(kwargsParam, FunctionParameter.ParameterType.KWARGS));
+        }
+        
+        return result;
+    }
+    
+    // 从 FunctionParameter 列表中提取信息的工具方法
+    private List<String> extractParameterNames(List<FunctionParameter> functionParameters) {
+        return functionParameters.stream()
+                .filter(FunctionParameter::isNormal)
+                .map(FunctionParameter::getIdentifier)
+                .collect(Collectors.toList());
+    }
+    
+    private String extractVarargsParam(List<FunctionParameter> functionParameters) {
+        return functionParameters.stream()
+                .filter(FunctionParameter::isVarargs)
+                .map(FunctionParameter::getIdentifier)
+                .findFirst()
+                .orElse(null);
+    }
+    
+    private String extractKwargsParam(List<FunctionParameter> functionParameters) {
+        return functionParameters.stream()
+                .filter(FunctionParameter::isKwargs)
+                .map(FunctionParameter::getIdentifier)
+                .findFirst()
+                .orElse(null);
+    }
+    
+    private Map<String, ASTNode> extractDefaultValues(List<FunctionParameter> functionParameters) {
+        Map<String, ASTNode> result = new HashMap<>();
+        for (FunctionParameter param : functionParameters) {
+            if (param.hasDefaultValue()) {
+                result.put(param.getIdentifier(), param.getDefaultValue());
+            }
+        }
+        return result;
+    }
+
+    @Override
     public String getTypeName() { return "function"; }
     
     @Override
@@ -40,6 +146,16 @@ public class PyFunction extends PyObject {
     
     @Override
     public boolean isTruthy() { return true; }
+    
+    // Public getter methods for function properties
+    public String getName() { return name; }
+    public List<String> getParameters() { return new ArrayList<>(parameters); }
+    public List<FunctionParameter> getFunctionParameters() { return new ArrayList<>(functionParameters); }
+    public Map<String, ASTNode> getDefaultValues() { return new HashMap<>(defaultValues); }
+    public String getVarargsParam() { return varargsParam; }
+    public String getKwargsParam() { return kwargsParam; }
+    public List<ASTNode> getBody() { return new ArrayList<>(body); }
+    public Environment getClosure() { return closure; }
     
     @Override
     public PyObject getAttribute(String attributeName) {
@@ -57,32 +173,215 @@ public class PyFunction extends PyObject {
     }    @Override
     public PyObject call(List<PyObject> arguments) {
         return call(arguments, null);
-    }    @Override
+    }
+    
+    @Override
+    public PyObject call(List<PyObject> positionalArguments, Map<String, PyObject> keywordArguments, Interpreter interpreter) {
+        // Create new function scope
+        Environment environment = new Environment(closure);
+        
+        int regularParamCount = parameters.size();
+        int posArgCount = positionalArguments.size();
+        
+        // Debug output
+        System.out.println("DEBUG: Calling function " + name + " with keywords");
+        System.out.println("DEBUG: regularParamCount = " + regularParamCount);
+        System.out.println("DEBUG: posArgCount = " + posArgCount);
+        System.out.println("DEBUG: keywordArgCount = " + 
+                      (keywordArguments != null ? keywordArguments.size() : 0));
+        System.out.println("DEBUG: parameters = " + parameters);
+        System.out.println("DEBUG: varargsParam = " + varargsParam);
+        System.out.println("DEBUG: kwargsParam = " + kwargsParam);
+        
+        // 跟踪已经绑定的参数
+        Set<String> boundParams = new HashSet<>();
+        
+        // 1. 绑定由关键字指定的参数
+        if (keywordArguments != null && !keywordArguments.isEmpty()) {
+            for (Map.Entry<String, PyObject> entry : keywordArguments.entrySet()) {
+                String paramName = entry.getKey();
+                PyObject value = entry.getValue();
+                
+                // 如果是函数声明中的参数，则直接绑定
+                if (parameters.contains(paramName)) {
+                    environment.define(paramName, value);
+                    boundParams.add(paramName);
+                    System.out.println("DEBUG: Bound keyword parameter: " + paramName + " = " + value);
+                } 
+                // 否则，如果有**kwargs参数，则放入kwargs字典
+                else if (kwargsParam != null) {
+                    // 暂存，稍后会放入kwargs字典
+                    System.out.println("DEBUG: Found keyword for kwargs: " + paramName + " = " + value);
+                } else {
+                    throw new RuntimeException(name + "() got an unexpected keyword argument '" + paramName + "'");
+                }
+            }
+        }
+        
+        // 2. 绑定位置参数
+        int paramIndex = 0;
+        int argIndex = 0;
+        
+        while (paramIndex < regularParamCount && argIndex < posArgCount) {
+            String paramName = parameters.get(paramIndex);
+            
+            // 跳过已经由关键字绑定的参数
+            if (boundParams.contains(paramName)) {
+                paramIndex++;
+                continue;
+            }
+            
+            // 绑定位置参数
+            environment.define(paramName, positionalArguments.get(argIndex));
+            boundParams.add(paramName);
+            System.out.println("DEBUG: Bound positional parameter: " + paramName + " = " + positionalArguments.get(argIndex));
+            paramIndex++;
+            argIndex++;
+        }
+        
+        // 3. 为未绑定的参数使用默认值
+        while (paramIndex < regularParamCount) {
+            String paramName = parameters.get(paramIndex);
+            
+            // 跳过已经由关键字绑定的参数
+            if (boundParams.contains(paramName)) {
+                paramIndex++;
+                continue;
+            }
+            
+            // 使用默认值
+            if (defaultValues.containsKey(paramName)) {
+                try {
+                    PyObject defaultValue = evaluateDefaultValue(defaultValues.get(paramName), interpreter);
+                    environment.define(paramName, defaultValue);
+                    System.out.println("DEBUG: Using default value for: " + paramName + " = " + defaultValue);
+                } catch (Exception e) {
+                    throw new RuntimeException("Error evaluating default value for parameter '" + 
+                                         paramName + "': " + e.getMessage());
+                }
+            } else {
+                throw new RuntimeException(name + "() missing required positional argument: '" + paramName + "'");
+            }
+            
+            paramIndex++;
+        }
+        
+        // 4. 处理*args参数
+        if (varargsParam != null) {
+            List<PyObject> varargsValues = new ArrayList<>();
+            while (argIndex < posArgCount) {
+                varargsValues.add(positionalArguments.get(argIndex));
+                argIndex++;
+            }
+            environment.define(varargsParam, new PyTuple(varargsValues));
+            System.out.println("DEBUG: Bound varargs parameter: " + varargsParam + " = " + varargsValues);
+        } else if (argIndex < posArgCount) {
+            // 如果没有*args但还有额外的位置参数，则报错
+            throw new RuntimeException(name + "() takes " + regularParamCount + 
+                               " positional arguments but " + posArgCount + " were given");
+        }
+        
+        // 5. 处理**kwargs参数
+        if (kwargsParam != null) {
+            Map<PyObject, PyObject> kwargsMap = new HashMap<>();
+            
+            if (keywordArguments != null) {
+                for (Map.Entry<String, PyObject> entry : keywordArguments.entrySet()) {
+                    String paramName = entry.getKey();
+                    
+                    // 只将未在参数列表中声明的关键字参数加入kwargs
+                    if (!parameters.contains(paramName)) {
+                        kwargsMap.put(new PyString(paramName), entry.getValue());
+                    }
+                }
+            }
+            
+            environment.define(kwargsParam, new PyDict(kwargsMap));
+            System.out.println("DEBUG: Bound kwargs parameter: " + kwargsParam + " = " + kwargsMap);
+        } else if (keywordArguments != null) {
+            // 确保没有未处理的关键字参数
+            for (String key : keywordArguments.keySet()) {
+                if (!parameters.contains(key)) {
+                    throw new RuntimeException(name + "() got an unexpected keyword argument '" + key + "'");
+                }
+            }
+        }
+        
+        // 执行函数体
+        return callWithInterpreter(environment, interpreter);
+    }
+    
+    @Override
     public PyObject call(List<PyObject> arguments, Interpreter interpreter) {
         // Create new function scope
         Environment environment = new Environment(closure);
         
-        // Check parameter count for regular parameters
         int regularParamCount = parameters.size();
         int argCount = arguments.size();
         
-        if (varargsParam == null) {
-            // No varargs, must match exactly
-            if (argCount != regularParamCount) {
-                throw new RuntimeException(name + "() takes " + regularParamCount + 
-                    " positional arguments but " + argCount + " were given");
-            }
-        } else {
-            // Has varargs, must have at least the regular parameters
-            if (argCount < regularParamCount) {
-                throw new RuntimeException(name + "() takes at least " + regularParamCount + 
-                    " positional arguments but " + argCount + " were given");
-            }
-        }
+        // Debug output
+        System.out.println("DEBUG: Calling function " + name);
+        System.out.println("DEBUG: regularParamCount = " + regularParamCount);
+        System.out.println("DEBUG: argCount = " + argCount);
+        System.out.println("DEBUG: parameters = " + parameters);
+        System.out.println("DEBUG: varargsParam = " + varargsParam);
+        System.out.println("DEBUG: kwargsParam = " + kwargsParam);
         
-        // Bind regular parameters
+        // Handle parameter binding with default values
+        if (varargsParam == null && kwargsParam == null) {
+            // No varargs or kwargs - check bounds considering default values
+            int requiredParams = 0;
+            for (String param : parameters) {
+                if (!defaultValues.containsKey(param)) {
+                    requiredParams++;
+                }
+            }
+            
+            if (argCount < requiredParams || argCount > regularParamCount) {
+                throw new RuntimeException(name + "() takes " + requiredParams + 
+                    " to " + regularParamCount + " positional arguments but " + argCount + " were given");
+            }
+        } else if (varargsParam != null && kwargsParam == null) {
+            // Has varargs but no kwargs
+            int requiredParams = 0;
+            for (String param : parameters) {
+                if (!defaultValues.containsKey(param)) {
+                    requiredParams++;
+                }
+            }
+            
+            if (argCount < requiredParams) {
+                throw new RuntimeException(name + "() takes at least " + requiredParams + 
+                    " positional arguments but " + argCount + " were given");
+            }
+        }          // Bind regular parameters
+        System.out.println("DEBUG: Binding parameters for " + name + "():");
+        System.out.println("  regularParamCount: " + regularParamCount);
+        System.out.println("  argCount: " + argCount);
+        System.out.println("  parameters: " + parameters);
+        System.out.println("  varargsParam: " + varargsParam);
+        
         for (int i = 0; i < regularParamCount; i++) {
-            environment.define(parameters.get(i), arguments.get(i));
+            String paramName = parameters.get(i);
+            System.out.println("  Processing parameter " + i + ": " + paramName);
+            if (i < argCount) {
+                // Use provided argument
+                System.out.println("    Using provided argument: " + arguments.get(i));
+                environment.define(paramName, arguments.get(i));
+            } else if (defaultValues.containsKey(paramName)) {
+                // Use default value - evaluate it in the closure environment
+                System.out.println("    Using default value");
+                try {
+                    PyObject defaultValue = evaluateDefaultValue(defaultValues.get(paramName), interpreter);
+                    environment.define(paramName, defaultValue);
+                } catch (Exception e) {
+                    throw new RuntimeException("Error evaluating default value for parameter '" + paramName + "': " + e.getMessage());
+                }
+            } else {
+                // Missing required parameter
+                System.out.println("    ERROR: Missing required parameter");
+                throw new RuntimeException(name + "() missing required positional argument: '" + paramName + "'");
+            }
         }
         
         // Bind varargs parameter if present
@@ -94,9 +393,30 @@ public class PyFunction extends PyObject {
             environment.define(varargsParam, new PyTuple(varargsValues));
         }
         
+        // Bind kwargs parameter if present (empty for now - will be populated when we add keyword arg support)
+        if (kwargsParam != null) {
+            environment.define(kwargsParam, new PyDict(new HashMap<>()));
+        }
+        
         // Execute function body with interpreter context
         return callWithInterpreter(environment, interpreter);
-    }    /**
+    }
+    
+    private PyObject evaluateDefaultValue(ASTNode defaultExpr, Interpreter interpreter) {
+        if (interpreter == null) {
+            interpreter = new Interpreter();
+        }
+        
+        // Evaluate default value in the closure environment
+        Environment previousEnv = interpreter.getEnvironment();
+        interpreter.setEnvironment(closure);
+        
+        try {
+            return defaultExpr.accept(interpreter);
+        } finally {
+            interpreter.setEnvironment(previousEnv);
+        }
+    }/**
      * 使用指定的解释器调用函数，如果没有提供解释器则创建新的
      */
     public PyObject callWithInterpreter(Environment functionEnvironment, Interpreter interpreter) {

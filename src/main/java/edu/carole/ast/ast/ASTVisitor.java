@@ -19,10 +19,11 @@ public interface ASTVisitor<T> {
     T visitFunctionDef(FunctionDef function);
     T visitClassDef(ClassDef classDef);
     T visitReturnStatement(ReturnStatement statement);    T visitBreakStatement(BreakStatement statement);
-    T visitContinueStatement(ContinueStatement statement);
-    T visitPassStatement(PassStatement statement);
+    T visitContinueStatement(ContinueStatement statement);    T visitPassStatement(PassStatement statement);
     T visitTryExceptStatement(TryExceptStatement statement);
     T visitWithStatement(WithStatement statement);
+    T visitGlobalStatement(GlobalStatement statement);
+    T visitNonlocalStatement(NonlocalStatement statement);
 
     T visitBinaryExpression(BinaryExpression expression);
     T visitUnaryExpression(UnaryExpression expression);

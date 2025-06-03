@@ -71,14 +71,15 @@ public class ProjectEntry {
             run(source, interpreter);
         } catch (IOException e) {
             System.err.println("Error reading file: " + e.getMessage());
-            System.exit(74);
-        } catch (Exception e) {
-            System.err.println("Error: " + e.getMessage());
+            System.exit(74);        } catch (Exception e) {
+            System.err.println("Runtime Error: " + e.getMessage());
+            System.err.println("Exception type: " + e.getClass().getSimpleName());
+            System.err.println("Stack trace:");
+            e.printStackTrace();
             System.exit(70);
         }
     }
-    
-    /**
+      /**
      * 执行Python代码
      */
     private static void run(String source, Interpreter interpreter) {
@@ -95,7 +96,10 @@ public class ProjectEntry {
             interpreter.interpret(program);
             
         } catch (Exception e) {
-            System.err.println("Error: " + e.getMessage());
+            System.err.println("Runtime Error: " + e.getMessage());
+            System.err.println("Exception type: " + e.getClass().getSimpleName());
+            System.err.println("Stack trace:");
+            e.printStackTrace();
         }
     }
 }

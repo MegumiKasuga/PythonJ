@@ -13,6 +13,7 @@ import java.util.*;
  * 将token流转换为抽象语法树
  */
 public class Parser {
+
     private final List<Token> tokens;
     private int current = 0;
     
@@ -37,7 +38,9 @@ public class Parser {
         }
         
         return new Program(statements);
-    }    private ASTNode statement() {
+    }
+
+    private ASTNode statement() {
         try {
             // Check for decorators (must come before function and class definitions)
             if (match(Token.Type.AT)) return decoratorStatement();
@@ -48,21 +51,27 @@ public class Parser {
             if (match(Token.Type.DEF)) return functionDef();
             if (match(Token.Type.CLASS)) return classDef();
             if (match(Token.Type.RETURN)) return returnStatement();
-            if (match(Token.Type.BREAK)) return new BreakStatement();            if (match(Token.Type.CONTINUE)) return new ContinueStatement();
+            if (match(Token.Type.BREAK)) return new BreakStatement();
+            if (match(Token.Type.CONTINUE)) return new ContinueStatement();
             if (match(Token.Type.PASS)) return new PassStatement();
             if (match(Token.Type.TRY)) return tryExceptStatement();
             if (match(Token.Type.WITH)) return withStatement();
-            
+            if (match(Token.Type.GLOBAL)) return globalStatement();
+            if (match(Token.Type.NONLOCAL)) return nonlocalStatement();
+//            if (checkNext(Token.Type.LEFT_PAREN) && match(Token.Type.IDENTIFIER)) {
+//                return call();
+//            }
             return expressionStatement();
         } catch (Exception e) {
             // 错误恢复：跳到下一行
+            e.printStackTrace();
             synchronize();
             return null;
         }
     }
     
     private ASTNode ifStatement() {
-        ASTNode condition = expression();
+        ASTNode condition = expression(true);
         consume(Token.Type.COLON, "Expected ':' after if condition");
         consume(Token.Type.NEWLINE, "Expected newline after ':'");
         consume(Token.Type.INDENT, "Expected indentation after if statement");
@@ -79,58 +88,108 @@ public class Parser {
         
         return new IfStatement(condition, thenBranch, elseBranch);
     }
-    
+
     private ASTNode whileStatement() {
-        ASTNode condition = expression();
+        ASTNode condition = expression(true);
         consume(Token.Type.COLON, "Expected ':' after while condition");
         consume(Token.Type.NEWLINE, "Expected newline after ':'");
         consume(Token.Type.INDENT, "Expected indentation after while statement");
         
         List<ASTNode> body = block();
-        return new WhileStatement(condition, body);
+        List<ASTNode> elseBody = new ArrayList<>();
+        
+        // Check for else clause
+        if (match(Token.Type.ELSE)) {
+            consume(Token.Type.COLON, "Expected ':' after else");
+            consume(Token.Type.NEWLINE, "Expected newline after ':'");
+            consume(Token.Type.INDENT, "Expected indentation after else statement");
+            elseBody = block();
+        }
+        
+        return new WhileStatement(condition, body, elseBody);
     }
-    
+
     private ASTNode forStatement() {
         Token variable = consume(Token.Type.IDENTIFIER, "Expected variable name in for loop");
         consume(Token.Type.IN, "Expected 'in' in for loop");
-        ASTNode iterable = expression();
+        ASTNode iterable = expression(true);
         consume(Token.Type.COLON, "Expected ':' after for statement");
         consume(Token.Type.NEWLINE, "Expected newline after ':'");
         consume(Token.Type.INDENT, "Expected indentation after for statement");
         
         List<ASTNode> body = block();
-        return new ForStatement(variable.getValue(), iterable, body);
+        List<ASTNode> elseBody = new ArrayList<>();
+        
+        // Check for else clause
+        if (match(Token.Type.ELSE)) {
+            consume(Token.Type.COLON, "Expected ':' after else");
+            consume(Token.Type.NEWLINE, "Expected newline after ':'");
+            consume(Token.Type.INDENT, "Expected indentation after else statement");
+            elseBody = block();
+        }
+        return new ForStatement(variable.getValue(), iterable, body, elseBody);
     }
-      private ASTNode functionDef() {
+
+    private ASTNode functionDef() {
         Token name = consume(Token.Type.IDENTIFIER, "Expected function name");
         consume(Token.Type.LEFT_PAREN, "Expected '(' after function name");
         
-        List<String> parameters = new ArrayList<>();
-        String varargsParam = null;
+        List<FunctionParameter> parameters = new ArrayList<>();
         
         if (!check(Token.Type.RIGHT_PAREN)) {
             do {
-                // Check for *args syntax
-                if (match(Token.Type.MULTIPLY)) {
-                    Token varargsToken = consume(Token.Type.IDENTIFIER, "Expected parameter name after '*'");
-                    varargsParam = varargsToken.getValue();
-                    break; // *args must be last parameter for now
-                } else {
-                    Token param = consume(Token.Type.IDENTIFIER, "Expected parameter name");
-                    parameters.add(param.getValue());
-                }
+                FunctionParameter param = parseParameter();
+                parameters.add(param);
             } while (match(Token.Type.COMMA));
         }
         
         consume(Token.Type.RIGHT_PAREN, "Expected ')' after parameters");
+        
+        // 检查返回值类型提示
+        ASTNode returnTypeHint = null;
+        if (match(Token.Type.ARROW)) { // -> 
+            returnTypeHint = expression(false);
+        }
+        
         consume(Token.Type.COLON, "Expected ':' after function signature");
         consume(Token.Type.NEWLINE, "Expected newline after ':'");
         consume(Token.Type.INDENT, "Expected indentation after function definition");
         
         List<ASTNode> body = block();
-        return new FunctionDef(name.getValue(), parameters, body, varargsParam);
+        return new FunctionDef(name.getValue(), parameters, body, returnTypeHint);
     }
-      private ASTNode classDef() {
+    
+    private FunctionParameter parseParameter() {
+        FunctionParameter.ParameterType paramType = FunctionParameter.ParameterType.NORMAL;
+        
+        // 检查 **kwargs
+        if (match(Token.Type.POWER)) {
+            paramType = FunctionParameter.ParameterType.KWARGS;
+        }
+        // 检查 *args
+        else if (match(Token.Type.MULTIPLY)) {
+            paramType = FunctionParameter.ParameterType.VARARGS;
+        }
+        
+        Token paramToken = consume(Token.Type.IDENTIFIER, "Expected parameter name");
+        String paramName = paramToken.getValue();
+        
+        // 解析类型提示
+        ASTNode typeHint = null;
+        if (match(Token.Type.COLON)) {
+            typeHint = expression(false);
+        }
+        
+        // 解析默认值（只有普通参数可以有默认值）
+        ASTNode defaultValue = null;
+        if (paramType == FunctionParameter.ParameterType.NORMAL && match(Token.Type.ASSIGN)) {
+            defaultValue = expression(false);
+        }
+        
+        return new FunctionParameter(paramName, paramType, defaultValue, typeHint);
+    }
+
+    private ASTNode classDef() {
         Token name = consume(Token.Type.IDENTIFIER, "Expected class name");
         
         List<String> baseClasses = new ArrayList<>();
@@ -153,13 +212,17 @@ public class Parser {
         List<ASTNode> body = block();
         return new ClassDef(name.getValue(), baseClasses, body);
     }
-      private ASTNode returnStatement() {
+
+
+    private ASTNode returnStatement() {
         ASTNode value = null;
         if (!check(Token.Type.NEWLINE) && !isAtEnd()) {
-            value = tupleExpression(); // Use tupleExpression to support comma-separated returns
+            value = tupleExpression(true); // Use tupleExpression to support comma-separated returns
         }
         return new ReturnStatement(value);
-    }      private List<ASTNode> block() {
+    }
+
+    private List<ASTNode> block() {
         List<ASTNode> statements = new ArrayList<>();
         
         while (!check(Token.Type.DEDENT) && !isAtEnd()) {
@@ -179,8 +242,10 @@ public class Parser {
         }
         
         return statements;
-    }    private ASTNode expressionStatement() {
-        ASTNode expr = assignment();
+    }
+
+    private ASTNode expressionStatement() {
+        ASTNode expr = assignment(true);
           // If assignment() returned a statement (like AssignmentStatement), don't wrap it
         if (expr instanceof AssignmentStatement || 
             expr instanceof CompoundAssignmentStatement ||
@@ -191,23 +256,22 @@ public class Parser {
         }
         
         return new ExpressionStatement(expr);
-    }private ASTNode assignment() {
-        ASTNode expr = tupleExpression();
+    }
+
+    private ASTNode assignment(boolean greedy) {
+        ASTNode expr = tupleExpression(greedy);
         
         if (match(Token.Type.ASSIGN)) {
-            ASTNode value = assignment();
+            ASTNode value = assignment(greedy);
               if (expr instanceof Identifier) {
                 return new AssignmentStatement(((Identifier) expr).getName(), value);
-            } else if (expr instanceof AttributeExpression) {
-                AttributeExpression attrExpr = (AttributeExpression) expr;
-                return new AttributeAssignmentStatement(attrExpr.getObject(), attrExpr.getAttribute(), value);
-            } else if (expr instanceof IndexExpression) {
-                IndexExpression indexExpr = (IndexExpression) expr;
-                return new IndexAssignmentStatement(indexExpr.getObject(), indexExpr.getIndex(), value);
-            } else if (expr instanceof TupleLiteral) {
+            } else if (expr instanceof AttributeExpression attrExpr) {
+                  return new AttributeAssignmentStatement(attrExpr.getObject(), attrExpr.getAttribute(), value);
+            } else if (expr instanceof IndexExpression indexExpr) {
+                  return new IndexAssignmentStatement(indexExpr.getObject(), indexExpr.getIndex(), value);
+            } else if (expr instanceof TupleLiteral tuple) {
                 // Handle tuple unpacking assignment: a, b, c = expression
-                TupleLiteral tuple = (TupleLiteral) expr;
-                List<String> targets = new ArrayList<>();
+                  List<String> targets = new ArrayList<>();
                 for (ASTNode element : tuple.getElements()) {
                     if (!(element instanceof Identifier)) {
                         throw new RuntimeException("Invalid tuple unpacking target");
@@ -224,50 +288,24 @@ public class Parser {
                           Token.Type.LEFT_SHIFT_ASSIGN, Token.Type.RIGHT_SHIFT_ASSIGN)) {
             // Handle compound assignments
             Token.Type operatorType = previous().getType();
-            ASTNode value = assignment();
+            ASTNode value = assignment(greedy);
             
             if (expr instanceof Identifier) {
-                CompoundAssignmentStatement.Operator operator;
-                switch (operatorType) {
-                    case PLUS_ASSIGN:
-                        operator = CompoundAssignmentStatement.Operator.PLUS_ASSIGN;
-                        break;
-                    case MINUS_ASSIGN:
-                        operator = CompoundAssignmentStatement.Operator.MINUS_ASSIGN;
-                        break;
-                    case MULTIPLY_ASSIGN:
-                        operator = CompoundAssignmentStatement.Operator.MULTIPLY_ASSIGN;
-                        break;
-                    case DIVIDE_ASSIGN:
-                        operator = CompoundAssignmentStatement.Operator.DIVIDE_ASSIGN;
-                        break;
-                    case MODULO_ASSIGN:
-                        operator = CompoundAssignmentStatement.Operator.MODULO_ASSIGN;
-                        break;
-                    case POWER_ASSIGN:
-                        operator = CompoundAssignmentStatement.Operator.POWER_ASSIGN;
-                        break;
-                    case FLOOR_DIVIDE_ASSIGN:
-                        operator = CompoundAssignmentStatement.Operator.FLOOR_DIVIDE_ASSIGN;
-                        break;
-                    case AND_ASSIGN:
-                        operator = CompoundAssignmentStatement.Operator.AND_ASSIGN;
-                        break;
-                    case OR_ASSIGN:
-                        operator = CompoundAssignmentStatement.Operator.OR_ASSIGN;
-                        break;
-                    case XOR_ASSIGN:
-                        operator = CompoundAssignmentStatement.Operator.XOR_ASSIGN;
-                        break;
-                    case LEFT_SHIFT_ASSIGN:
-                        operator = CompoundAssignmentStatement.Operator.LEFT_SHIFT_ASSIGN;
-                        break;
-                    case RIGHT_SHIFT_ASSIGN:
-                        operator = CompoundAssignmentStatement.Operator.RIGHT_SHIFT_ASSIGN;
-                        break;
-                    default:
-                        throw new RuntimeException("Unknown compound assignment operator: " + operatorType);
-                }
+                CompoundAssignmentStatement.Operator operator = switch (operatorType) {
+                    case PLUS_ASSIGN -> CompoundAssignmentStatement.Operator.PLUS_ASSIGN;
+                    case MINUS_ASSIGN -> CompoundAssignmentStatement.Operator.MINUS_ASSIGN;
+                    case MULTIPLY_ASSIGN -> CompoundAssignmentStatement.Operator.MULTIPLY_ASSIGN;
+                    case DIVIDE_ASSIGN -> CompoundAssignmentStatement.Operator.DIVIDE_ASSIGN;
+                    case MODULO_ASSIGN -> CompoundAssignmentStatement.Operator.MODULO_ASSIGN;
+                    case POWER_ASSIGN -> CompoundAssignmentStatement.Operator.POWER_ASSIGN;
+                    case FLOOR_DIVIDE_ASSIGN -> CompoundAssignmentStatement.Operator.FLOOR_DIVIDE_ASSIGN;
+                    case AND_ASSIGN -> CompoundAssignmentStatement.Operator.AND_ASSIGN;
+                    case OR_ASSIGN -> CompoundAssignmentStatement.Operator.OR_ASSIGN;
+                    case XOR_ASSIGN -> CompoundAssignmentStatement.Operator.XOR_ASSIGN;
+                    case LEFT_SHIFT_ASSIGN -> CompoundAssignmentStatement.Operator.LEFT_SHIFT_ASSIGN;
+                    case RIGHT_SHIFT_ASSIGN -> CompoundAssignmentStatement.Operator.RIGHT_SHIFT_ASSIGN;
+                    default -> throw new RuntimeException("Unknown compound assignment operator: " + operatorType);
+                };
                 return new CompoundAssignmentStatement(((Identifier) expr).getName(), operator, value);
             } else {
                 throw new RuntimeException("Invalid compound assignment target - must be identifier");
@@ -276,25 +314,28 @@ public class Parser {
         
         return expr;
     }
-      private ASTNode tupleExpression() {
+
+    private ASTNode tupleExpression(boolean greedy) {
         ASTNode expr = or();
         
         // Check if this is a tuple (comma-separated expressions)
         if (check(Token.Type.COMMA)) {
             List<ASTNode> elements = new ArrayList<>();
             elements.add(expr);
-            
-            while (match(Token.Type.COMMA)) {
-                // Handle trailing comma case (empty after comma)
-                if (check(Token.Type.ASSIGN) || check(Token.Type.NEWLINE) || check(Token.Type.RIGHT_PAREN) || isAtEnd()) {
-                    break;
+
+            if (greedy) {
+                while (match(Token.Type.COMMA)) {
+                    // Handle trailing comma case (empty after comma)
+                    if (check(Token.Type.ASSIGN) || check(Token.Type.NEWLINE) || check(Token.Type.RIGHT_PAREN) || isAtEnd()) {
+                        break;
+                    }
+                    elements.add(or());
                 }
-                elements.add(or());
             }
             
             // Create a tuple if we have more than one element OR if there's a trailing comma
             // The trailing comma case is important for single-element tuple unpacking: "a, = ..."
-            return new TupleLiteral(elements);
+            return greedy ? new TupleLiteral(elements) : elements.get(0);
         }
         
         return expr;
@@ -310,7 +351,9 @@ public class Parser {
         
         return expr;
     }
-      private ASTNode and() {
+
+
+    private ASTNode and() {
         ASTNode expr = bitwiseOr();
         
         while (match(Token.Type.AND)) {
@@ -367,7 +410,9 @@ public class Parser {
         
         return expr;
     }
-      private ASTNode equality() {
+
+
+    private ASTNode equality() {
         ASTNode expr = comparison();
         
         while (match(Token.Type.EQUAL, Token.Type.NOT_EQUAL)) {
@@ -387,16 +432,15 @@ public class Parser {
         while (match(Token.Type.GREATER, Token.Type.GREATER_EQUAL, Token.Type.LESS, Token.Type.LESS_EQUAL, Token.Type.IN, Token.Type.IS)) {
             Token operator = previous();
             ASTNode right = term();
-            BinaryExpression.Operator op;
-            switch (operator.getType()) {
-                case GREATER: op = BinaryExpression.Operator.GREATER; break;
-                case GREATER_EQUAL: op = BinaryExpression.Operator.GREATER_EQUAL; break;
-                case LESS: op = BinaryExpression.Operator.LESS; break;
-                case LESS_EQUAL: op = BinaryExpression.Operator.LESS_EQUAL; break;
-                case IN: op = BinaryExpression.Operator.IN; break;
-                case IS: op = BinaryExpression.Operator.IS; break;
-                default: throw new RuntimeException("Unknown comparison operator");
-            }
+            BinaryExpression.Operator op = switch (operator.getType()) {
+                case GREATER -> BinaryExpression.Operator.GREATER;
+                case GREATER_EQUAL -> BinaryExpression.Operator.GREATER_EQUAL;
+                case LESS -> BinaryExpression.Operator.LESS;
+                case LESS_EQUAL -> BinaryExpression.Operator.LESS_EQUAL;
+                case IN -> BinaryExpression.Operator.IN;
+                case IS -> BinaryExpression.Operator.IS;
+                default -> throw new RuntimeException("Unknown comparison operator");
+            };
             expr = new BinaryExpression(expr, op, right);
         }
         
@@ -416,20 +460,21 @@ public class Parser {
         
         return expr;
     }
-      private ASTNode factor() {
+
+
+    private ASTNode factor() {
         ASTNode expr = power();
         
         while (match(Token.Type.DIVIDE, Token.Type.MULTIPLY, Token.Type.MODULO, Token.Type.FLOOR_DIVIDE)) {
             Token operator = previous();
             ASTNode right = power();
-            BinaryExpression.Operator op;
-            switch (operator.getType()) {
-                case DIVIDE: op = BinaryExpression.Operator.DIVIDE; break;
-                case MULTIPLY: op = BinaryExpression.Operator.MULTIPLY; break;
-                case MODULO: op = BinaryExpression.Operator.MODULO; break;
-                case FLOOR_DIVIDE: op = BinaryExpression.Operator.FLOOR_DIVIDE; break;
-                default: throw new RuntimeException("Unknown factor operator");
-            }
+            BinaryExpression.Operator op = switch (operator.getType()) {
+                case DIVIDE -> BinaryExpression.Operator.DIVIDE;
+                case MULTIPLY -> BinaryExpression.Operator.MULTIPLY;
+                case MODULO -> BinaryExpression.Operator.MODULO;
+                case FLOOR_DIVIDE -> BinaryExpression.Operator.FLOOR_DIVIDE;
+                default -> throw new RuntimeException("Unknown factor operator");
+            };
             expr = new BinaryExpression(expr, op, right);
         }
         
@@ -480,20 +525,54 @@ public class Parser {
         
         return expr;
     }
-      private ASTNode finishCall(ASTNode callee) {
-        List<ASTNode> arguments = new ArrayList<>();
+    private ASTNode finishCall(ASTNode callee) {
+        List<ASTNode> positionalArguments = new ArrayList<>();
+        Map<String, ASTNode> keywordArguments = new HashMap<>();
+        boolean hasKeywordArg = false;  // 标记是否已经遇到了关键字参数
+        
+        System.out.println("DEBUG PARSER: 开始解析函数调用参数");
         
         if (!check(Token.Type.RIGHT_PAREN)) {
-            do {
-                // Use or() instead of expression() to avoid tuple parsing
-                arguments.add(or());
+            do {                // 检查是否为关键字参数 (name=value)
+                if (check(Token.Type.IDENTIFIER) && checkNext(Token.Type.ASSIGN)) {
+                    System.out.println("DEBUG PARSER: 发现可能的关键字参数");
+                    System.out.println("DEBUG PARSER: 当前token: " + peek().getType() + " 值: " + peek().getValue());
+                    System.out.println("DEBUG PARSER: 下一个token: " + tokens.get(current + 1).getType() + " 值: " + tokens.get(current + 1).getValue());
+                    
+                    hasKeywordArg = true;
+                    String name = consume(Token.Type.IDENTIFIER, "Expected parameter name").getValue();
+                    System.out.println("DEBUG PARSER: 参数名: " + name);
+                    
+                    // 这里检查是否是赋值符号ASSIGN (=)，而不是比较符号EQUAL(==)
+                    System.out.println("DEBUG PARSER: 现在检查等号, 当前token: " + peek().getType() + " 值: " + peek().getValue());
+                    consume(Token.Type.ASSIGN, "Expected '=' after parameter name");
+                    
+                    // 解析参数值
+                    System.out.println("DEBUG PARSER: 开始解析参数值");
+                    ASTNode value = or();
+                    keywordArguments.put(name, value);
+                    System.out.println("DEBUG PARSER: 关键字参数解析完成: " + name + "=...");
+                } else {
+                    // 不允许位置参数出现在关键字参数之后
+                    if (hasKeywordArg) {
+                        throw error("Positional argument follows keyword argument");
+                    }
+                    
+                    // 位置参数
+                    System.out.println("DEBUG PARSER: 解析位置参数");
+                    positionalArguments.add(or());
+                    System.out.println("DEBUG PARSER: 位置参数解析完成");
+                }
             } while (match(Token.Type.COMMA));
         }
         
+        System.out.println("DEBUG PARSER: 参数解析完成, 现在检查右括号");
+        System.out.println("DEBUG PARSER: 当前token: " + peek().getType() + " 值: " + peek().getValue());
         consume(Token.Type.RIGHT_PAREN, "Expected ')' after arguments");
-        return new CallExpression(callee, arguments);
+        return new CallExpression(callee, positionalArguments, keywordArguments);
     }
-      private ASTNode primary() {
+
+    private ASTNode primary() {
         if (match(Token.Type.TRUE)) return new Literal(true);
         if (match(Token.Type.FALSE)) return new Literal(false);
         if (match(Token.Type.NONE)) return new Literal(null);
@@ -526,7 +605,9 @@ public class Parser {
         
         if (match(Token.Type.IDENTIFIER)) {
             return new Identifier(previous().getValue());
-        }        if (match(Token.Type.LEFT_PAREN)) {
+        }
+
+        if (match(Token.Type.LEFT_PAREN)) {
             // Handle both grouped expressions, tuple literals, and generator expressions
             if (check(Token.Type.RIGHT_PAREN)) {
                 // Empty tuple: ()
@@ -564,9 +645,9 @@ public class Parser {
                 return first;
             }
         }
-          if (match(Token.Type.LEFT_BRACKET)) {
+        if (match(Token.Type.LEFT_BRACKET)) {
             if (check(Token.Type.RIGHT_BRACKET)) {
-                // Empty list
+            // Empty list
                 consume(Token.Type.RIGHT_BRACKET, "Expected ']' after '['");
                 return new ListLiteral(new ArrayList<>());
             }
@@ -574,7 +655,8 @@ public class Parser {
             ASTNode result = parseListOrComprehension();
             consume(Token.Type.RIGHT_BRACKET, "Expected ']' after list elements");
             return result;
-        }        if (match(Token.Type.LEFT_BRACE)) {
+        }
+        if (match(Token.Type.LEFT_BRACE)) {
             // Handle empty braces as empty dictionary
             if (check(Token.Type.RIGHT_BRACE)) {
                 consume(Token.Type.RIGHT_BRACE, "Expected '}' after empty braces");
@@ -621,9 +703,11 @@ public class Parser {
         throw new RuntimeException("Expected expression at " + peek().getLine());
     }
     
-    private ASTNode expression() {
-        return assignment();
-    }    private boolean match(Token.Type... types) {
+    private ASTNode expression(boolean greedy) {
+        return assignment(greedy);
+    }
+
+    private boolean match(Token.Type... types) {
         for (Token.Type type : types) {
             if (check(type)) {
                 advance();
@@ -636,6 +720,11 @@ public class Parser {
     private boolean check(Token.Type type) {
         if (isAtEnd()) return false;
         return peek().getType() == type;
+    }
+    
+    private boolean checkNext(Token.Type type) {
+        if (current + 1 >= tokens.size()) return false;
+        return tokens.get(current + 1).getType() == type;
     }
     
     private Token advance() {
@@ -658,6 +747,10 @@ public class Parser {
     private Token consume(Token.Type type, String message) {
         if (check(type)) return advance();
         throw new RuntimeException(message + " at line " + peek().getLine());
+    }
+
+    private RuntimeException error(String message) {
+        return new RuntimeException(message + " at line " + peek().getLine());
     }
     
     private void synchronize() {
@@ -728,12 +821,12 @@ public class Parser {
         if (exceptClauses.isEmpty() && finallyBody.isEmpty()) {
             throw new RuntimeException("Expected at least one except or finally clause");
         }
-          return new TryExceptStatement(tryBody, exceptClauses, finallyBody);
+        return new TryExceptStatement(tryBody, exceptClauses, finallyBody);
     }
     
     private ASTNode withStatement() {
         // with context_expression as target_variable:
-        ASTNode contextExpression = expression();
+        ASTNode contextExpression = expression(true);
         String targetVariable = null;
         
         // Optional 'as' variable
@@ -748,6 +841,30 @@ public class Parser {
         
         List<ASTNode> body = block();
         return new WithStatement(contextExpression, targetVariable, body);
+    }
+    
+    private ASTNode globalStatement() {
+        List<String> variables = new ArrayList<>();
+        
+        // Parse variable names: global x, y, z
+        do {
+            Token variable = consume(Token.Type.IDENTIFIER, "Expected variable name after 'global'");
+            variables.add(variable.getValue());
+        } while (match(Token.Type.COMMA));
+        
+        return new GlobalStatement(variables);
+    }
+    
+    private ASTNode nonlocalStatement() {
+        List<String> variables = new ArrayList<>();
+        
+        // Parse variable names: nonlocal x, y, z
+        do {
+            Token variable = consume(Token.Type.IDENTIFIER, "Expected variable name after 'nonlocal'");
+            variables.add(variable.getValue());
+        } while (match(Token.Type.COMMA));
+        
+        return new NonlocalStatement(variables);
     }
     
     private ASTNode lambdaExpression() {
@@ -781,7 +898,8 @@ public class Parser {
             return new SuperExpression(className.getValue());
         }
     }
-      private ASTNode parseListOrComprehension() {
+
+    private ASTNode parseListOrComprehension() {
         // Parse first element
         ASTNode firstElement = or();
         
@@ -864,9 +982,11 @@ public class Parser {
         }
         
         return new GeneratorExpression(element, clauses);
-    }    private ASTNode decoratorStatement() {
+    }
+
+    private ASTNode decoratorStatement() {
         // Parse the decorator expression (can be a simple identifier or a call)
-        ASTNode expression = expression();
+        ASTNode expression = expression(true);
         
         consume(Token.Type.NEWLINE, "Expected newline after decorator");
         
@@ -888,11 +1008,13 @@ public class Parser {
         
         // Create a decorator node
         return new Decorator(expression, decorated);
-    }    /**
+    }
+
+    /**
      * Parse a single expression (public method for F-string evaluation)
      */
     public ASTNode parseExpression() {
-        return expression();
+        return expression(true);
     }
     
     /**
@@ -909,13 +1031,13 @@ public class Parser {
             advance(); // consume :
             
             if (!check(Token.Type.RIGHT_BRACKET) && !check(Token.Type.COLON)) {
-                stop = expression();
+                stop = expression(true);
             }
             
             // Check for step part
             if (match(Token.Type.COLON)) {
                 if (!check(Token.Type.RIGHT_BRACKET)) {
-                    step = expression();
+                    step = expression(true);
                 }
             }
             
@@ -923,7 +1045,7 @@ public class Parser {
         }
         
         // Parse first expression
-        start = expression();
+        start = expression(true);
         
         // Check if this is a slice
         if (match(Token.Type.COLON)) {
@@ -931,13 +1053,13 @@ public class Parser {
             
             // Parse stop if present
             if (!check(Token.Type.RIGHT_BRACKET) && !check(Token.Type.COLON)) {
-                stop = expression();
+                stop = expression(true);
             }
             
             // Check for step part
             if (match(Token.Type.COLON)) {
                 if (!check(Token.Type.RIGHT_BRACKET)) {
-                    step = expression();
+                    step = expression(true);
                 }
             }
             

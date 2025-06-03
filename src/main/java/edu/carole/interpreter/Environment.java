@@ -125,4 +125,47 @@ public class Environment {
         }
         return null;
     }
+    
+    /**
+     * 获取全局环境（遍历到最顶层）
+     */
+    public Environment getGlobal() {
+        Environment current = this;
+        while (current.enclosing != null) {
+            current = current.enclosing;
+        }
+        return current;
+    }
+    
+    /**
+     * 在指定环境中定义变量（用于global和nonlocal）
+     */
+    public void defineInEnvironment(String name, PyObject value, Environment targetEnv) {
+        targetEnv.define(name, value);
+    }
+    
+    /**
+     * 在指定环境中赋值变量（用于global和nonlocal）
+     */
+    public void assignInEnvironment(String name, PyObject value, Environment targetEnv) {
+        if (targetEnv.values.containsKey(name)) {
+            targetEnv.values.put(name, value);
+        } else {
+            targetEnv.define(name, value);
+        }
+    }
+    
+    /**
+     * 获取外层非局部环境中的变量（用于nonlocal）
+     */
+    public Environment findNonlocalEnvironment(String name) {
+        Environment current = this.enclosing;
+        while (current != null) {
+            if (current.values.containsKey(name)) {
+                return current;
+            }
+            current = current.enclosing;
+        }
+        return null;
+    }
 }

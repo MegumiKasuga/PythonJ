@@ -7,6 +7,10 @@ import edu.carole.ast.expressions.*;
 import edu.carole.runtime.*;
 
 import java.util.*;
+import java.util.Set;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.HashMap;
 
 /**
  * Python解释器
@@ -14,6 +18,8 @@ import java.util.*;
 public class Interpreter implements ASTVisitor<PyObject> {
     private Environment globals;
     private Environment environment;
+    private Set<String> globalVariables = new HashSet<>(); // Track variables declared as global in current scope
+    private Map<String, Environment> nonlocalVariables = new HashMap<>(); // Track nonlocal variables and their target environments
     
     public Interpreter() {
         this.globals = BuiltinFunctions.createGlobalEnvironment();
@@ -83,11 +89,24 @@ public class Interpreter implements ASTVisitor<PyObject> {
         }
         return result;
     }
-    
-    @Override
+      @Override
     public PyObject visitAssignmentStatement(AssignmentStatement statement) {
         PyObject value = statement.getValue().accept(this);
-        environment.define(statement.getTarget(), value);
+        String target = statement.getTarget();
+        
+        // Check if this variable is declared as global
+        if (globalVariables.contains(target)) {
+            globals.define(target, value);
+        }        // Check if this variable is declared as nonlocal
+        else if (nonlocalVariables.containsKey(target)) {
+            Environment targetEnv = nonlocalVariables.get(target);
+            targetEnv.define(target, value);
+        }
+        // Regular local assignment
+        else {
+            environment.define(target, value);
+        }
+        
         return value;
     }
 
@@ -138,11 +157,18 @@ public class Interpreter implements ASTVisitor<PyObject> {
                 newValue = callMagicMethod(currentValue, "__rshift__", rightValue, () -> rightShift(currentValue, rightValue));
                 break;
             default:
-                throw new RuntimeException("Unknown compound assignment operator: " + statement.getOperator());
+                throw new RuntimeException("Unknown compound assignment operator: " + statement.getOperator());        }
+        
+        // Store the new value respecting global/nonlocal declarations
+        String target = statement.getTarget();
+        if (globalVariables.contains(target)) {
+            globals.define(target, newValue);        } else if (nonlocalVariables.containsKey(target)) {
+            Environment targetEnv = nonlocalVariables.get(target);
+            targetEnv.define(target, newValue);
+        }else {
+            environment.define(target, newValue);
         }
         
-        // Store the new value
-        environment.define(statement.getTarget(), newValue);
         return newValue;
     }
 
@@ -236,9 +262,10 @@ public class Interpreter implements ASTVisitor<PyObject> {
         
         return PyNone.INSTANCE;
     }
-    
-    @Override
+      @Override
     public PyObject visitWhileStatement(WhileStatement statement) {
+        boolean brokeOut = false;
+        
         try {
             while (statement.getCondition().accept(this).isTruthy()) {
                 try {
@@ -250,16 +277,24 @@ public class Interpreter implements ASTVisitor<PyObject> {
                 }
             }
         } catch (BreakException e) {
-            // 正常退出循环
+            // 通过break退出循环
+            brokeOut = true;
+        }
+        
+        // 只有在没有通过break退出循环时才执行else块
+        if (!brokeOut && !statement.getElseBody().isEmpty()) {
+            for (ASTNode stmt : statement.getElseBody()) {
+                stmt.accept(this);
+            }
         }
         
         return PyNone.INSTANCE;
     }
-    
-    @Override
+      @Override
     public PyObject visitForStatement(ForStatement statement) {
         PyObject iterable = statement.getIterable().accept(this);
         Iterator<PyObject> iterator = iterable.iterator();
+        boolean brokeOut = false;
         
         try {
             while (iterator.hasNext()) {
@@ -275,19 +310,24 @@ public class Interpreter implements ASTVisitor<PyObject> {
                 }
             }
         } catch (BreakException e) {
-            // 正常退出循环
+            // 通过break退出循环
+            brokeOut = true;
         }
         
-        return PyNone.INSTANCE;
-    }
-      @Override
+        // 只有在没有通过break退出循环时才执行else块
+        if (!brokeOut && !statement.getElseBody().isEmpty()) {
+            for (ASTNode stmt : statement.getElseBody()) {
+                stmt.accept(this);
+            }
+        }
+        
+        return PyNone.INSTANCE;    }    @Override
     public PyObject visitFunctionDef(FunctionDef function) {
         PyFunction pyFunction = new PyFunction(
             function.getName(),
             function.getParameters(),
             function.getBody(),
-            environment,
-            function.getVarargsParam()
+            environment
         );
         environment.define(function.getName(), pyFunction);
         return pyFunction;
@@ -314,15 +354,13 @@ public class Interpreter implements ASTVisitor<PyObject> {
         try {
             this.environment = classEnvironment;
               // 执行类体
-            for (ASTNode statement : classDef.getBody()) {
-                if (statement instanceof FunctionDef) {
+            for (ASTNode statement : classDef.getBody()) {                if (statement instanceof FunctionDef) {
                     FunctionDef method = (FunctionDef) statement;
                     PyFunction pyMethod = new PyFunction(
                         method.getName(),
                         method.getParameters(),
                         method.getBody(),
-                        classEnvironment,
-                        method.getVarargsParam()
+                        classEnvironment
                     );
                     methods.put(method.getName(), pyMethod);
                 } else {
@@ -356,9 +394,30 @@ public class Interpreter implements ASTVisitor<PyObject> {
     public PyObject visitContinueStatement(ContinueStatement statement) {
         throw new ContinueException();
     }
+      @Override
+    public PyObject visitPassStatement(PassStatement statement) {
+        return PyNone.INSTANCE;
+    }
     
     @Override
-    public PyObject visitPassStatement(PassStatement statement) {
+    public PyObject visitGlobalStatement(GlobalStatement statement) {
+        // Mark variables as global in the current scope
+        for (String variable : statement.getVariables()) {
+            globalVariables.add(variable);
+        }
+        return PyNone.INSTANCE;
+    }
+    
+    @Override
+    public PyObject visitNonlocalStatement(NonlocalStatement statement) {
+        // Mark variables as nonlocal and find their target environments
+        for (String variable : statement.getVariables()) {
+            Environment nonlocalEnv = environment.findNonlocalEnvironment(variable);
+            if (nonlocalEnv == null) {
+                throw new RuntimeException("no binding for nonlocal '" + variable + "' found");
+            }
+            nonlocalVariables.put(variable, nonlocalEnv);
+        }
         return PyNone.INSTANCE;
     }
     
@@ -571,13 +630,27 @@ public class Interpreter implements ASTVisitor<PyObject> {
     public PyObject visitCallExpression(CallExpression expression) {
         PyObject function = expression.getFunction().accept(this);
         
-        List<PyObject> arguments = new ArrayList<>();
-        for (ASTNode arg : expression.getArguments()) {
-            arguments.add(arg.accept(this));
+        // 处理位置参数
+        List<PyObject> positionalArguments = new ArrayList<>();
+        for (ASTNode arg : expression.getPositionalArguments()) {
+            positionalArguments.add(arg.accept(this));
         }
         
-        // Use the context-aware call method to maintain interpreter context
-        return function.call(arguments, this);
+        // 处理关键字参数
+        Map<String, PyObject> keywordArguments = new HashMap<>();
+        if (expression.hasKeywordArguments()) {
+            for (Map.Entry<String, ASTNode> entry : expression.getKeywordArguments().entrySet()) {
+                keywordArguments.put(entry.getKey(), entry.getValue().accept(this));
+            }
+        }
+        
+        // 调用支持关键字参数的call方法
+        if (!keywordArguments.isEmpty()) {
+            return function.call(positionalArguments, keywordArguments, this);
+        } else {
+            // 保持向后兼容
+            return function.call(positionalArguments, this);
+        }
     }
     
     @Override
@@ -617,11 +690,24 @@ public class Interpreter implements ASTVisitor<PyObject> {
         // Return a slice object (we could create a PySlice class for this)
         return new PySlice(start, stop, step);
     }
-    
-    @Override
+      @Override
     public PyObject visitIdentifier(Identifier identifier) {
-        return environment.get(identifier.getName());
-    }    @Override
+        String name = identifier.getName();
+        
+        // Check if this variable is declared as global
+        if (globalVariables.contains(name)) {
+            return globals.get(name);
+        }
+        // Check if this variable is declared as nonlocal
+        else if (nonlocalVariables.containsKey(name)) {
+            Environment targetEnv = nonlocalVariables.get(name);
+            return targetEnv.get(name);
+        }
+        // Regular variable access (follows normal scope resolution)
+        else {
+            return environment.get(name);
+        }
+    }@Override
     public PyObject visitLiteral(Literal literal) {
         Object value = literal.getValue();
         

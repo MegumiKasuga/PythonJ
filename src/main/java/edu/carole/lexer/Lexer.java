@@ -29,15 +29,22 @@ public class Lexer {
         map.put("continue", Token.Type.CONTINUE);
         map.put("and", Token.Type.AND);
         map.put("or", Token.Type.OR);
-        map.put("not", Token.Type.NOT);        map.put("is", Token.Type.IS);
+        map.put("not", Token.Type.NOT);
+        map.put("is", Token.Type.IS);
         map.put("as", Token.Type.AS);
         map.put("True", Token.Type.TRUE);
-        map.put("False", Token.Type.FALSE);        map.put("None", Token.Type.NONE);        map.put("pass", Token.Type.PASS);        map.put("try", Token.Type.TRY);
+        map.put("False", Token.Type.FALSE);
+        map.put("None", Token.Type.NONE);
+        map.put("pass", Token.Type.PASS);
+        map.put("try", Token.Type.TRY);
         map.put("except", Token.Type.EXCEPT);
-        map.put("finally", Token.Type.FINALLY);        map.put("lambda", Token.Type.LAMBDA);
+        map.put("finally", Token.Type.FINALLY);
+        map.put("lambda", Token.Type.LAMBDA);
         map.put("yield", Token.Type.YIELD);
         map.put("with", Token.Type.WITH);
         map.put("super", Token.Type.SUPER);
+        map.put("global", Token.Type.GLOBAL);
+        map.put("nonlocal", Token.Type.NONLOCAL);
         KEYWORDS = Collections.unmodifiableMap(map);
     }
     
@@ -116,14 +123,15 @@ public class Lexer {
                 } else {
                     addToken(Token.Type.PLUS, "+");
                 }
-                break;
-            case '-':
+                break;            case '-':
                 if (match('=')) {
                     addToken(Token.Type.MINUS_ASSIGN, "-=");
+                } else if (match('>')) {
+                    addToken(Token.Type.ARROW, "->");
                 } else {
                     addToken(Token.Type.MINUS, "-");
                 }
-                break;            case '*':
+                break;case '*':
                 if (match('*')) {
                     if (match('=')) {
                         addToken(Token.Type.POWER_ASSIGN, "**=");
