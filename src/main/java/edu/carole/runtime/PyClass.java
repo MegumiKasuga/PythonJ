@@ -64,8 +64,7 @@ public class PyClass extends PyObject {
     public String toString() { return "<class '" + name + "'>"; }
     
     @Override
-    public boolean isTruthy() { return true; }
-      @Override
+    public boolean isTruthy() { return true; }      @Override
     public PyObject getAttribute(String attributeName) {
         // 按MRO顺序查找方法
         for (PyClass cls : mro) {
@@ -75,6 +74,21 @@ public class PyClass extends PyObject {
             }
         }
         throw new RuntimeException("type object '" + name + "' has no attribute '" + attributeName + "'");
+    }
+    
+    /**
+     * Finds a method in this class or its parent classes
+     * Does not throw exception if not found
+     */
+    public PyObject findMethod(String methodName) {
+        // Look in the method resolution order
+        for (PyClass cls : mro) {
+            PyObject method = cls.methods.get(methodName);
+            if (method != null) {
+                return method;
+            }
+        }
+        return null;
     }
     
     @Override
@@ -101,19 +115,6 @@ public class PyClass extends PyObject {
         }
         
         return instance;
-    }
-    
-    /**
-     * 按MRO查找方法
-     */
-    public PyObject findMethod(String methodName) {
-        for (PyClass cls : mro) {
-            PyObject method = cls.methods.get(methodName);
-            if (method != null) {
-                return method;
-            }
-        }
-        return null;
     }
     
     public String getName() { return name; }

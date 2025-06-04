@@ -23,8 +23,7 @@ public class PyInstance extends PyObject {
     }
     
     @Override
-    public boolean isTruthy() { return true; }
-      @Override
+    public boolean isTruthy() { return true; }      @Override
     public PyObject getAttribute(String name) {
         // 首先检查实例属性
         PyObject attribute = attributes.get(name);
@@ -35,7 +34,11 @@ public class PyInstance extends PyObject {
         // 然后按MRO顺序检查类方法
         PyObject method = pyClass.findMethod(name);
         if (method != null) {
-            // 绑定方法
+            // If it's a function, bind it to this instance
+            if (method instanceof PyFunction) {
+                return ((PyFunction) method).bindToInstance(this);
+            }
+            // For other method types (including decorated methods)
             return new PyBoundMethod(this, method);
         }
         

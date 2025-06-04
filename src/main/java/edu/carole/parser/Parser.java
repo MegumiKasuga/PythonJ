@@ -153,12 +153,15 @@ public class Parser {
         
         consume(Token.Type.COLON, "Expected ':' after function signature");
         consume(Token.Type.NEWLINE, "Expected newline after ':'");
+        while (check(Token.Type.NEWLINE)) {
+            advance(); // 跳过多余的换行符
+        }
         consume(Token.Type.INDENT, "Expected indentation after function definition");
         
         List<ASTNode> body = block();
         return new FunctionDef(name.getValue(), parameters, body, returnTypeHint);
     }
-    
+
     private FunctionParameter parseParameter() {
         FunctionParameter.ParameterType paramType = FunctionParameter.ParameterType.NORMAL;
         
@@ -173,6 +176,16 @@ public class Parser {
         
         Token paramToken = consume(Token.Type.IDENTIFIER, "Expected parameter name");
         String paramName = paramToken.getValue();
+        
+        // For special parameter types, modify the parameter name to include the prefix
+        // This will help with runtime identification
+        if (paramType == FunctionParameter.ParameterType.VARARGS) {
+            // Mark it as a varargs parameter with the prefix, but don't change the actual name
+            System.out.println("DEBUG: Parsed varargs parameter: *" + paramName);
+        } else if (paramType == FunctionParameter.ParameterType.KWARGS) {
+            // Mark it as a kwargs parameter with the prefix, but don't change the actual name
+            System.out.println("DEBUG: Parsed kwargs parameter: **" + paramName);
+        }
         
         // 解析类型提示
         ASTNode typeHint = null;
@@ -546,7 +559,33 @@ public class Parser {
         boolean hasKeywordArg = false;  // 标记是否已经遇到了关键字参数
         
         if (!check(Token.Type.RIGHT_PAREN)) {
-            do {                // 检查是否为关键字参数 (name=value)
+            do {                // 检查是否是*args
+                if (check(Token.Type.MULTIPLY)) {
+                    advance(); // consume the '*'
+                    ASTNode args = or();
+                    if (!(args instanceof Identifier)) {
+                        throw error("Expected identifier after '*'");
+                    }
+                    // Create a special StarredExpression to mark this as *args
+                    positionalArguments.add(new StarredExpression(args));
+                    continue;
+                }
+
+                // 检查是否是**kwargs
+                if (check(Token.Type.POWER)) {
+                    advance();
+                    // consume the '**'
+                    ASTNode kwargs = or();
+                    if (!(kwargs instanceof Identifier)) {
+                        throw error("Expected identifier after '**'");
+                    }
+                    // Create a special DoubleStarredExpression to mark this as **kwargs
+                    String kwargName = ((Identifier) kwargs).getName();
+                    keywordArguments.put("**" + kwargName, kwargs);
+                    continue;
+                }
+
+                // 检查是否为关键字参数 (name=value)
                 if (check(Token.Type.IDENTIFIER) && checkNext(Token.Type.ASSIGN)) {
                     hasKeywordArg = true;
                     String name = consume(Token.Type.IDENTIFIER, "Expected parameter name").getValue();
@@ -574,6 +613,10 @@ public class Parser {
     }
 
     private ASTNode primary() {
+//        if (match(Token.Type.INDENT, Token.Type.NEWLINE)) {
+//            advance();
+//            return primary();
+//        }
         if (match(Token.Type.TRUE)) return new Literal(true);
         if (match(Token.Type.FALSE)) return new Literal(false);
         if (match(Token.Type.NONE)) return new Literal(null);
@@ -594,7 +637,8 @@ public class Parser {
             } else {
                 return new Literal(Long.parseLong(value));
             }
-        }        if (match(Token.Type.STRING, Token.Type.RAW_STRING, Token.Type.TRIPLE_STRING, Token.Type.TRIPLE_RAW_STRING)) {
+        }
+        if (match(Token.Type.STRING, Token.Type.RAW_STRING, Token.Type.TRIPLE_STRING, Token.Type.TRIPLE_RAW_STRING)) {
             return new Literal(previous().getValue());
         }
         
@@ -995,6 +1039,7 @@ public class Parser {
         ASTNode decorated;
         
         if (check(Token.Type.AT)) {
+            advance();
             // This is a stacked decorator, parse the next one in the stack
             decorated = decoratorStatement();
         } else if (check(Token.Type.DEF)) {

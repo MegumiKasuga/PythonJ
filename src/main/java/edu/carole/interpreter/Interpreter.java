@@ -638,22 +638,57 @@ public class Interpreter implements ASTVisitor<PyObject> {
             return expression.getTrueExpression().accept(this);
         } else {
             return expression.getFalseExpression().accept(this);
-        }    }
-      @Override
+        }    }    @Override
     public PyObject visitCallExpression(CallExpression expression) {
         PyObject function = expression.getFunction().accept(this);
         
-        // 处理位置参数
+        // 处理位置参数，包括*args展开
         List<PyObject> positionalArguments = new ArrayList<>();
         for (ASTNode arg : expression.getPositionalArguments()) {
-            positionalArguments.add(arg.accept(this));
+            if (arg instanceof StarredExpression) {
+                // Handle *args unpacking
+                StarredExpression starred = (StarredExpression) arg;
+                PyObject starredValue = starred.getExpression().accept(this);
+                
+                // Unpack the starred argument
+                if (starredValue instanceof PyList) {
+                    PyList list = (PyList) starredValue;
+                    positionalArguments.addAll(list.getElements());
+                } else if (starredValue instanceof PyTuple) {
+                    PyTuple tuple = (PyTuple) starredValue;
+                    positionalArguments.addAll(tuple.getElements());
+                } else {
+                    // Try to iterate over the object
+                    throw new RuntimeException("Cannot unpack non-sequence object in function call");
+                }
+            } else {
+                positionalArguments.add(arg.accept(this));
+            }
         }
         
-        // 处理关键字参数
+        // 处理关键字参数，包括**kwargs展开
         Map<String, PyObject> keywordArguments = new HashMap<>();
         if (expression.hasKeywordArguments()) {
             for (Map.Entry<String, ASTNode> entry : expression.getKeywordArguments().entrySet()) {
-                keywordArguments.put(entry.getKey(), entry.getValue().accept(this));
+                String key = entry.getKey();
+                if (key.startsWith("**")) {
+                    // Handle **kwargs unpacking
+                    String kwargName = key.substring(2);
+                    PyObject kwargsValue = entry.getValue().accept(this);
+                      if (kwargsValue instanceof PyDict) {
+                        PyDict dict = (PyDict) kwargsValue;
+                        // Add all key-value pairs from the dict to keyword arguments
+                        for (Map.Entry<PyObject, PyObject> dictEntry : dict.getEntries().entrySet()) {
+                            // Convert PyObject key to String for keyword arguments
+                            String keyStr = dictEntry.getKey().toString();
+                            keywordArguments.put(keyStr, dictEntry.getValue());
+                        }
+                    } else {
+                        throw new RuntimeException("Cannot unpack non-dict object as keyword arguments");
+                    }
+                } else {
+                    keywordArguments.put(key, entry.getValue().accept(this));
+                }
             }
         }
         
@@ -1026,8 +1061,7 @@ public class Interpreter implements ASTVisitor<PyObject> {
     public PyObject visitLambdaExpression(LambdaExpression lambdaExpression) {
         return new PyLambda(lambdaExpression.getParameters(), lambdaExpression.getBody(), environment);
     }
-    
-    @Override
+      @Override
     public PyObject visitSuperExpression(SuperExpression superExpression) {
         // Get the current class and instance from the environment context
         PyClass currentClass = environment.getCurrentClass();
@@ -1039,6 +1073,17 @@ public class Interpreter implements ASTVisitor<PyObject> {
         
         // Create a super object that knows how to resolve methods from parent classes
         return new PySuper(currentClass, currentInstance, superExpression.getClassName());
+    }
+
+    @Override
+    public PyObject visitStarredExpression(StarredExpression starredExpression) {
+        // For starred expressions (*args), we need to evaluate the expression
+        // and mark it as a starred argument for function calls
+        PyObject value = starredExpression.getExpression().accept(this);
+        
+        // For now, return the value directly - the CallExpression visitor
+        // should handle the unpacking logic
+        return value;
     }
 
     @Override

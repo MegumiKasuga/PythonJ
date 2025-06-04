@@ -7,7 +7,6 @@ import edu.carole.interpreter.Interpreter;
 
 import java.util.*;
 import java.util.stream.Collectors;
-import java.util.stream.Collectors;
 
 /**
  * Python函数对象
@@ -21,8 +20,11 @@ public class PyFunction extends PyObject {
     private final Map<String, PyObject> attributes = new HashMap<>();
     private final String varargsParam; // *args parameter name
     private final String kwargsParam; // **kwargs parameter name
-    private final Map<String, ASTNode> defaultValues; // parameter name -> default value expression    
-      // 静态工厂方法用于向后兼容
+    private final Map<String, ASTNode> defaultValues; // parameter name -> default value expression
+    private boolean isBoundMethod = false;
+    private PyObject boundInstance = null;  // For bound methods, the instance it's bound to
+    
+    // 静态工厂方法用于向后兼容
     public static PyFunction fromParameterNames(String name, List<String> parameters, List<ASTNode> body, Environment closure) {
         List<FunctionParameter> functionParameters = parameters.stream()
                 .map(FunctionParameter::new)
@@ -156,13 +158,19 @@ public class PyFunction extends PyObject {
     public String getKwargsParam() { return kwargsParam; }
     public List<ASTNode> getBody() { return new ArrayList<>(body); }
     public Environment getClosure() { return closure; }
-    
+
     @Override
     public PyObject getAttribute(String attributeName) {
         if (attributes.containsKey(attributeName)) {
             return attributes.get(attributeName);
         } else if ("__name__".equals(attributeName)) {
             return new PyString(name);
+        } else if ("__doc__".equals(attributeName)) {
+            // Return None if no docstring is set
+            return PyNone.INSTANCE;
+        } else if ("__module__".equals(attributeName)) {
+            // Return None if no module is set
+            return PyNone.INSTANCE;
         }
         return super.getAttribute(attributeName);
     }
@@ -310,14 +318,22 @@ public class PyFunction extends PyObject {
         // 执行函数体
         return callWithInterpreter(environment, interpreter);
     }
-    
-    @Override
+      @Override
     public PyObject call(List<PyObject> arguments, Interpreter interpreter) {
         // Create new function scope
         Environment environment = new Environment(closure);
         
+        List<PyObject> actualArguments = new ArrayList<>(arguments);
+        
+        // Handle bound method behavior by injecting 'self' as first argument
+        if (isBoundMethod) {
+            // Insert the instance as the first argument (self)
+            actualArguments.add(0, boundInstance);
+            System.out.println("DEBUG: Injecting self argument for bound method: " + boundInstance);
+        }
+        
         int regularParamCount = parameters.size();
-        int argCount = arguments.size();
+        int argCount = actualArguments.size();
         
         // Debug output
         System.out.println("DEBUG: Calling function " + name);
@@ -326,6 +342,7 @@ public class PyFunction extends PyObject {
         System.out.println("DEBUG: parameters = " + parameters);
         System.out.println("DEBUG: varargsParam = " + varargsParam);
         System.out.println("DEBUG: kwargsParam = " + kwargsParam);
+        System.out.println("DEBUG: isBoundMethod = " + isBoundMethod);
         
         // Handle parameter binding with default values
         if (varargsParam == null && kwargsParam == null) {
@@ -354,7 +371,7 @@ public class PyFunction extends PyObject {
                 throw new RuntimeException(name + "() takes at least " + requiredParams + 
                     " positional arguments but " + argCount + " were given");
             }
-        }          // Bind regular parameters
+        }        // Bind regular parameters
         System.out.println("DEBUG: Binding parameters for " + name + "():");
         System.out.println("  regularParamCount: " + regularParamCount);
         System.out.println("  argCount: " + argCount);
@@ -366,8 +383,8 @@ public class PyFunction extends PyObject {
             System.out.println("  Processing parameter " + i + ": " + paramName);
             if (i < argCount) {
                 // Use provided argument
-                System.out.println("    Using provided argument: " + arguments.get(i));
-                environment.define(paramName, arguments.get(i));
+                System.out.println("    Using provided argument: " + actualArguments.get(i));
+                environment.define(paramName, actualArguments.get(i));
             } else if (defaultValues.containsKey(paramName)) {
                 // Use default value - evaluate it in the closure environment
                 System.out.println("    Using default value");
@@ -383,12 +400,11 @@ public class PyFunction extends PyObject {
                 throw new RuntimeException(name + "() missing required positional argument: '" + paramName + "'");
             }
         }
-        
-        // Bind varargs parameter if present
+          // Bind varargs parameter if present
         if (varargsParam != null) {
             List<PyObject> varargsValues = new ArrayList<>();
             for (int i = regularParamCount; i < argCount; i++) {
-                varargsValues.add(arguments.get(i));
+                varargsValues.add(actualArguments.get(i));
             }
             environment.define(varargsParam, new PyTuple(varargsValues));
         }
@@ -401,7 +417,7 @@ public class PyFunction extends PyObject {
         // Execute function body with interpreter context
         return callWithInterpreter(environment, interpreter);
     }
-    
+
     private PyObject evaluateDefaultValue(ASTNode defaultExpr, Interpreter interpreter) {
         if (interpreter == null) {
             interpreter = new Interpreter();
@@ -416,17 +432,50 @@ public class PyFunction extends PyObject {
         } finally {
             interpreter.setEnvironment(previousEnv);
         }
-    }/**
+    }
+    
+    /**
      * 使用指定的解释器调用函数，如果没有提供解释器则创建新的
+     * Enhanced to better handle closures and nested functions
      */
     public PyObject callWithInterpreter(Environment functionEnvironment, Interpreter interpreter) {
         if (interpreter == null) {
             interpreter = new Interpreter();
         }
         
-        // 保存原来的环境并设置为函数环境
+        // For closures, ensure the function's original closure is part of the environment chain
+        Environment executionEnvironment;
+        
+        if (this.closure != null && functionEnvironment != this.closure) {
+            // For nested functions, we need to make sure the closure environment is in the chain
+            // Create a synthetic environment that links both the call environment and the closure
+            executionEnvironment = new Environment(functionEnvironment);
+            
+            // Add closure's variables directly to the execution environment
+            for (Map.Entry<String, PyObject> entry : closure.getValues().entrySet()) {
+                // Important: Preserve special handling for varargs (*args) and kwargs (**kwargs)
+                String varName = entry.getKey();
+                PyObject varValue = entry.getValue();
+                
+                // Handle special case for varargs and kwargs parameters
+                if (varName.equals(varargsParam) || varName.equals(kwargsParam)) {
+                    // These will be properly handled in call() method, just pass through
+                    System.out.println("DEBUG: Preserving special parameter " + varName + " in closure");
+                }
+                
+                executionEnvironment.define(varName, varValue);
+            }
+        } else {
+            // Use the provided environment directly
+            executionEnvironment = functionEnvironment;
+        }
+        
+        // Save the original environment and set to the execution environment
         Environment previousEnv = interpreter.getEnvironment();
-        interpreter.setEnvironment(functionEnvironment);
+        interpreter.setEnvironment(executionEnvironment);
+        
+        // Add the function itself to its environment to support recursion
+        executionEnvironment.define(name, this);
         
         try {
             for (ASTNode statement : body) {
@@ -435,22 +484,52 @@ public class PyFunction extends PyObject {
         } catch (ReturnException returnException) {
             return returnException.getValue();
         } finally {
-            // 恢复原来的环境
+            // Restore the original environment
             interpreter.setEnvironment(previousEnv);
         }
         
         return PyNone.INSTANCE;
     }
-      /**
+
+    // We no longer need this method as we're handling closure variables directly
+    // in the callWithInterpreter method
+
+    /**
+     * Creates a function that is bound to a specific object instance (for methods)
+     *
+     * @param instance The object instance to bind this function to
+     * @return A new PyFunction that is bound to the specified instance
+     */
+    public PyFunction bindToInstance(PyObject instance) {
+        PyFunction boundFunction = new PyFunction(
+                name,
+                functionParameters,
+                body,
+                closure
+        );
+
+        // Mark as bound method and keep reference to the instance
+        boundFunction.isBoundMethod = true;
+        boundFunction.boundInstance = instance;
+
+        // Copy attributes to the bound function
+        for (Map.Entry<String, PyObject> entry : attributes.entrySet()) {
+            boundFunction.setAttribute(entry.getKey(), entry.getValue());
+        }
+
+        return boundFunction;
+    }
+
+    /**
      * 返回异常，用于控制流
      */
     public static class ReturnException extends RuntimeException {
         private final PyObject value;
-        
+
         public ReturnException(PyObject value) {
             this.value = value;
         }
-        
+
         public PyObject getValue() {
             return value;
         }

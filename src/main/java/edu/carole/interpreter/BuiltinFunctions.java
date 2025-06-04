@@ -1,6 +1,7 @@
 package edu.carole.interpreter;
 
 import edu.carole.runtime.*;
+import edu.carole.runtime.BuiltinModules.functools;
 
 import java.io.*;
 import java.util.*;
@@ -9,12 +10,46 @@ import java.util.*;
  * Python内置函数和全局对象
  */
 public class BuiltinFunctions {
-    
-    /**
+      /**
      * 创建包含所有内置函数的全局环境
-     */
-    public static Environment createGlobalEnvironment() {
+     */    public static Environment createGlobalEnvironment() {
         Environment globals = new Environment();
+        
+        // Register built-in modules
+        functools.registerModule(globals.getValues());
+        
+        // Add wraps as a global function for convenience
+        globals.define("wraps", new PyBuiltinFunction("wraps", args -> {
+            if (args.size() != 1) {
+                throw new RuntimeException("wraps() takes exactly 1 argument (" + args.size() + " given)");
+            }
+            
+            if (!(args.get(0) instanceof PyFunction)) {
+                throw new RuntimeException("wraps() requires a function as its argument");
+            }
+            
+            PyFunction wrapped = (PyFunction) args.get(0);
+            
+            return new PyBuiltinFunction("wraps_decorator", decoratorArgs -> {
+                if (decoratorArgs.size() != 1) {
+                    throw new RuntimeException("decorator returned by wraps() takes exactly 1 argument");
+                }
+                
+                if (!(decoratorArgs.get(0) instanceof PyFunction)) {
+                    throw new RuntimeException("Function wrapper must be a function");
+                }
+                
+                PyFunction wrapper = (PyFunction) decoratorArgs.get(0);
+                
+                // Copy metadata from wrapped to wrapper
+                wrapper.setAttribute("__name__", new PyString(wrapped.getName()));
+                wrapper.setAttribute("__doc__", wrapped.getAttribute("__doc__"));
+                wrapper.setAttribute("__module__", wrapped.getAttribute("__module__"));
+                wrapper.setAttribute("__wrapped__", wrapped);
+                
+                return wrapper;
+            });
+        }));
           // print函数
         globals.define("print", new PyBuiltinFunction("print", args -> {
             StringBuilder output = new StringBuilder();

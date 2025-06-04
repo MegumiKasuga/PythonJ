@@ -36,9 +36,9 @@ public interface ASTVisitor<T> {
     T visitDictLiteral(DictLiteral dictLiteral);
     T visitSetLiteral(SetLiteral setLiteral);
     T visitTupleLiteral(TupleLiteral tupleLiteral);T visitLambdaExpression(LambdaExpression lambdaExpression);
-    T visitListComprehension(ListComprehension listComprehension);
-    T visitGeneratorExpression(GeneratorExpression generatorExpression);
+    T visitListComprehension(ListComprehension listComprehension);    T visitGeneratorExpression(GeneratorExpression generatorExpression);
     T visitSuperExpression(SuperExpression expression);
+    T visitStarredExpression(StarredExpression expression);
     T visitDecorator(Decorator decorator);
 }
 
