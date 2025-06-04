@@ -828,7 +828,30 @@ public class BuiltinFunctions {
                 }
                 return PyBool.FALSE;
             }
-              return PyBool.valueOf(isInstanceOfType(obj, classinfo));
+            return PyBool.valueOf(isInstanceOfType(obj, classinfo));
+        }));
+        
+        // issubclass函数 - 检查一个类是否是另一个类的子类
+        globals.define("issubclass", new PyBuiltinFunction("issubclass", args -> {
+            if (args.size() != 2) {
+                throw new RuntimeException("issubclass() takes exactly 2 arguments (" + args.size() + " given)");
+            }
+            
+            PyObject cls = args.get(0);
+            PyObject classinfo = args.get(1);
+            
+            // 支持元组形式的多类型检查
+            if (classinfo instanceof PyTuple) {
+                List<PyObject> types = ((PyTuple) classinfo).getElements();
+                for (PyObject type : types) {
+                    if (isSubclassOfType(cls, type)) {
+                        return PyBool.TRUE;
+                    }
+                }
+                return PyBool.FALSE;
+            }
+            
+            return PyBool.valueOf(isSubclassOfType(cls, classinfo));
         }));
         
         // id函数 - 返回对象的唯一标识符
@@ -1250,8 +1273,7 @@ public class BuiltinFunctions {
         }
         
         return result;
-    }
-      /**
+    }    /**
      * 检查对象是否是指定类型的实例，支持继承关系
      */
     private static boolean isInstanceOfType(PyObject obj, PyObject classinfo) {
@@ -1289,20 +1311,74 @@ public class BuiltinFunctions {
             }
         }
         
-        // 对于类对象的直接比较
+        // 对于类对象的比较 - 使用MRO进行真正的继承检查
         if (classinfo instanceof PyClass) {
-            return obj instanceof PyInstance && 
-                   ((PyInstance) obj).getPyClass().equals(classinfo);
+            if (obj instanceof PyInstance) {
+                PyClass objClass = ((PyInstance) obj).getPyClass();
+                PyClass targetClass = (PyClass) classinfo;
+                
+                // 检查直接类型匹配
+                if (objClass.equals(targetClass)) {
+                    return true;
+                }
+                
+                // 检查MRO中是否包含目标类
+                List<PyClass> mro = objClass.getMRO();
+                for (PyClass cls : mro) {
+                    if (cls.equals(targetClass)) {
+                        return true;
+                    }
+                }
+                
+                // 检查PyClasspath继承关系
+                String targetClassName = targetClass.getName();
+                PyClasspath targetClasspath = targetClass.getClasspath();
+                if (targetClasspath != null) {
+                    String targetModulePath = targetClasspath.getModulePath();
+                    String targetFullName = targetModulePath + "." + targetClassName;
+                    
+                    if (objClass.isSubclassOfByPath(targetFullName)) {
+                        return true;
+                    }
+                }
+                
+                return false;
+            }
+            return false;
         }
         
         // 对于内置类型，比较Java类型
         return obj.getClass().equals(classinfo.getClass());
     }
-    
-    /**
+      /**
      * 检查对象是否符合指定类型的继承链
      */
     private static boolean checkInheritanceChain(PyObject obj, String className) {
+        // 对于用户定义的类实例，检查MRO和Classpath
+        if (obj instanceof PyInstance) {
+            PyClass objClass = ((PyInstance) obj).getPyClass();
+            
+            // 检查MRO中是否有匹配的类名
+            List<PyClass> mro = objClass.getMRO();
+            for (PyClass cls : mro) {
+                if (cls.getName().equals(className)) {
+                    return true;
+                }
+            }
+            
+            // 检查PyClasspath继承关系
+            if (objClass.isSubclassOfByPath(className)) {
+                return true;
+            }
+            
+            // 检查模块路径形式的类名（如 "package.ClassName"）
+            if (className.contains(".")) {
+                if (objClass.isSubclassOfByPath(className)) {
+                    return true;
+                }
+            }
+        }
+        
         // 检查集合类型的继承关系
         if (obj instanceof edu.carole.runtime.collections.PyIterable) {
             if ("Iterable".equals(className) || "collections.abc.Iterable".equals(className)) {
@@ -1338,6 +1414,109 @@ public class BuiltinFunctions {
             if ("MutableMapping".equals(className) || "collections.abc.MutableMapping".equals(className)) {
                 return true;
             }
+        }
+          return false;
+    }
+    
+    /**
+     * 检查一个类是否是另一个类的子类
+     */
+    private static boolean isSubclassOfType(PyObject cls, PyObject classinfo) {
+        // 处理字符串类名
+        if (classinfo instanceof PyString) {
+            String className = ((PyString) classinfo).getValue();
+            
+            if (cls instanceof PyClass) {
+                PyClass pyClass = (PyClass) cls;
+                
+                // 检查直接类名匹配
+                if (pyClass.getName().equals(className)) {
+                    return true;
+                }
+                
+                // 检查MRO中是否有匹配的类名
+                List<PyClass> mro = pyClass.getMRO();
+                for (PyClass mroClass : mro) {
+                    if (mroClass.getName().equals(className)) {
+                        return true;
+                    }
+                }
+                
+                // 检查PyClasspath继承关系
+                if (pyClass.isSubclassOfByPath(className)) {
+                    return true;
+                }
+                
+                return false;
+            }
+            
+            // 对于内置类型，检查类型名匹配
+            if (cls instanceof PyString && "str".equals(className)) {
+                return true;
+            }
+            return false;
+        }
+        
+        // 处理内置类型函数
+        if (classinfo instanceof PyBuiltinFunction) {
+            PyBuiltinFunction typeFunc = (PyBuiltinFunction) classinfo;
+            String typeName = typeFunc.toString();
+            
+            if (typeName.startsWith("<built-in function ") && typeName.endsWith(">")) {
+                String className = typeName.substring(19, typeName.length() - 1);
+                
+                if (cls instanceof PyClass) {
+                    PyClass pyClass = (PyClass) cls;
+                    
+                    // 检查类名匹配
+                    if (pyClass.getName().equals(className)) {
+                        return true;
+                    }
+                    
+                    // 检查MRO继承关系
+                    List<PyClass> mro = pyClass.getMRO();
+                    for (PyClass mroClass : mro) {
+                        if (mroClass.getName().equals(className)) {
+                            return true;
+                        }
+                    }
+                }
+                
+                return false;
+            }
+        }
+        
+        // 处理类对象的直接比较
+        if (classinfo instanceof PyClass && cls instanceof PyClass) {
+            PyClass pyClass = (PyClass) cls;
+            PyClass targetClass = (PyClass) classinfo;
+            
+            // 检查直接匹配
+            if (pyClass.equals(targetClass)) {
+                return true;
+            }
+            
+            // 检查MRO中是否包含目标类
+            List<PyClass> mro = pyClass.getMRO();
+            for (PyClass mroClass : mro) {
+                if (mroClass.equals(targetClass)) {
+                    return true;
+                }
+            }
+            
+            // 检查PyClasspath继承关系
+            String targetClassName = targetClass.getName();
+            PyClasspath targetClasspath = targetClass.getClasspath();
+            if (targetClasspath != null) {
+                String targetModulePath = targetClasspath.getModulePath();
+                String targetFullName = targetModulePath + "." + targetClassName;
+                
+                if (pyClass.isSubclassOfByPath(targetFullName)) {
+                    return true;
+                }
+            }
+            
+            return false;
         }
         
         return false;

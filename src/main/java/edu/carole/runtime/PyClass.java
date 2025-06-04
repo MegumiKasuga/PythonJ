@@ -10,12 +10,15 @@ public class PyClass extends PyObject {
     private final Map<String, PyObject> methods;
     private final List<PyClass> baseClasses; // 直接父类列表
     private List<PyClass> mro; // 方法解析顺序 (Method Resolution Order)
+    private PyClasspath classpath; // Class path information
     
     public PyClass(String name, Map<String, PyObject> methods) {
         this.name = name;
         this.methods = new HashMap<>(methods);
         this.baseClasses = new ArrayList<>();
         computeMRO();
+        // Create default classpath in __main__ module
+        this.classpath = new PyClasspath(this, name);
     }
     
     public PyClass(String name, Map<String, PyObject> methods, List<PyClass> baseClasses) {
@@ -23,6 +26,51 @@ public class PyClass extends PyObject {
         this.methods = new HashMap<>(methods);
         this.baseClasses = new ArrayList<>(baseClasses);
         computeMRO();
+        
+        // Create classpath with parent classpaths
+        this.classpath = new PyClasspath(this, "__main__", name);
+        
+        // Add parent classpaths
+        for (PyClass baseClass : baseClasses) {
+            this.classpath.addParentClasspath(baseClass.getClasspath());
+        }
+    }
+    
+    /**
+     * Create a Python class with explicit module path
+     * 
+     * @param name Class name
+     * @param modulePath Module path (e.g., "package.subpackage")
+     * @param methods Class methods
+     */
+    public PyClass(String name, String modulePath, Map<String, PyObject> methods) {
+        this.name = name;
+        this.methods = new HashMap<>(methods);
+        this.baseClasses = new ArrayList<>();
+        computeMRO();
+        this.classpath = new PyClasspath(this, modulePath, name);
+    }
+    
+    /**
+     * Create a Python class with explicit module path and base classes
+     * 
+     * @param name Class name
+     * @param modulePath Module path (e.g., "package.subpackage")
+     * @param methods Class methods
+     * @param baseClasses Base classes
+     */
+    public PyClass(String name, String modulePath, Map<String, PyObject> methods, List<PyClass> baseClasses) {
+        this.name = name;
+        this.methods = new HashMap<>(methods);
+        this.baseClasses = new ArrayList<>(baseClasses);
+        computeMRO();
+        
+        // Create classpath with parent classpaths
+        List<PyClasspath> parentPaths = new ArrayList<>();
+        for (PyClass baseClass : baseClasses) {
+            parentPaths.add(baseClass.getClasspath());
+        }
+        this.classpath = new PyClasspath(this, modulePath, name, parentPaths);
     }
     
     /**
@@ -123,9 +171,44 @@ public class PyClass extends PyObject {
     public List<PyClass> getMRO() { return mro; }
     
     /**
-     * 检查是否是指定类的实例或子类
+     * Get the classpath of this class
      */
-    public boolean isSubclassOf(PyClass other) {
-        return mro.contains(other);
+    public PyClasspath getClasspath() {
+        return classpath;
+    }
+    
+    /**
+     * Set the classpath for this class
+     * @param modulePath The module path (e.g., "package.subpackage")
+     * @param className The class name (typically the same as this.name)
+     */
+    public void setClasspath(String modulePath, String className) {
+        // Create new classpath with specified module path
+        List<PyClasspath> parentPaths = new ArrayList<>();
+        
+        // Transfer parent classpaths from existing classpath if available
+        if (classpath != null) {
+            parentPaths.addAll(classpath.getParentClasspaths());
+        } else {
+            // Add parent classpaths based on base classes
+            for (PyClass baseClass : baseClasses) {
+                PyClasspath parentPath = baseClass.getClasspath();
+                if (parentPath != null) {
+                    parentPaths.add(parentPath);
+                }
+            }
+        }
+        
+        classpath = new PyClasspath(this, modulePath, className, parentPaths);
+    }
+    
+    /**
+     * Check if this class is a subclass of another class by fully qualified name
+     */
+    public boolean isSubclassOfByPath(String fullyQualifiedName) {
+        if (classpath != null) {
+            return classpath.isSubclassOf(fullyQualifiedName);
+        }
+        return false;
     }
 }

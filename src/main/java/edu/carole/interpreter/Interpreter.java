@@ -5,6 +5,7 @@ import edu.carole.ast.ast.ASTVisitor;
 import edu.carole.ast.statements.*;
 import edu.carole.ast.expressions.*;
 import edu.carole.runtime.*;
+import edu.carole.runtime.io.IOManager;
 
 import java.util.*;
 import java.util.Set;
@@ -20,10 +21,18 @@ public class Interpreter implements ASTVisitor<PyObject> {
     private Environment environment;
     private Set<String> globalVariables = new HashSet<>(); // Track variables declared as global in current scope
     private Map<String, Environment> nonlocalVariables = new HashMap<>(); // Track nonlocal variables and their target environments
-    
+    private ModuleLoader moduleLoader; // Module loading system
+    private final IOManager io;
+
     public Interpreter() {
+        this(IOManager.getInstance());
+    }
+    
+    public Interpreter(IOManager io) {
+        this.io = io;
         this.globals = BuiltinFunctions.createGlobalEnvironment();
         this.environment = globals;
+        this.moduleLoader = new ModuleLoader(io);
     }
     
     // Getter and setter for environment access
@@ -419,8 +428,51 @@ public class Interpreter implements ASTVisitor<PyObject> {
             nonlocalVariables.put(variable, nonlocalEnv);
         }
         return PyNone.INSTANCE;
+    }    @Override
+    public PyObject visitImportStatement(ImportStatement statement) {
+        for (ImportStatement.ImportClause importClause : statement.getImports()) {
+            String moduleName = importClause.getModuleName();
+            String effectiveName = importClause.getEffectiveName();
+            
+            try {
+                PyModule module = moduleLoader.importModule(moduleName);
+                environment.define(effectiveName, module);
+            } catch (Exception e) {
+                throw new RuntimeException("ImportError: No module named '" + moduleName + "'");
+            }
+        }
+        
+        return PyNone.INSTANCE;
+    }    @Override
+    public PyObject visitFromImportStatement(FromImportStatement statement) {
+        String moduleName = statement.getModuleName();
+        
+        try {
+            PyModule module = moduleLoader.importModule(moduleName);
+            
+            if (statement.isImportAll()) {
+                // from module import * - import all public attributes
+                moduleLoader.importAllFromModule(module, environment);
+            } else {
+                // from module import item1, item2 as alias
+                for (FromImportStatement.ImportClause importClause : statement.getImports()) {
+                    String itemName = importClause.getItemName();
+                    String effectiveName = importClause.getEffectiveName();
+                    
+                    PyObject item = moduleLoader.importFromModule(module, itemName);
+                    if (item == null) {
+                        throw new RuntimeException("ImportError: cannot import name '" + itemName + "' from '" + moduleName + "'");
+                    }
+                    environment.define(effectiveName, item);
+                }
+            }
+        } catch (Exception e) {
+            throw new RuntimeException("ImportError: No module named '" + moduleName + "'");
+        }
+        
+        return PyNone.INSTANCE;
     }
-    
+
     @Override
     public PyObject visitTryExceptStatement(TryExceptStatement statement) {
         PyObject result = PyNone.INSTANCE;

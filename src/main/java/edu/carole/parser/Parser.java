@@ -55,9 +55,10 @@ public class Parser {
             if (match(Token.Type.CONTINUE)) return new ContinueStatement();
             if (match(Token.Type.PASS)) return new PassStatement();
             if (match(Token.Type.TRY)) return tryExceptStatement();
-            if (match(Token.Type.WITH)) return withStatement();
-            if (match(Token.Type.GLOBAL)) return globalStatement();
+            if (match(Token.Type.WITH)) return withStatement();            if (match(Token.Type.GLOBAL)) return globalStatement();
             if (match(Token.Type.NONLOCAL)) return nonlocalStatement();
+            if (match(Token.Type.IMPORT)) return importStatement();
+            if (match(Token.Type.FROM)) return fromImportStatement();
 //            if (checkNext(Token.Type.LEFT_PAREN) && match(Token.Type.IDENTIFIER)) {
 //                return call();
 //            }
@@ -910,6 +911,56 @@ public class Parser {
         } while (match(Token.Type.COMMA));
         
         return new NonlocalStatement(variables);
+    }
+    
+    private ASTNode importStatement() {
+        List<ImportStatement.ImportClause> imports = new ArrayList<>();
+        
+        // Parse import clauses: import module1, module2 as alias
+        do {
+            Token moduleName = consume(Token.Type.IDENTIFIER, "Expected module name after 'import'");
+            String alias = null;
+            
+            // Handle 'as alias'
+            if (match(Token.Type.AS)) {
+                Token aliasToken = consume(Token.Type.IDENTIFIER, "Expected alias name after 'as'");
+                alias = aliasToken.getValue();
+            }
+            
+            imports.add(new ImportStatement.ImportClause(moduleName.getValue(), alias));
+        } while (match(Token.Type.COMMA));
+        
+        return new ImportStatement(imports);
+    }
+    
+    private ASTNode fromImportStatement() {
+        // from module import ...
+        Token moduleToken = consume(Token.Type.IDENTIFIER, "Expected module name after 'from'");
+        String moduleName = moduleToken.getValue();
+        
+        consume(Token.Type.IMPORT, "Expected 'import' after module name");
+        
+        // Check for 'import *'
+        if (match(Token.Type.MULTIPLY)) {
+            return new FromImportStatement(moduleName, true);
+        }
+        
+        // Parse import items: import item1, item2 as alias
+        List<FromImportStatement.ImportClause> imports = new ArrayList<>();
+        do {
+            Token itemName = consume(Token.Type.IDENTIFIER, "Expected item name in from import");
+            String alias = null;
+            
+            // Handle 'as alias'
+            if (match(Token.Type.AS)) {
+                Token aliasToken = consume(Token.Type.IDENTIFIER, "Expected alias name after 'as'");
+                alias = aliasToken.getValue();
+            }
+            
+            imports.add(new FromImportStatement.ImportClause(itemName.getValue(), alias));
+        } while (match(Token.Type.COMMA));
+        
+        return new FromImportStatement(moduleName, imports);
     }
     
     private ASTNode lambdaExpression() {

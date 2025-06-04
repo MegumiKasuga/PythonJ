@@ -29,8 +29,9 @@ public class Lexer {
         map.put("continue", Token.Type.CONTINUE);
         map.put("and", Token.Type.AND);
         map.put("or", Token.Type.OR);
-        map.put("not", Token.Type.NOT);
-        map.put("is", Token.Type.IS);
+        map.put("not", Token.Type.NOT);        map.put("is", Token.Type.IS);
+        map.put("import", Token.Type.IMPORT);
+        map.put("from", Token.Type.FROM);
         map.put("as", Token.Type.AS);
         map.put("True", Token.Type.TRUE);
         map.put("False", Token.Type.FALSE);

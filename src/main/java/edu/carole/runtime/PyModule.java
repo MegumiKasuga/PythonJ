@@ -1,5 +1,6 @@
 package edu.carole.runtime;
 
+import edu.carole.interpreter.Environment;
 import edu.carole.runtime.base.PyObjectWithMethods;
 import edu.carole.runtime.registry.MethodRegistry;
 
@@ -29,14 +30,33 @@ public class PyModule extends PyObjectWithMethods {
         attributes.put("__name__", new PyString(name));
         attributes.put("__doc__", new PyString(doc));
     }
-    
-    /**
+      /**
      * 创建一个没有文档字符串的新模块
      * 
      * @param name 模块名称
      */
     public PyModule(String name) {
         this(name, "");
+    }
+    
+    /**
+     * 创建一个从环境中导入属性的模块
+     * 
+     * @param name 模块名称
+     * @param environment 环境对象，包含模块的属性
+     */
+    public PyModule(String name, Environment environment) {
+        this.name = name;
+        this.doc = "";
+        
+        // 设置标准属性
+        attributes.put("__name__", new PyString(name));
+        attributes.put("__doc__", new PyString(doc));
+          // 从环境中复制所有变量到模块属性
+        if (environment != null) {
+            Map<String, PyObject> envVars = environment.getValues();
+            attributes.putAll(envVars);
+        }
     }
     
     @Override
