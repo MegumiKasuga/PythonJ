@@ -313,9 +313,7 @@ public class Parser {
         }
         
         return expr;
-    }
-
-    private ASTNode tupleExpression(boolean greedy) {
+    }    private ASTNode tupleExpression(boolean greedy) {
         ASTNode expr = or();
         
         // Check if this is a tuple (comma-separated expressions)
@@ -342,11 +340,28 @@ public class Parser {
     }
     
     private ASTNode or() {
+        ASTNode expr = conditionalExpression();
+          while (match(Token.Type.OR)) {
+            ASTNode right = conditionalExpression();
+            expr = new BinaryExpression(expr, BinaryExpression.Operator.OR, right);
+        }
+        
+        return expr;
+    }
+
+    /**
+     * Parse conditional expressions: expr1 if condition else expr2
+     * This has lower precedence than 'or' but higher than lambda
+     */
+    private ASTNode conditionalExpression() {
         ASTNode expr = and();
         
-        while (match(Token.Type.OR)) {
-            ASTNode right = and();
-            expr = new BinaryExpression(expr, BinaryExpression.Operator.OR, right);
+        // Check for conditional expression (ternary operator)
+        if (match(Token.Type.IF)) {
+            ASTNode condition = or(); // Parse condition with higher precedence
+            consume(Token.Type.ELSE, "Expected 'else' in conditional expression");
+            ASTNode falseExpression = conditionalExpression(); // Right-associative
+            return new ConditionalExpression(expr, condition, falseExpression);
         }
         
         return expr;

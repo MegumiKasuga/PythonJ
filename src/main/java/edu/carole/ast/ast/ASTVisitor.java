@@ -27,6 +27,7 @@ public interface ASTVisitor<T> {
 
     T visitBinaryExpression(BinaryExpression expression);
     T visitUnaryExpression(UnaryExpression expression);
+    T visitConditionalExpression(ConditionalExpression expression);
     T visitCallExpression(CallExpression expression);    T visitAttributeExpression(AttributeExpression expression);
     T visitIndexExpression(IndexExpression expression);
     T visitSliceExpression(SliceExpression expression);    T visitIdentifier(Identifier identifier);

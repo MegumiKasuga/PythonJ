@@ -626,6 +626,19 @@ public class Interpreter implements ASTVisitor<PyObject> {
             throw e;
         }
     }
+
+    @Override
+    public PyObject visitConditionalExpression(ConditionalExpression expression) {
+        // Evaluate the condition first
+        PyObject condition = expression.getCondition().accept(this);
+        
+        // Python's truthiness evaluation: return the true expression if condition is truthy, 
+        // otherwise return the false expression
+        if (condition.isTruthy()) {
+            return expression.getTrueExpression().accept(this);
+        } else {
+            return expression.getFalseExpression().accept(this);
+        }    }
       @Override
     public PyObject visitCallExpression(CallExpression expression) {
         PyObject function = expression.getFunction().accept(this);
