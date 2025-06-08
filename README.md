@@ -9,8 +9,8 @@ A small Python interpreter for recreational use, not intended to implement full 
 
 HOW TO USE (need java17 installed):
 - Repl Mode: run the jar file directly.
-- File Mode: run with `ProjectJ-xxxx-xxxx.jar --your_python_file.py`
+- File Mode: run with `java -jar ProjectJ-xxxx-xxxx.jar your_python_file.py`
 
 如何使用(需要已安装java17):
 - 交互式模式: 直接运行jar文件。
-- 文件模式: 命令行输入 `ProjectJ-xxxx-xxxx.jar --your_python_file.py`
+- 文件模式: 命令行输入 `java -jar ProjectJ-xxxx-xxxx.jar your_python_file.py`
