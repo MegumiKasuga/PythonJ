@@ -13,7 +13,10 @@ public class Lexer {
     private int column = 1;
     private final List<Token> tokens = new ArrayList<>();
     private final Stack<Integer> indentStack = new Stack<>();
-      private static final Map<String, Token.Type> KEYWORDS;
+    private static final Map<String, Token.Type> KEYWORDS;
+    private int parenCount = 0, bracketCount = 0, braceCount = 0;
+
+
     static {
         Map<String, Token.Type> map = new HashMap<>();
         map.put("if", Token.Type.IF);
@@ -29,7 +32,8 @@ public class Lexer {
         map.put("continue", Token.Type.CONTINUE);
         map.put("and", Token.Type.AND);
         map.put("or", Token.Type.OR);
-        map.put("not", Token.Type.NOT);        map.put("is", Token.Type.IS);
+        map.put("not", Token.Type.NOT);
+        map.put("is", Token.Type.IS);
         map.put("import", Token.Type.IMPORT);
         map.put("from", Token.Type.FROM);
         map.put("as", Token.Type.AS);
@@ -46,6 +50,8 @@ public class Lexer {
         map.put("super", Token.Type.SUPER);
         map.put("global", Token.Type.GLOBAL);
         map.put("nonlocal", Token.Type.NONLOCAL);
+        map.put("match", Token.Type.MATCH);
+        map.put("case", Token.Type.CASE);
         KEYWORDS = Collections.unmodifiableMap(map);
     }
     
@@ -73,10 +79,15 @@ public class Lexer {
         char c = advance();
         
         switch (c) {
-            case ' ': case '\r': case '\t':
+            case ' ':
+            case '\r':
+            case '\t':
                 // 忽略空白字符（但不是换行符）
                 break;
             case '\n':
+                if (parenCount > 0 || bracketCount > 0 || braceCount > 0) {
+                    break;
+                }
                 addToken(Token.Type.NEWLINE, "\n");
                 line++;
                 column = 1;
@@ -88,20 +99,27 @@ public class Lexer {
                 break;
             case '(':
                 addToken(Token.Type.LEFT_PAREN, "(");
+                parenCount ++;
                 break;
             case ')':
                 addToken(Token.Type.RIGHT_PAREN, ")");
+                parenCount --;
                 break;
             case '[':
                 addToken(Token.Type.LEFT_BRACKET, "[");
+                bracketCount ++;
                 break;
             case ']':
                 addToken(Token.Type.RIGHT_BRACKET, "]");
+                bracketCount --;
                 break;
             case '{':
                 addToken(Token.Type.LEFT_BRACE, "{");
-                break;            case '}':
+                braceCount ++;
+                break;
+            case '}':
                 addToken(Token.Type.RIGHT_BRACE, "}");
+                braceCount --;
                 break;
             case ',':
                 addToken(Token.Type.COMMA, ",");
@@ -124,7 +142,8 @@ public class Lexer {
                 } else {
                     addToken(Token.Type.PLUS, "+");
                 }
-                break;            case '-':
+                break;
+            case '-':
                 if (match('=')) {
                     addToken(Token.Type.MINUS_ASSIGN, "-=");
                 } else if (match('>')) {
@@ -132,7 +151,8 @@ public class Lexer {
                 } else {
                     addToken(Token.Type.MINUS, "-");
                 }
-                break;case '*':
+                break;
+            case '*':
                 if (match('*')) {
                     if (match('=')) {
                         addToken(Token.Type.POWER_ASSIGN, "**=");
@@ -221,14 +241,31 @@ public class Lexer {
                 break;
             case '!':
                 if (match('=')) {
-                    addToken(Token.Type.NOT_EQUAL, "!=");                }
-                break;case '"':
-            case '\'':
+                    addToken(Token.Type.NOT_EQUAL, "!=");
+                }
+                break;
+            case '"', '\'':
                 // Check for triple quotes
                 if (peek() == c && peekNext() == c) {
                     string(c, false, false, true);
                 } else {
                     string(c, false, false, false);
+                }
+                break;
+            case '\\':
+                int index = current;
+                int len = source.length();
+                while (index < len && source.charAt(index) == ' ') {
+                    index++;
+                }
+                if (index >= len) break;
+                if (source.charAt(index) == '\n') {
+                    // jump all \\\n
+                    current = index + 1;
+                }
+                if (index + 1 >= len) break;
+                if (source.charAt(index) == '\r' && source.charAt(index + 1) == '\n') {
+                    current = index + 2;
                 }
                 break;
             default:
@@ -288,10 +325,16 @@ public class Lexer {
                     advance(); // third quote
                     break;
                 }
-                
-                if (peek() == '\n') {
-                    line++;
-                    column = 1;
+                // skip next line
+                if (peek() == '\r' && peekNext() == '\n') {
+                    current += 2;
+                    while (!isAtEnd() && peek() == ' ') {
+                        current++;
+                    }
+                } else if (peek() == '\n') {
+                    do {
+                        current++;
+                    } while (!isAtEnd() && peek() == ' ');
                 }
                 
                 if (!isRaw && peek() == '\\') {
@@ -324,6 +367,7 @@ public class Lexer {
                         case 'n': value.append('\n'); break;
                         case 't': value.append('\t'); break;
                         case 'r': value.append('\r'); break;
+                        case 'u': value.append("\\u"); break;
                         case '\\': value.append('\\'); break;
                         case '\'': value.append('\''); break;
                         case '"': value.append('"'); break;
@@ -386,15 +430,19 @@ public class Lexer {
         
         addToken(Token.Type.NUMBER, value.toString());
     }
-      private void identifier() {
+
+    private void identifier() {
         StringBuilder value = new StringBuilder();
         value.append(source.charAt(current - 1)); // 添加第一个字符
         
-        while (isAlphaNumeric(peek())) {
+        while (isAlphaNumeric(peek()) || peek() == '.') {
             value.append(advance());
         }
         
         String text = value.toString();
+        if (text.endsWith(".")) {
+            throw new RuntimeException("Invalid identifier: " + text + " at line " + line);
+        }
         
         // Check for string prefixes
         if (checkStringPrefix(text)) {

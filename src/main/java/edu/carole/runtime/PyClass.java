@@ -1,5 +1,7 @@
 package edu.carole.runtime;
 
+import edu.carole.interpreter.Environment;
+
 import java.util.*;
 
 /**
@@ -11,6 +13,7 @@ public class PyClass extends PyObject {
     private final List<PyClass> baseClasses; // 直接父类列表
     private List<PyClass> mro; // 方法解析顺序 (Method Resolution Order)
     private PyClasspath classpath; // Class path information
+    private final Map<String, PyObject> classAttributes; // Class attributes
     
     public PyClass(String name, Map<String, PyObject> methods) {
         this.name = name;
@@ -19,6 +22,7 @@ public class PyClass extends PyObject {
         computeMRO();
         // Create default classpath in __main__ module
         this.classpath = new PyClasspath(this, name);
+        classAttributes = new HashMap<>();
     }
     
     public PyClass(String name, Map<String, PyObject> methods, List<PyClass> baseClasses) {
@@ -34,6 +38,7 @@ public class PyClass extends PyObject {
         for (PyClass baseClass : baseClasses) {
             this.classpath.addParentClasspath(baseClass.getClasspath());
         }
+        classAttributes = new HashMap<>();
     }
     
     /**
@@ -49,6 +54,7 @@ public class PyClass extends PyObject {
         this.baseClasses = new ArrayList<>();
         computeMRO();
         this.classpath = new PyClasspath(this, modulePath, name);
+        classAttributes = new HashMap<>();
     }
     
     /**
@@ -71,6 +77,15 @@ public class PyClass extends PyObject {
             parentPaths.add(baseClass.getClasspath());
         }
         this.classpath = new PyClasspath(this, modulePath, name, parentPaths);
+        classAttributes = new HashMap<>();
+    }
+
+    public void addClassAttribute(String name, PyObject value) {
+        classAttributes.put(name, value);
+    }
+
+    public void addClassAttributes(Map<String, PyObject> attributes) {
+        classAttributes.putAll(attributes);
     }
     
     /**
@@ -112,7 +127,9 @@ public class PyClass extends PyObject {
     public String toString() { return "<class '" + name + "'>"; }
     
     @Override
-    public boolean isTruthy() { return true; }      @Override
+    public boolean isTruthy() { return true; }
+
+    @Override
     public PyObject getAttribute(String attributeName) {
         // 按MRO顺序查找方法
         for (PyClass cls : mro) {
@@ -122,6 +139,16 @@ public class PyClass extends PyObject {
             }
         }
         throw new RuntimeException("type object '" + name + "' has no attribute '" + attributeName + "'");
+    }
+
+    public Map<String, PyObject> getAttributeEnv(String name) {
+        // 按MRO顺序查找方法
+        for (PyClass cls : mro) {
+            if (cls.classAttributes.containsKey(name)) {
+                return cls.classAttributes;
+            }
+        }
+        return null;
     }
     
     /**
@@ -138,12 +165,23 @@ public class PyClass extends PyObject {
         }
         return null;
     }
+
+    public Map<String, PyObject> findMethodEnv(String methodName) {
+        // Look in the method resolution order
+        for (PyClass cls : mro) {
+            if (cls.methods.containsKey(methodName)) {
+                return cls.methods;
+            }
+        }
+        return null;
+    }
     
     @Override
     public PyObject call(List<PyObject> arguments) {
         return call(arguments, null);
     }
-      @Override
+
+    @Override
     public PyObject call(List<PyObject> arguments, edu.carole.interpreter.Interpreter interpreter) {
         // 创建实例
         PyInstance instance = new PyInstance(this);
@@ -176,7 +214,11 @@ public class PyClass extends PyObject {
     public PyClasspath getClasspath() {
         return classpath;
     }
-    
+
+    public Map<String, PyObject> getClassAttributes() {
+        return classAttributes;
+    }
+
     /**
      * Set the classpath for this class
      * @param modulePath The module path (e.g., "package.subpackage")

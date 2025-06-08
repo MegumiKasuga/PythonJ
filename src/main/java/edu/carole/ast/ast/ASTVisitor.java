@@ -21,10 +21,10 @@ public interface ASTVisitor<T> {
     T visitReturnStatement(ReturnStatement statement);    T visitBreakStatement(BreakStatement statement);
     T visitContinueStatement(ContinueStatement statement);    T visitPassStatement(PassStatement statement);
     T visitTryExceptStatement(TryExceptStatement statement);    T visitWithStatement(WithStatement statement);
-    T visitGlobalStatement(GlobalStatement statement);
-    T visitNonlocalStatement(NonlocalStatement statement);
+    T visitGlobalStatement(GlobalStatement statement);    T visitNonlocalStatement(NonlocalStatement statement);
     T visitImportStatement(ImportStatement statement);
     T visitFromImportStatement(FromImportStatement statement);
+    T visitMatchStatement(MatchStatement statement);
 
     T visitBinaryExpression(BinaryExpression expression);
     T visitUnaryExpression(UnaryExpression expression);
@@ -37,9 +37,15 @@ public interface ASTVisitor<T> {
     T visitDictLiteral(DictLiteral dictLiteral);
     T visitSetLiteral(SetLiteral setLiteral);
     T visitTupleLiteral(TupleLiteral tupleLiteral);T visitLambdaExpression(LambdaExpression lambdaExpression);
-    T visitListComprehension(ListComprehension listComprehension);    T visitGeneratorExpression(GeneratorExpression generatorExpression);
-    T visitSuperExpression(SuperExpression expression);
+    T visitListComprehension(ListComprehension listComprehension);    T visitGeneratorExpression(GeneratorExpression generatorExpression);    T visitSuperExpression(SuperExpression expression);
     T visitStarredExpression(StarredExpression expression);
     T visitDecorator(Decorator decorator);
+    
+    // Match-case pattern visitors
+    T visitWildcardPattern(WildcardPattern pattern);
+    T visitCapturePattern(CapturePattern pattern);
+    T visitLiteralPattern(LiteralPattern pattern);
+    T visitSequencePattern(SequencePattern pattern);
+    T visitOrPattern(OrPattern pattern);
 }
 

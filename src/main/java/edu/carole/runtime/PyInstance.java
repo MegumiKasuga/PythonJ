@@ -23,7 +23,17 @@ public class PyInstance extends PyObject {
     }
     
     @Override
-    public boolean isTruthy() { return true; }      @Override
+    public boolean isTruthy() { return true; }
+
+    public PyObject getMethod(String name) {
+        return pyClass.findMethod(name);
+    }
+
+    public Map<String, PyObject> getAttributes() {
+        return attributes;
+    }
+
+    @Override
     public PyObject getAttribute(String name) {
         // 首先检查实例属性
         PyObject attribute = attributes.get(name);

@@ -25,7 +25,8 @@ public class PyTuple extends PyObjectWithMethods {
     }
 
     @Override
-    public String toString() {        if (elements.size() == 1) {
+    public String toString() {
+        if (elements.size() == 1) {
             // Single element tuple displays with trailing comma
             PyObject element = elements.get(0);
             if (element instanceof PyString) {
@@ -109,7 +110,9 @@ public class PyTuple extends PyObjectWithMethods {
         } else {
             throw new RuntimeException("can only concatenate tuple (not \"" + other.getTypeName() + "\") to tuple");
         }
-    }    private PyObject __mul__(PyObject other) {
+    }
+
+    private PyObject __mul__(PyObject other) {
         if (other instanceof PyInt) {
             long times = ((PyInt) other).getValue();
             if (times <= 0) {

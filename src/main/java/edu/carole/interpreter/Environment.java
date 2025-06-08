@@ -1,8 +1,6 @@
 package edu.carole.interpreter;
 
-import edu.carole.runtime.PyObject;
-import edu.carole.runtime.PyClass;
-import edu.carole.runtime.PyInstance;
+import edu.carole.runtime.*;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -35,16 +33,102 @@ public class Environment {
      * 获取变量
      */
     public PyObject get(String name) {
-        if (values.containsKey(name)) {
+        if (name.contains(".")) {
+            String[] path = name.split("\\.");
+            Map<String, PyObject> attributes = getAttributeEnv(path, true);
+            if (attributes != null && attributes.containsKey(path[path.length - 1])) {
+                return attributes.get(path[path.length - 1]);
+            }
+        } else if (values.containsKey(name)) {
             return values.get(name);
-        }
-          if (enclosing != null) {
+        } else if (enclosing != null) {
             return enclosing.get(name);
         }
-        
+
         throw new Interpreter.PyExceptionWrapper(
             edu.carole.runtime.PyException.nameError("Undefined variable '" + name + "'")
         );
+    }
+
+    public PyObject set(String name, PyObject value) {
+        if (name.contains(".")) {
+            String[] path = name.split("\\.");
+            Map<String, PyObject> attributes = getAttributeEnv(path, !path[0].equals("self"));
+            if (attributes != null) {
+                attributes.put(path[path.length - 1], value);
+                return value;
+            }
+        } else if (values.containsKey(name)) {
+            return values.put(name, value);
+        } else if (enclosing != null) {
+            return enclosing.set(name, value);
+        }
+
+        throw new Interpreter.PyExceptionWrapper(
+            edu.carole.runtime.PyException.nameError("Undefined variable '" + name + "'")
+        );
+    }
+
+    public Map<String, PyObject> getAttributeEnv(String[] path, boolean allowClass) {
+        Environment current = this;
+
+        while (!current.values.containsKey(path[0])) {
+            current = current.enclosing;
+            if (current == null) {
+                return null;
+            }
+        }
+
+        Map<String, PyObject> currentValues = new HashMap<>(current.values);
+        for (int i = 0; i < path.length; i++) {
+            PyObject obj = currentValues.get(path[i]);
+            if (obj == null) {
+                return null; // 属性不存在
+            }
+            if (i == path.length - 1) {
+                return currentValues;
+            } else if (obj instanceof PyModule module) {
+                if (module.getAttribute(path[i + 1]) != null) {
+                    currentValues = module.getAttributes();
+                }
+            } else if (obj instanceof PyClass cls) {
+                if (cls.getAttribute(path[i + 1]) != null) {
+                    currentValues = cls.getClassAttributes();
+                }
+            } else if (obj instanceof PyInstance instance) {
+                if (!allowClass && i + 1 >= path.length - 1) {
+                    return instance.getAttributes();
+                } else {
+                    if (instance.getAttributes().containsKey(path[i + 1])) {
+                        currentValues = instance.getAttributes();
+                    } else {
+                        PyClass clazz = instance.getPyClass();
+                        Map<String, PyObject> classAttributes = new HashMap<>();
+                        classAttributes.putAll(clazz.getClassAttributes());
+                        classAttributes.putAll(clazz.getMethods());
+                        if (i + 1 >= path.length - 1) {
+                            Map<String, PyObject> cache = null;
+                            cache = (clazz.findMethodEnv(path[i + 1]));
+                            if (cache != null) {
+                                PyFunction func = ((PyFunction) cache.get(path[i + 1]));
+                                func = func.bindToInstance(instance);
+                                return Map.of(path[i + 1], func);
+                            }
+                            cache = clazz.getAttributeEnv(path[i + 1]);
+                            return cache;
+                        }
+                        if (classAttributes.containsKey(path[i + 1])) {
+                            currentValues = classAttributes;
+                        } else {
+                            return null; // 属性不存在
+                        }
+                    }
+                }
+            } else {
+                return null;
+            }
+        }
+        return null;
     }
     
     /**

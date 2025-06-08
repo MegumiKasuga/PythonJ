@@ -14,7 +14,12 @@ public class AttributeExpression extends ASTNode {
         this.object = object;
         this.attribute = attribute;
     }
-    
+
+    @Override
+    public String toString() {
+        return object.toString() + "." + attribute;
+    }
+
     public ASTNode getObject() { return object; }
     public String getAttribute() { return attribute; }
     

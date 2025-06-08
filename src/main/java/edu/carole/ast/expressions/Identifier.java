@@ -16,7 +16,12 @@ public class Identifier extends ASTNode {
     public String getName() {
         return name;
     }
-    
+
+    @Override
+    public String toString() {
+        return getName();
+    }
+
     @Override
     public <T> T accept(ASTVisitor<T> visitor) {
         return visitor.visitIdentifier(this);

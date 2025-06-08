@@ -92,7 +92,14 @@ public abstract class PyObject {
      * 迭代器
      */
     public Iterator<PyObject> iterator() {
-        throw new RuntimeException("'" + getTypeName() + "' object is not iterable");
+        try {
+            getAttribute("__iter__");
+            getAttribute("__next__");
+        } catch (RuntimeException e) {
+            // 如果没有__iter__或__next__方法，抛出异常
+            throw new RuntimeException("'" + getTypeName() + "' object is not iterable");
+        }
+        return new PyIterator(this, getTypeName());
     }
       /**
      * 相等性比较

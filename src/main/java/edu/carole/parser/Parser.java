@@ -7,6 +7,8 @@ import edu.carole.ast.expressions.ListComprehension.ComprehensionClause;
 import edu.carole.lexer.Token;
 
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Python语法分析器
@@ -55,10 +57,12 @@ public class Parser {
             if (match(Token.Type.CONTINUE)) return new ContinueStatement();
             if (match(Token.Type.PASS)) return new PassStatement();
             if (match(Token.Type.TRY)) return tryExceptStatement();
-            if (match(Token.Type.WITH)) return withStatement();            if (match(Token.Type.GLOBAL)) return globalStatement();
+            if (match(Token.Type.WITH)) return withStatement();
+            if (match(Token.Type.GLOBAL)) return globalStatement();
             if (match(Token.Type.NONLOCAL)) return nonlocalStatement();
             if (match(Token.Type.IMPORT)) return importStatement();
             if (match(Token.Type.FROM)) return fromImportStatement();
+            if (match(Token.Type.MATCH)) return matchStatement();
 //            if (checkNext(Token.Type.LEFT_PAREN) && match(Token.Type.IDENTIFIER)) {
 //                return call();
 //            }
@@ -73,38 +77,53 @@ public class Parser {
     
     private ASTNode ifStatement() {
         ASTNode condition = expression(true);
-        consume(Token.Type.COLON, "Expected ':' after if condition");
-        consume(Token.Type.NEWLINE, "Expected newline after ':'");
-        consume(Token.Type.INDENT, "Expected indentation after if statement");
+        boolean singleLine = skipLineAndCheckIfSingleLine(
+                "if condition", "if statement"
+        );
         
-        List<ASTNode> thenBranch = block();
+        List<ASTNode> thenBranch = block(singleLine);
+        List<Map.Entry<ASTNode, List<ASTNode>>> conditionBranches = new ArrayList<>();
+        conditionBranches.add(new AbstractMap.SimpleEntry<>(condition, thenBranch));
+        if (match(Token.Type.ELIF)) {
+            // Handle elif clauses
+            while (check(Token.Type.ELIF)) {
+                advance();
+                ASTNode elifCondition = expression(true);
+                singleLine = skipLineAndCheckIfSingleLine(
+                        "elif", "elif statement"
+                );
+                List<ASTNode> elifBranch = block(singleLine);
+                conditionBranches.add(new AbstractMap.SimpleEntry<>(elifCondition, elifBranch));
+            }
+        }
+
         List<ASTNode> elseBranch = new ArrayList<>();
-        
         if (match(Token.Type.ELSE)) {
             consume(Token.Type.COLON, "Expected ':' after else");
-            consume(Token.Type.NEWLINE, "Expected newline after ':'");
-            consume(Token.Type.INDENT, "Expected indentation after else statement");
-            elseBranch = block();
+            singleLine = skipLineAndCheckIfSingleLine(
+                    "else", "else statement"
+            );
+            elseBranch = block(singleLine);
         }
         
-        return new IfStatement(condition, thenBranch, elseBranch);
+        return new IfStatement(conditionBranches, elseBranch);
     }
 
     private ASTNode whileStatement() {
         ASTNode condition = expression(true);
-        consume(Token.Type.COLON, "Expected ':' after while condition");
-        consume(Token.Type.NEWLINE, "Expected newline after ':'");
-        consume(Token.Type.INDENT, "Expected indentation after while statement");
-        
-        List<ASTNode> body = block();
+        boolean singleLine = skipLineAndCheckIfSingleLine(
+                "while condition", "while statement"
+        );
+
+        List<ASTNode> body = block(singleLine);
         List<ASTNode> elseBody = new ArrayList<>();
         
         // Check for else clause
         if (match(Token.Type.ELSE)) {
-            consume(Token.Type.COLON, "Expected ':' after else");
-            consume(Token.Type.NEWLINE, "Expected newline after ':'");
-            consume(Token.Type.INDENT, "Expected indentation after else statement");
-            elseBody = block();
+            singleLine = skipLineAndCheckIfSingleLine(
+                    "else", "else statement"
+            );
+            elseBody = block(singleLine);
         }
         
         return new WhileStatement(condition, body, elseBody);
@@ -114,19 +133,18 @@ public class Parser {
         Token variable = consume(Token.Type.IDENTIFIER, "Expected variable name in for loop");
         consume(Token.Type.IN, "Expected 'in' in for loop");
         ASTNode iterable = expression(true);
-        consume(Token.Type.COLON, "Expected ':' after for statement");
-        consume(Token.Type.NEWLINE, "Expected newline after ':'");
-        consume(Token.Type.INDENT, "Expected indentation after for statement");
-        
-        List<ASTNode> body = block();
+        boolean singleLine = skipLineAndCheckIfSingleLine(
+                "for statement", "for statement"
+        );
+        List<ASTNode> body = block(singleLine);
         List<ASTNode> elseBody = new ArrayList<>();
         
         // Check for else clause
         if (match(Token.Type.ELSE)) {
-            consume(Token.Type.COLON, "Expected ':' after else");
-            consume(Token.Type.NEWLINE, "Expected newline after ':'");
-            consume(Token.Type.INDENT, "Expected indentation after else statement");
-            elseBody = block();
+            singleLine = skipLineAndCheckIfSingleLine(
+                    "else", "else statement"
+            );
+            elseBody = block(singleLine);
         }
         return new ForStatement(variable.getValue(), iterable, body, elseBody);
     }
@@ -151,15 +169,11 @@ public class Parser {
         if (match(Token.Type.ARROW)) { // -> 
             returnTypeHint = expression(false);
         }
-        
-        consume(Token.Type.COLON, "Expected ':' after function signature");
-        consume(Token.Type.NEWLINE, "Expected newline after ':'");
-        while (check(Token.Type.NEWLINE)) {
-            advance(); // 跳过多余的换行符
-        }
-        consume(Token.Type.INDENT, "Expected indentation after function definition");
-        
-        List<ASTNode> body = block();
+        boolean singleLine = skipLineAndCheckIfSingleLine(
+                "function signature", "function definition"
+        );
+
+        List<ASTNode> body = block(singleLine);
         return new FunctionDef(name.getValue(), parameters, body, returnTypeHint);
     }
 
@@ -223,7 +237,7 @@ public class Parser {
         consume(Token.Type.NEWLINE, "Expected newline after ':'");
         consume(Token.Type.INDENT, "Expected indentation after class definition");
         
-        List<ASTNode> body = block();
+        List<ASTNode> body = block(false);
         return new ClassDef(name.getValue(), baseClasses, body);
     }
 
@@ -236,12 +250,14 @@ public class Parser {
         return new ReturnStatement(value);
     }
 
-    private List<ASTNode> block() {
+    private List<ASTNode> block(boolean singleLine) {
         List<ASTNode> statements = new ArrayList<>();
         
         while (!check(Token.Type.DEDENT) && !isAtEnd()) {
             if (check(Token.Type.NEWLINE)) {
                 advance();
+                // If single line, return immediately
+                if (singleLine) return statements;
                 continue;
             }
             
@@ -294,7 +310,8 @@ public class Parser {
                 }
                 return new TupleUnpackingAssignment(targets, value);
             }
-            throw new RuntimeException("Invalid assignment target");        } else if (match(Token.Type.PLUS_ASSIGN, Token.Type.MINUS_ASSIGN, 
+            throw new RuntimeException("Invalid assignment target");
+        } else if (match(Token.Type.PLUS_ASSIGN, Token.Type.MINUS_ASSIGN,
                           Token.Type.MULTIPLY_ASSIGN, Token.Type.DIVIDE_ASSIGN,
                           Token.Type.MODULO_ASSIGN, Token.Type.POWER_ASSIGN, 
                           Token.Type.FLOOR_DIVIDE_ASSIGN, Token.Type.AND_ASSIGN,
@@ -303,8 +320,10 @@ public class Parser {
             // Handle compound assignments
             Token.Type operatorType = previous().getType();
             ASTNode value = assignment(greedy);
-            
-            if (expr instanceof Identifier) {
+
+
+
+            if (expr instanceof Identifier || expr instanceof AttributeExpression) {
                 CompoundAssignmentStatement.Operator operator = switch (operatorType) {
                     case PLUS_ASSIGN -> CompoundAssignmentStatement.Operator.PLUS_ASSIGN;
                     case MINUS_ASSIGN -> CompoundAssignmentStatement.Operator.MINUS_ASSIGN;
@@ -320,6 +339,9 @@ public class Parser {
                     case RIGHT_SHIFT_ASSIGN -> CompoundAssignmentStatement.Operator.RIGHT_SHIFT_ASSIGN;
                     default -> throw new RuntimeException("Unknown compound assignment operator: " + operatorType);
                 };
+                if (expr instanceof AttributeExpression) {
+                    return new CompoundAssignmentStatement(expr.toString(), operator, value);
+                }
                 return new CompoundAssignmentStatement(((Identifier) expr).getName(), operator, value);
             } else {
                 throw new RuntimeException("Invalid compound assignment target - must be identifier");
@@ -327,7 +349,9 @@ public class Parser {
         }
         
         return expr;
-    }    private ASTNode tupleExpression(boolean greedy) {
+    }
+
+    private ASTNode tupleExpression(boolean greedy) {
         ASTNode expr = or();
         
         // Check if this is a tuple (comma-separated expressions)
@@ -355,11 +379,10 @@ public class Parser {
     
     private ASTNode or() {
         ASTNode expr = conditionalExpression();
-          while (match(Token.Type.OR)) {
-            ASTNode right = conditionalExpression();
-            expr = new BinaryExpression(expr, BinaryExpression.Operator.OR, right);
-        }
-        
+            while (match(Token.Type.OR)) {
+                ASTNode right = conditionalExpression();
+                expr = new BinaryExpression(expr, BinaryExpression.Operator.OR, right);
+            }
         return expr;
     }
 
@@ -373,11 +396,13 @@ public class Parser {
         // Check for conditional expression (ternary operator)
         if (match(Token.Type.IF)) {
             ASTNode condition = or(); // Parse condition with higher precedence
-            consume(Token.Type.ELSE, "Expected 'else' in conditional expression");
-            ASTNode falseExpression = conditionalExpression(); // Right-associative
+            ASTNode falseExpression = null;
+            if (check(Token.Type.ELSE)) {
+                consume(Token.Type.ELSE, "Expected 'else' in conditional expression");
+                falseExpression = conditionalExpression(); // Right-associative
+            }
             return new ConditionalExpression(expr, condition, falseExpression);
         }
-        
         return expr;
     }
 
@@ -543,7 +568,8 @@ public class Parser {
                 expr = finishCall(expr);
             } else if (match(Token.Type.DOT)) {
                 Token name = consume(Token.Type.IDENTIFIER, "Expected property name after '.'");
-                expr = new AttributeExpression(expr, name.getValue());            } else if (match(Token.Type.LEFT_BRACKET)) {
+                expr = new AttributeExpression(expr, name.getValue());
+            } else if (match(Token.Type.LEFT_BRACKET)) {
                 ASTNode indexOrSlice = parseIndexOrSlice();
                 consume(Token.Type.RIGHT_BRACKET, "Expected ']' after index");
                 expr = new IndexExpression(expr, indexOrSlice);
@@ -554,13 +580,15 @@ public class Parser {
         
         return expr;
     }
+
     private ASTNode finishCall(ASTNode callee) {
         List<ASTNode> positionalArguments = new ArrayList<>();
         Map<String, ASTNode> keywordArguments = new HashMap<>();
         boolean hasKeywordArg = false;  // 标记是否已经遇到了关键字参数
         
         if (!check(Token.Type.RIGHT_PAREN)) {
-            do {                // 检查是否是*args
+            do {
+                // 检查是否是*args
                 if (check(Token.Type.MULTIPLY)) {
                     advance(); // consume the '*'
                     ASTNode args = or();
@@ -632,6 +660,10 @@ public class Parser {
         }
         
         if (match(Token.Type.NUMBER)) {
+            Long specialNum = dealWithSpecialNumbers();
+            if (specialNum != null) {
+                return new Literal(specialNum);
+            }
             String value = previous().getValue();
             if (value.contains(".")) {
                 return new Literal(Double.parseDouble(value));
@@ -639,7 +671,10 @@ public class Parser {
                 return new Literal(Long.parseLong(value));
             }
         }
-        if (match(Token.Type.STRING, Token.Type.RAW_STRING, Token.Type.TRIPLE_STRING, Token.Type.TRIPLE_RAW_STRING)) {
+        if (match(Token.Type.STRING, Token.Type.TRIPLE_STRING)) {
+            return new Literal(decodeUnicode(previous().getValue()));
+        }
+        if (match(Token.Type.RAW_STRING, Token.Type.TRIPLE_RAW_STRING)) {
             return new Literal(previous().getValue());
         }
         
@@ -821,17 +856,17 @@ public class Parser {
 
     private ASTNode tryExceptStatement() {
         // try:
-        consume(Token.Type.COLON, "Expected ':' after try");
-        consume(Token.Type.NEWLINE, "Expected newline after ':'");
-        consume(Token.Type.INDENT, "Expected indentation after try statement");
-        
-        List<ASTNode> tryBody = block();
+        boolean singleLine = skipLineAndCheckIfSingleLine(
+                "try", "try statement"
+        );
+        List<ASTNode> tryBody = block(singleLine);
         List<TryExceptStatement.ExceptClause> exceptClauses = new ArrayList<>();
         
         // 解析except子句
         while (match(Token.Type.EXCEPT)) {
             String exceptionType = null;
             String variable = null;
+            singleLine = false;
             
             // except ExceptionType:
             // except ExceptionType as var:
@@ -848,20 +883,22 @@ public class Parser {
             }
             
             consume(Token.Type.COLON, "Expected ':' after except clause");
-            consume(Token.Type.NEWLINE, "Expected newline after ':'");
-            consume(Token.Type.INDENT, "Expected indentation after except statement");
-            
-            List<ASTNode> exceptBody = block();
+            if (match(Token.Type.NEWLINE)) {
+                advance(); // Consume the newline after ':'
+                consume(Token.Type.INDENT, "Expected indentation after except statement");
+            } else singleLine = true;
+
+            List<ASTNode> exceptBody = block(singleLine);
             exceptClauses.add(new TryExceptStatement.ExceptClause(exceptionType, variable, exceptBody));
         }
         
         // 可选的finally块
         List<ASTNode> finallyBody = new ArrayList<>();
         if (match(Token.Type.FINALLY)) {
-            consume(Token.Type.COLON, "Expected ':' after finally");
-            consume(Token.Type.NEWLINE, "Expected newline after ':'");
-            consume(Token.Type.INDENT, "Expected indentation after finally statement");
-            finallyBody = block();
+            singleLine = skipLineAndCheckIfSingleLine(
+                    "finally", "finally statement"
+            );
+            finallyBody = block(singleLine);
         }
         
         if (exceptClauses.isEmpty() && finallyBody.isEmpty()) {
@@ -882,10 +919,11 @@ public class Parser {
         }
         
         consume(Token.Type.COLON, "Expected ':' after with statement");
-        consume(Token.Type.NEWLINE, "Expected newline after ':'");
-        consume(Token.Type.INDENT, "Expected indentation after with statement");
-        
-        List<ASTNode> body = block();
+        boolean singleLine = skipLineAndCheckIfSingleLine(
+                "with statement", "with statement"
+        );
+
+        List<ASTNode> body = block(singleLine);
         return new WithStatement(contextExpression, targetVariable, body);
     }
     
@@ -959,9 +997,166 @@ public class Parser {
             
             imports.add(new FromImportStatement.ImportClause(itemName.getValue(), alias));
         } while (match(Token.Type.COMMA));
-        
-        return new FromImportStatement(moduleName, imports);
+          return new FromImportStatement(moduleName, imports);
     }
+    
+    private ASTNode matchStatement() {
+        // match subject:
+        ASTNode subject = expression(true);
+        consume(Token.Type.COLON, "Expected ':' after match subject");
+        consume(Token.Type.NEWLINE, "Expected newline after ':'");
+        consume(Token.Type.INDENT, "Expected indentation after match statement");
+        
+        List<MatchStatement.CaseClause> cases = new ArrayList<>();
+        List<ASTNode> defaultBody = null;
+
+        while (match(Token.Type.CASE)) {
+            boolean singleLine = false;
+            if (tokens.get(current).getValue().equals("_")) {
+                // default case: case _:
+                advance(); // Consume the '_'
+                singleLine = skipLineAndCheckIfSingleLine(
+                        "case pattern", "case statement");
+                defaultBody = block(singleLine);
+                break;
+            }
+            ASTNode pattern = parsePattern();
+            
+            // Optional guard (if condition)
+            ASTNode guard = null;
+            if (match(Token.Type.IF)) {
+                guard = expression(true);
+            }
+
+            singleLine = skipLineAndCheckIfSingleLine(
+                    "case pattern", "case statement");
+            List<ASTNode> body = block(singleLine);
+            cases.add(new MatchStatement.CaseClause(pattern, guard, body));
+        }
+        
+        // Consume the final dedent for the match block
+        if (check(Token.Type.DEDENT)) {
+            advance();
+        }
+        
+        if (cases.isEmpty()) {
+            throw new RuntimeException("Match statement must have at least one case");
+        }
+        
+        return new MatchStatement(subject, cases, defaultBody);
+    }
+    
+    private ASTNode parsePattern() {
+        return parseOrPattern();
+    }
+    
+    private ASTNode parseOrPattern() {
+        ASTNode pattern = parseSequencePattern();
+        
+        while (match(Token.Type.BITWISE_OR)) {
+            ASTNode right = parseSequencePattern();
+            pattern = new OrPattern(pattern, right);
+        }
+        
+        return pattern;
+    }
+    
+    private ASTNode parseSequencePattern() {
+        if (match(Token.Type.LEFT_PAREN)) {
+            // Tuple pattern: (a, b, c) or just grouped pattern: (a)
+            if (check(Token.Type.RIGHT_PAREN)) {
+                // Empty tuple pattern: ()
+                consume(Token.Type.RIGHT_PAREN, "Expected ')' after '('");
+                return new SequencePattern(new ArrayList<>(), true);
+            }
+            
+            List<ASTNode> patterns = new ArrayList<>();
+            patterns.add(parsePattern());
+            
+            if (match(Token.Type.COMMA)) {
+                // This is a tuple pattern
+                while (!check(Token.Type.RIGHT_PAREN)) {
+                    if (check(Token.Type.RIGHT_PAREN)) break; // trailing comma
+                    patterns.add(parsePattern());
+                    if (!match(Token.Type.COMMA)) break;
+                }
+                consume(Token.Type.RIGHT_PAREN, "Expected ')' after tuple pattern");
+                return new SequencePattern(patterns, true);
+            } else {
+                // This is just a grouped pattern
+                consume(Token.Type.RIGHT_PAREN, "Expected ')' after pattern");
+                return patterns.get(0);
+            }
+        } else if (match(Token.Type.LEFT_BRACKET)) {
+            // List pattern: [a, b, c]
+            List<ASTNode> patterns = new ArrayList<>();
+            
+            if (!check(Token.Type.RIGHT_BRACKET)) {
+                patterns.add(parsePattern());
+                while (match(Token.Type.COMMA)) {
+                    if (check(Token.Type.RIGHT_BRACKET)) break; // trailing comma
+                    patterns.add(parsePattern());
+                }
+            }
+            
+            consume(Token.Type.RIGHT_BRACKET, "Expected ']' after list pattern");
+            return new SequencePattern(patterns, false);
+        }
+        
+        return parseAtomicPattern();
+    }
+
+    private ASTNode parseAtomicPattern() {
+        // Check for identifier first (wildcard or capture pattern)
+        if (check(Token.Type.IDENTIFIER)) {
+            Token identifier = peek();
+            
+            // Wildcard pattern: _
+            if (identifier.getValue().equals("_")) {
+                advance(); // consume the token
+                return new WildcardPattern();
+            }
+            
+            // Capture pattern: variable name
+            advance(); // consume the token
+            return new CapturePattern(identifier.getValue());
+        }
+        
+        // Literal patterns: numbers, strings, booleans, None
+        if (match(Token.Type.NUMBER, Token.Type.STRING, Token.Type.RAW_STRING, 
+                  Token.Type.TRIPLE_STRING, Token.Type.TRIPLE_RAW_STRING,
+                  Token.Type.TRUE, Token.Type.FALSE, Token.Type.NONE)) {
+            Token literal = previous();
+            ASTNode value;
+            
+            switch (literal.getType()) {
+                case NUMBER -> {
+                    String val = literal.getValue();
+                    if (val.contains(".")) {
+                        value = new Literal(Double.parseDouble(val));
+                    } else {
+                        value = new Literal(Long.parseLong(val));
+                    }
+                }
+                case STRING, TRIPLE_STRING -> {
+                    String v = decodeUnicode(literal.getValue());
+                    value = new Literal(v);
+                }
+                case RAW_STRING, TRIPLE_RAW_STRING ->
+                    value = new Literal(literal.getValue());
+                case TRUE -> value = new Literal(true);
+                case FALSE -> value = new Literal(false);
+                case NONE -> value = new Literal(null);
+                default -> throw new RuntimeException("Unexpected literal type in pattern");
+            }
+            
+            return new LiteralPattern(value);
+        }
+        
+        throw new RuntimeException("Expected pattern at line " + peek().getLine());
+    }
+
+
     
     private ASTNode lambdaExpression() {
         List<String> parameters = new ArrayList<>();
@@ -1023,10 +1218,10 @@ public class Parser {
         Token variable = consume(Token.Type.IDENTIFIER, "Expected variable name in comprehension");
         consume(Token.Type.IN, "Expected 'in' in comprehension");
         ASTNode iterable = or();
-        
         ASTNode condition = null;
-        if (match(Token.Type.IF)) {
-            condition = or();
+        if (iterable instanceof ConditionalExpression conditionalExpression) {
+            condition = conditionalExpression.getCondition();
+            iterable = conditionalExpression.getTrueExpression();
         }
         
         clauses.add(new ListComprehension.ComprehensionClause(variable.getValue(), iterable, condition));
@@ -1055,10 +1250,10 @@ public class Parser {
         Token variable = consume(Token.Type.IDENTIFIER, "Expected variable name in generator");
         consume(Token.Type.IN, "Expected 'in' in generator");
         ASTNode iterable = or();
-        
         ASTNode condition = null;
-        if (match(Token.Type.IF)) {
-            condition = or();
+        if (iterable instanceof ConditionalExpression conditionalExpression) {
+            condition = conditionalExpression.getCondition();
+            iterable = conditionalExpression.getTrueExpression();
         }
         
         clauses.add(new ListComprehension.ComprehensionClause(variable.getValue(), iterable, condition));
@@ -1165,5 +1360,49 @@ public class Parser {
         
         // This is a simple index
         return start;
+    }
+
+    private boolean skipLineAndCheckIfSingleLine(String statementNameColon,
+                                                 String statementNameIndent) {
+        consume(Token.Type.COLON, "Expected ':' after" + statementNameColon);
+        if (check(Token.Type.NEWLINE)) {
+            do {
+                advance();
+            } while (check(Token.Type.NEWLINE));
+            consume(Token.Type.INDENT, "Expected indentation after" + statementNameIndent);
+            return false;
+        }
+        return true;
+    }
+
+    private Long dealWithSpecialNumbers() {
+        if (!tokens.get(current - 1).getValue().equals("0")) return null;
+        Token next = tokens.get(current);
+        if (!next.getType().equals(Token.Type.IDENTIFIER)) return null;
+        String value = next.getValue();
+        if (value.length() < 2) return null;
+        String lastValue = value.substring(1);
+        char firstChar = value.charAt(0);
+        Integer radix = switch (firstChar) {
+            case 'o', 'O' -> 8;
+            case 'x', 'X' -> 16;
+            case 'b', 'B' -> 2;
+            default -> null;
+        };
+        if (radix == null) return null;
+        Long result = Long.parseLong(lastValue, radix);
+        advance();
+        return result;
+    }
+
+    public static String decodeUnicode(String str) {
+        Pattern pattern = Pattern.compile("(\\\\u(\\p{XDigit}{4}))");
+        Matcher matcher = pattern.matcher(str);
+        char ch;
+        while (matcher.find()) {
+            ch = (char) Integer.parseInt(matcher.group(2), 16);
+            str = str.replace(matcher.group(1), ch + "");
+        }
+        return str;
     }
 }

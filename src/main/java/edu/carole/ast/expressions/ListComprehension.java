@@ -33,9 +33,10 @@ public class ListComprehension extends ASTNode {
      * 推导式子句 (for variable in iterable [if condition])
      */
     public static class ComprehensionClause {
+
         private final String variable;
         private final ASTNode iterable;
-        private final ASTNode condition; // 可为null
+        private final ASTNode condition;  // 可为null
         
         public ComprehensionClause(String variable, ASTNode iterable, ASTNode condition) {
             this.variable = variable;
@@ -44,7 +45,9 @@ public class ListComprehension extends ASTNode {
         }
         
         public String getVariable() { return variable; }
+
         public ASTNode getIterable() { return iterable; }
+
         public ASTNode getCondition() { return condition; }
     }
 }

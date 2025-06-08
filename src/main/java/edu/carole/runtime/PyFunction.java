@@ -41,7 +41,7 @@ public class PyFunction extends PyObject {
         this.varargsParam = extractVarargsParam(functionParameters);
         this.kwargsParam = extractKwargsParam(functionParameters);
         this.defaultValues = extractDefaultValues(functionParameters);
-        
+
         // Debug output
         System.out.println("DEBUG: Function " + name + " created with:");
         System.out.println("  Regular parameters: " + parameters);
@@ -178,7 +178,9 @@ public class PyFunction extends PyObject {
     @Override
     public void setAttribute(String attributeName, PyObject value) {
         attributes.put(attributeName, value);
-    }    @Override
+    }
+
+    @Override
     public PyObject call(List<PyObject> arguments) {
         return call(arguments, null);
     }
@@ -318,7 +320,8 @@ public class PyFunction extends PyObject {
         // 执行函数体
         return callWithInterpreter(environment, interpreter);
     }
-      @Override
+
+    @Override
     public PyObject call(List<PyObject> arguments, Interpreter interpreter) {
         // Create new function scope
         Environment environment = new Environment(closure);

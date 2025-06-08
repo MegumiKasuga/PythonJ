@@ -17,6 +17,7 @@ import java.util.Scanner;
  */
 public class ProjectEntry {
     public static void main(String[] args) {
+        // System.out.println("\u0007");
         if (args.length == 0) {
             // 交互式模式 (REPL)
             runRepl();
@@ -71,7 +72,8 @@ public class ProjectEntry {
             run(source, interpreter);
         } catch (IOException e) {
             System.err.println("Error reading file: " + e.getMessage());
-            System.exit(74);        } catch (Exception e) {
+            System.exit(74);
+        } catch (Exception e) {
             System.err.println("Runtime Error: " + e.getMessage());
             System.err.println("Exception type: " + e.getClass().getSimpleName());
             System.err.println("Stack trace:");

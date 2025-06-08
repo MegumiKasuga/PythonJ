@@ -51,7 +51,8 @@ public class Interpreter implements ASTVisitor<PyObject> {
             System.err.println("Runtime Error: " + error.getMessage());
         }
     }
-      public PyObject execute(ASTNode statement, Environment env) {
+
+    public PyObject execute(ASTNode statement, Environment env) {
         Environment previous = this.environment;
         try {
             this.environment = env;
@@ -98,7 +99,8 @@ public class Interpreter implements ASTVisitor<PyObject> {
         }
         return result;
     }
-      @Override
+
+    @Override
     public PyObject visitAssignmentStatement(AssignmentStatement statement) {
         PyObject value = statement.getValue().accept(this);
         String target = statement.getTarget();
@@ -127,57 +129,45 @@ public class Interpreter implements ASTVisitor<PyObject> {
         // Get the right-hand side value
         PyObject rightValue = statement.getValue().accept(this);
           // Perform the compound operation
-        PyObject newValue;
-        switch (statement.getOperator()) {
-            case PLUS_ASSIGN:
-                newValue = callMagicMethod(currentValue, "__add__", rightValue, () -> add(currentValue, rightValue));
-                break;
-            case MINUS_ASSIGN:
-                newValue = callMagicMethod(currentValue, "__sub__", rightValue, () -> subtract(currentValue, rightValue));
-                break;
-            case MULTIPLY_ASSIGN:
-                newValue = callMagicMethod(currentValue, "__mul__", rightValue, () -> multiply(currentValue, rightValue));
-                break;
-            case DIVIDE_ASSIGN:
-                newValue = callMagicMethod(currentValue, "__truediv__", rightValue, () -> divide(currentValue, rightValue));
-                break;
-            case MODULO_ASSIGN:
-                newValue = callMagicMethod(currentValue, "__mod__", rightValue, () -> modulo(currentValue, rightValue));
-                break;
-            case POWER_ASSIGN:
-                newValue = callMagicMethod(currentValue, "__pow__", rightValue, () -> power(currentValue, rightValue));
-                break;
-            case FLOOR_DIVIDE_ASSIGN:
-                newValue = callMagicMethod(currentValue, "__floordiv__", rightValue, () -> floorDivide(currentValue, rightValue));
-                break;
-            case AND_ASSIGN:
-                newValue = callMagicMethod(currentValue, "__and__", rightValue, () -> bitwiseAnd(currentValue, rightValue));
-                break;
-            case OR_ASSIGN:
-                newValue = callMagicMethod(currentValue, "__or__", rightValue, () -> bitwiseOr(currentValue, rightValue));
-                break;
-            case XOR_ASSIGN:
-                newValue = callMagicMethod(currentValue, "__xor__", rightValue, () -> bitwiseXor(currentValue, rightValue));
-                break;
-            case LEFT_SHIFT_ASSIGN:
-                newValue = callMagicMethod(currentValue, "__lshift__", rightValue, () -> leftShift(currentValue, rightValue));
-                break;
-            case RIGHT_SHIFT_ASSIGN:
-                newValue = callMagicMethod(currentValue, "__rshift__", rightValue, () -> rightShift(currentValue, rightValue));
-                break;
-            default:
-                throw new RuntimeException("Unknown compound assignment operator: " + statement.getOperator());        }
-        
+        PyObject newValue = switch (statement.getOperator()) {
+            case PLUS_ASSIGN ->
+                    callMagicMethod(currentValue, "__add__", rightValue, () -> add(currentValue, rightValue));
+            case MINUS_ASSIGN ->
+                    callMagicMethod(currentValue, "__sub__", rightValue, () -> subtract(currentValue, rightValue));
+            case MULTIPLY_ASSIGN ->
+                    callMagicMethod(currentValue, "__mul__", rightValue, () -> multiply(currentValue, rightValue));
+            case DIVIDE_ASSIGN ->
+                    callMagicMethod(currentValue, "__truediv__", rightValue, () -> divide(currentValue, rightValue));
+            case MODULO_ASSIGN ->
+                    callMagicMethod(currentValue, "__mod__", rightValue, () -> modulo(currentValue, rightValue));
+            case POWER_ASSIGN ->
+                    callMagicMethod(currentValue, "__pow__", rightValue, () -> power(currentValue, rightValue));
+            case FLOOR_DIVIDE_ASSIGN ->
+                    callMagicMethod(currentValue, "__floordiv__", rightValue, () -> floorDivide(currentValue, rightValue));
+            case AND_ASSIGN ->
+                    callMagicMethod(currentValue, "__and__", rightValue, () -> bitwiseAnd(currentValue, rightValue));
+            case OR_ASSIGN ->
+                    callMagicMethod(currentValue, "__or__", rightValue, () -> bitwiseOr(currentValue, rightValue));
+            case XOR_ASSIGN ->
+                    callMagicMethod(currentValue, "__xor__", rightValue, () -> bitwiseXor(currentValue, rightValue));
+            case LEFT_SHIFT_ASSIGN ->
+                    callMagicMethod(currentValue, "__lshift__", rightValue, () -> leftShift(currentValue, rightValue));
+            case RIGHT_SHIFT_ASSIGN ->
+                    callMagicMethod(currentValue, "__rshift__", rightValue, () -> rightShift(currentValue, rightValue));
+            default -> throw new RuntimeException("Unknown compound assignment operator: " + statement.getOperator());
+        };
+
         // Store the new value respecting global/nonlocal declarations
         String target = statement.getTarget();
         if (globalVariables.contains(target)) {
-            globals.define(target, newValue);        } else if (nonlocalVariables.containsKey(target)) {
+            globals.define(target, newValue);
+        } else if (nonlocalVariables.containsKey(target)) {
             Environment targetEnv = nonlocalVariables.get(target);
             targetEnv.define(target, newValue);
         }else {
+            environment.set(target, newValue);
             environment.define(target, newValue);
         }
-        
         return newValue;
     }
 
@@ -188,7 +178,8 @@ public class Interpreter implements ASTVisitor<PyObject> {
         object.setAttribute(statement.getAttribute(), value);
         return value;
     }
-      @Override
+
+    @Override
     public PyObject visitIndexAssignmentStatement(IndexAssignmentStatement statement) {
         PyObject object = statement.getObject().accept(this);
         PyObject value = statement.getValue().accept(this);
@@ -257,18 +248,22 @@ public class Interpreter implements ASTVisitor<PyObject> {
     
     @Override
     public PyObject visitIfStatement(IfStatement statement) {
-        PyObject condition = statement.getCondition().accept(this);
-        
-        if (condition.isTruthy()) {
-            for (ASTNode stmt : statement.getThenBranch()) {
-                stmt.accept(this);
+        for (Map.Entry<ASTNode, List<ASTNode>> branch : statement.getConditionBranches()) {
+            // Evaluate the condition
+            PyObject condition = branch.getKey().accept(this);
+            if (condition.isTruthy()) {
+                // If condition is true, execute the then branch
+                for (ASTNode stmt : branch.getValue()) {
+                    stmt.accept(this);
+                }
+                return PyNone.INSTANCE; // Exit after executing the first true branch
             }
-        } else if (!statement.getElseBranch().isEmpty()) {
+        }
+        if (!statement.getElseBranch().isEmpty()) {
             for (ASTNode stmt : statement.getElseBranch()) {
                 stmt.accept(this);
             }
         }
-        
         return PyNone.INSTANCE;
     }
       @Override
@@ -330,7 +325,10 @@ public class Interpreter implements ASTVisitor<PyObject> {
             }
         }
         
-        return PyNone.INSTANCE;    }    @Override
+        return PyNone.INSTANCE;
+    }
+
+    @Override
     public PyObject visitFunctionDef(FunctionDef function) {
         PyFunction pyFunction = new PyFunction(
             function.getName(),
@@ -341,7 +339,8 @@ public class Interpreter implements ASTVisitor<PyObject> {
         environment.define(function.getName(), pyFunction);
         return pyFunction;
     }
-      @Override
+
+    @Override
     public PyObject visitClassDef(ClassDef classDef) {
         Map<String, PyObject> methods = new HashMap<>();
         
@@ -359,11 +358,13 @@ public class Interpreter implements ASTVisitor<PyObject> {
         // 创建类环境
         Environment classEnvironment = new Environment(environment);
         Environment previous = this.environment;
+        Map<String, PyObject> classAttributes = new HashMap<>();
         
         try {
             this.environment = classEnvironment;
               // 执行类体
-            for (ASTNode statement : classDef.getBody()) {                if (statement instanceof FunctionDef) {
+            for (ASTNode statement : classDef.getBody()) {
+                if (statement instanceof FunctionDef) {
                     FunctionDef method = (FunctionDef) statement;
                     PyFunction pyMethod = new PyFunction(
                         method.getName(),
@@ -372,8 +373,10 @@ public class Interpreter implements ASTVisitor<PyObject> {
                         classEnvironment
                     );
                     methods.put(method.getName(), pyMethod);
-                } else {
-                    statement.accept(this);
+                } else if (statement instanceof AssignmentStatement assign) {
+                    PyObject obj = assign.accept(this);
+                    classAttributes.put(assign.getTarget(), obj);
+                    classEnvironment.define(assign.getTarget(), obj);
                 }
             }
         } finally {
@@ -381,6 +384,7 @@ public class Interpreter implements ASTVisitor<PyObject> {
         }
         
         PyClass pyClass = new PyClass(classDef.getName(), methods, baseClasses);
+        pyClass.addClassAttributes(classAttributes);
         environment.define(classDef.getName(), pyClass);
         return pyClass;
     }
@@ -428,7 +432,9 @@ public class Interpreter implements ASTVisitor<PyObject> {
             nonlocalVariables.put(variable, nonlocalEnv);
         }
         return PyNone.INSTANCE;
-    }    @Override
+    }
+
+    @Override
     public PyObject visitImportStatement(ImportStatement statement) {
         for (ImportStatement.ImportClause importClause : statement.getImports()) {
             String moduleName = importClause.getModuleName();
@@ -443,7 +449,9 @@ public class Interpreter implements ASTVisitor<PyObject> {
         }
         
         return PyNone.INSTANCE;
-    }    @Override
+    }
+
+    @Override
     public PyObject visitFromImportStatement(FromImportStatement statement) {
         String moduleName = statement.getModuleName();
         
@@ -575,7 +583,9 @@ public class Interpreter implements ASTVisitor<PyObject> {
         public PyException getPyException() {
             return pyException;
         }
-    }    @Override
+    }
+
+    @Override
     public PyObject visitBinaryExpression(BinaryExpression expression) {
         PyObject left = expression.getLeft().accept(this);
         
@@ -593,70 +603,49 @@ public class Interpreter implements ASTVisitor<PyObject> {
         PyObject right = expression.getRight().accept(this);
         
         // 使用运算符重载系统
-        switch (expression.getOperator()) {
-            case PLUS:
-                return callMagicMethod(left, "__add__", right, () -> add(left, right));
-            case MINUS:
-                return callMagicMethod(left, "__sub__", right, () -> subtract(left, right));
-            case MULTIPLY:
-                return callMagicMethod(left, "__mul__", right, () -> multiply(left, right));
-            case DIVIDE:
-                return callMagicMethod(left, "__truediv__", right, () -> divide(left, right));
-            case MODULO:
-                return callMagicMethod(left, "__mod__", right, () -> modulo(left, right));
-            case POWER:
-                return callMagicMethod(left, "__pow__", right, () -> power(left, right));
-            case EQUAL:
-                return callMagicMethod(left, "__eq__", right, () -> PyBool.valueOf(left.equals(right)));
-            case NOT_EQUAL:
-                return callMagicMethod(left, "__ne__", right, () -> PyBool.valueOf(!left.equals(right)));
-            case LESS:
-                return callMagicMethod(left, "__lt__", right, () -> PyBool.valueOf(compare(left, right) < 0));
-            case LESS_EQUAL:
-                return callMagicMethod(left, "__le__", right, () -> PyBool.valueOf(compare(left, right) <= 0));
-            case GREATER:
-                return callMagicMethod(left, "__gt__", right, () -> PyBool.valueOf(compare(left, right) > 0));
-            case GREATER_EQUAL:
-                return callMagicMethod(left, "__ge__", right, () -> PyBool.valueOf(compare(left, right) >= 0));            case IN:
-                return PyBool.valueOf(isIn(left, right));
-            case IS:
-                return PyBool.valueOf(left == right);
-            case FLOOR_DIVIDE:
-                return callMagicMethod(left, "__floordiv__", right, () -> floorDivide(left, right));
-            case BITWISE_AND:
-                return callMagicMethod(left, "__and__", right, () -> bitwiseAnd(left, right));
-            case BITWISE_OR:
-                return callMagicMethod(left, "__or__", right, () -> bitwiseOr(left, right));
-            case BITWISE_XOR:
-                return callMagicMethod(left, "__xor__", right, () -> bitwiseXor(left, right));
-            case LEFT_SHIFT:
-                return callMagicMethod(left, "__lshift__", right, () -> leftShift(left, right));
-            case RIGHT_SHIFT:
-                return callMagicMethod(left, "__rshift__", right, () -> rightShift(left, right));
-            default:
-                throw new RuntimeException("Unknown binary operator: " + expression.getOperator());
-        }
+        return switch (expression.getOperator()) {
+            case PLUS -> callMagicMethod(left, "__add__", right, () -> add(left, right));
+            case MINUS -> callMagicMethod(left, "__sub__", right, () -> subtract(left, right));
+            case MULTIPLY -> callMagicMethod(left, "__mul__", right, () -> multiply(left, right));
+            case DIVIDE -> callMagicMethod(left, "__truediv__", right, () -> divide(left, right));
+            case MODULO -> callMagicMethod(left, "__mod__", right, () -> modulo(left, right));
+            case POWER -> callMagicMethod(left, "__pow__", right, () -> power(left, right));
+            case EQUAL -> callMagicMethod(left, "__eq__", right, () -> PyBool.valueOf(left.equals(right)));
+            case NOT_EQUAL -> callMagicMethod(left, "__ne__", right, () -> PyBool.valueOf(!left.equals(right)));
+            case LESS -> callMagicMethod(left, "__lt__", right, () -> PyBool.valueOf(compare(left, right) < 0));
+            case LESS_EQUAL -> callMagicMethod(left, "__le__", right, () -> PyBool.valueOf(compare(left, right) <= 0));
+            case GREATER -> callMagicMethod(left, "__gt__", right, () -> PyBool.valueOf(compare(left, right) > 0));
+            case GREATER_EQUAL ->
+                    callMagicMethod(left, "__ge__", right, () -> PyBool.valueOf(compare(left, right) >= 0));
+            case IN -> PyBool.valueOf(isIn(left, right));
+            case IS -> PyBool.valueOf(left == right);
+            case FLOOR_DIVIDE -> callMagicMethod(left, "__floordiv__", right, () -> floorDivide(left, right));
+            case BITWISE_AND -> callMagicMethod(left, "__and__", right, () -> bitwiseAnd(left, right));
+            case BITWISE_OR -> callMagicMethod(left, "__or__", right, () -> bitwiseOr(left, right));
+            case BITWISE_XOR -> callMagicMethod(left, "__xor__", right, () -> bitwiseXor(left, right));
+            case LEFT_SHIFT -> callMagicMethod(left, "__lshift__", right, () -> leftShift(left, right));
+            case RIGHT_SHIFT -> callMagicMethod(left, "__rshift__", right, () -> rightShift(left, right));
+            default -> throw new RuntimeException("Unknown binary operator: " + expression.getOperator());
+        };
     }
-      @Override
+
+    @Override
     public PyObject visitUnaryExpression(UnaryExpression expression) {
         PyObject operand = expression.getOperand().accept(this);
-        
-        switch (expression.getOperator()) {
-            case MINUS:
-                return callMagicMethod(operand, "__neg__", null, () -> {
-                    if (operand instanceof PyInt) {
-                        return new PyInt(-((PyInt) operand).getValue());
-                    } else if (operand instanceof PyFloat) {
-                        return new PyFloat(-((PyFloat) operand).getValue());
-                    } else {
-                        throw new PyExceptionWrapper(PyException.typeError("bad operand type for unary -: '" + operand.getTypeName() + "'"));
-                    }
-                });
-            case NOT:
-                return PyBool.valueOf(!operand.isTruthy());
-            default:
-                throw new RuntimeException("Unknown unary operator: " + expression.getOperator());
-        }
+
+        return switch (expression.getOperator()) {
+            case MINUS -> callMagicMethod(operand, "__neg__", null, () -> {
+                if (operand instanceof PyInt) {
+                    return new PyInt(-((PyInt) operand).getValue());
+                } else if (operand instanceof PyFloat) {
+                    return new PyFloat(-((PyFloat) operand).getValue());
+                } else {
+                    throw new PyExceptionWrapper(PyException.typeError("bad operand type for unary -: '" + operand.getTypeName() + "'"));
+                }
+            });
+            case NOT -> PyBool.valueOf(!operand.isTruthy());
+            default -> throw new RuntimeException("Unknown unary operator: " + expression.getOperator());
+        };
     }
     
     /**
@@ -689,8 +678,15 @@ public class Interpreter implements ASTVisitor<PyObject> {
         if (condition.isTruthy()) {
             return expression.getTrueExpression().accept(this);
         } else {
+            if (expression.getFalseExpression() == null) {
+                // If there's no false expression, return None
+                return PyNone.INSTANCE;
+            }
             return expression.getFalseExpression().accept(this);
-        }    }    @Override
+        }
+    }
+
+    @Override
     public PyObject visitCallExpression(CallExpression expression) {
         PyObject function = expression.getFunction().accept(this);
         
@@ -727,14 +723,14 @@ public class Interpreter implements ASTVisitor<PyObject> {
                     // Handle **kwargs unpacking
                     String kwargName = key.substring(2);
                     PyObject kwargsValue = entry.getValue().accept(this);
-                      if (kwargsValue instanceof PyDict) {
-                        PyDict dict = (PyDict) kwargsValue;
-                        // Add all key-value pairs from the dict to keyword arguments
-                        for (Map.Entry<PyObject, PyObject> dictEntry : dict.getEntries().entrySet()) {
-                            // Convert PyObject key to String for keyword arguments
-                            String keyStr = dictEntry.getKey().toString();
-                            keywordArguments.put(keyStr, dictEntry.getValue());
-                        }
+                        if (kwargsValue instanceof PyDict) {
+                            PyDict dict = (PyDict) kwargsValue;
+                            // Add all key-value pairs from the dict to keyword arguments
+                            for (Map.Entry<PyObject, PyObject> dictEntry : dict.getEntries().entrySet()) {
+                                // Convert PyObject key to String for keyword arguments
+                                String keyStr = dictEntry.getKey().toString();
+                                keywordArguments.put(keyStr, dictEntry.getValue());
+                            }
                     } else {
                         throw new RuntimeException("Cannot unpack non-dict object as keyword arguments");
                     }
@@ -758,7 +754,8 @@ public class Interpreter implements ASTVisitor<PyObject> {
         PyObject object = expression.getObject().accept(this);
         return object.getAttribute(expression.getAttribute());
     }
-      @Override
+
+    @Override
     public PyObject visitIndexExpression(IndexExpression expression) {
         PyObject object = expression.getObject().accept(this);
         PyObject index = expression.getIndex().accept(this);
@@ -790,7 +787,8 @@ public class Interpreter implements ASTVisitor<PyObject> {
         // Return a slice object (we could create a PySlice class for this)
         return new PySlice(start, stop, step);
     }
-      @Override
+
+    @Override
     public PyObject visitIdentifier(Identifier identifier) {
         String name = identifier.getName();
         
@@ -807,7 +805,9 @@ public class Interpreter implements ASTVisitor<PyObject> {
         else {
             return environment.get(name);
         }
-    }@Override
+    }
+
+    @Override
     public PyObject visitLiteral(Literal literal) {
         Object value = literal.getValue();
         
@@ -824,7 +824,9 @@ public class Interpreter implements ASTVisitor<PyObject> {
         } else {
             throw new RuntimeException("Unknown literal type: " + value.getClass());
         }
-    }    @Override
+    }
+
+    @Override
     public PyObject visitFStringLiteral(FStringLiteral fStringLiteral) {
         String rawValue = fStringLiteral.getValue();
         
@@ -841,7 +843,9 @@ public class Interpreter implements ASTVisitor<PyObject> {
             elements.add(element.accept(this));
         }
         return new PyList(elements);
-    }    @Override
+    }
+
+    @Override
     public PyObject visitDictLiteral(DictLiteral dictLiteral) {
         Map<PyObject, PyObject> entries = new HashMap<>();
         for (Map.Entry<ASTNode, ASTNode> entry : dictLiteral.getEntries().entrySet()) {
@@ -886,7 +890,8 @@ public class Interpreter implements ASTVisitor<PyObject> {
         } else if (left instanceof PyList && right instanceof PyList) {
             List<PyObject> combined = new ArrayList<>(((PyList) left).getElements());
             combined.addAll(((PyList) right).getElements());
-            return new PyList(combined);        } else {
+            return new PyList(combined);
+        } else {
             throw new PyExceptionWrapper(PyException.typeError("unsupported operand type(s) for +: '" + 
                 left.getTypeName() + "' and '" + right.getTypeName() + "'"));
         }
@@ -972,7 +977,8 @@ public class Interpreter implements ASTVisitor<PyObject> {
                 left.getTypeName() + "' and '" + right.getTypeName() + "'"));
         }
     }
-      private PyObject power(PyObject left, PyObject right) {
+
+    private PyObject power(PyObject left, PyObject right) {
         if (left instanceof PyInt && right instanceof PyInt) {
             long base = ((PyInt) left).getValue();
             long exp = ((PyInt) right).getValue();
@@ -1113,7 +1119,8 @@ public class Interpreter implements ASTVisitor<PyObject> {
     public PyObject visitLambdaExpression(LambdaExpression lambdaExpression) {
         return new PyLambda(lambdaExpression.getParameters(), lambdaExpression.getBody(), environment);
     }
-      @Override
+
+    @Override
     public PyObject visitSuperExpression(SuperExpression superExpression) {
         // Get the current class and instance from the environment context
         PyClass currentClass = environment.getCurrentClass();
@@ -1181,59 +1188,33 @@ public class Interpreter implements ASTVisitor<PyObject> {
         Environment iterationEnv = new Environment(this.environment);
         Environment previous = this.environment;
         this.environment = iterationEnv;
-        
         try {
-            if (iterable instanceof PyList) {
-                PyList list = (PyList) iterable;
-                for (PyObject item : list.getElements()) {
-                    iterationEnv.define(clause.getVariable(), item);
-                    
-                    // Check condition if present
-                    if (clause.getCondition() != null) {
-                        PyObject condition = clause.getCondition().accept(this);
-                        if (!condition.isTruthy()) {
-                            continue;
-                        }
-                    }
-                    
-                    // Recurse to next clause
-                    executeComprehension(element, clauses, clauseIndex + 1, result);
-                }            } else if (iterable instanceof PyString) {
-                PyString str = (PyString) iterable;
-                for (char c : str.getValue().toCharArray()) {
-                    iterationEnv.define(clause.getVariable(), new PyString(String.valueOf(c)));
-                    
-                    // Check condition if present
-                    if (clause.getCondition() != null) {
-                        PyObject condition = clause.getCondition().accept(this);
-                        if (!condition.isTruthy()) {
-                            continue;
-                        }
-                    }
-                    
-                    executeComprehension(element, clauses, clauseIndex + 1, result);
+            Iterator<PyObject> iterator;
+            if (iterable instanceof PyString pyStr) {
+                String value = pyStr.getValue();
+                List<PyObject> strs = new ArrayList<>(value.length());
+                for (char c : value.toCharArray()) {
+                    strs.add(new PyString(String.valueOf(c)));
                 }
-            } else if (iterable instanceof Iterable) {
-                // Handle any iterable object (including PyRange)
-                @SuppressWarnings("unchecked")
-                Iterator<PyObject> iterator = ((Iterable<PyObject>) iterable).iterator();
-                while (iterator.hasNext()) {
-                    PyObject item = iterator.next();
-                    iterationEnv.define(clause.getVariable(), item);
-                    
-                    // Check condition if present
-                    if (clause.getCondition() != null) {
-                        PyObject condition = clause.getCondition().accept(this);
-                        if (!condition.isTruthy()) {
-                            continue;
-                        }
-                    }
-                    
-                    executeComprehension(element, clauses, clauseIndex + 1, result);
-                }
+                iterator = strs.iterator();
             } else {
-                throw new PyExceptionWrapper(PyException.typeError("'" + iterable.getTypeName() + "' object is not iterable"));
+                PyObject iterMethod = iterable.getAttribute("__iter__");
+                PyObject iterResult = iterMethod.call(Collections.emptyList(), this);
+                iterator = iterResult.iterator();
             }
+            while (iterator.hasNext()) {
+                PyObject iterElement = iterator.next();
+                iterationEnv.define(clause.getVariable(), iterElement);
+                if (clause.getCondition() != null) {
+                    PyObject condition = clause.getCondition().accept(this);
+                    if (!condition.isTruthy()) {
+                        continue; // Skip this iteration if condition is not met
+                    }
+                }
+                executeComprehension(element, clauses, clauseIndex + 1, result);
+            }
+        } catch (Exception e) {
+            throw new PyExceptionWrapper(PyException.typeError("'" + iterable.getTypeName() + "' object is not iterable"));
         } finally {
             this.environment = previous;
         }
@@ -1266,7 +1247,8 @@ public class Interpreter implements ASTVisitor<PyObject> {
         
         return decorated;
     }
-      @Override
+
+    @Override
     public PyObject visitWithStatement(WithStatement statement) {
         // Evaluate the context expression
         PyObject contextManager = statement.getContextExpression().accept(this);
@@ -1307,10 +1289,231 @@ public class Interpreter implements ASTVisitor<PyObject> {
             }
         }
         
-        return result;
+        return result;    }
+    
+    // Match-case statement and pattern visitor methods
+    
+    @Override
+    public PyObject visitMatchStatement(MatchStatement statement) {
+        // Evaluate the subject expression
+        PyObject subject = statement.getSubject().accept(this);
+        
+        // Try each case clause until one matches
+        for (MatchStatement.CaseClause caseClause : statement.getCases()) {
+            // Create a new environment for pattern variable bindings
+            Environment caseEnvironment = new Environment(this.environment);
+            Environment previous = this.environment;
+            
+            try {
+                this.environment = caseEnvironment;
+                
+                // Try to match the pattern against the subject
+                if (matchPattern(caseClause.getPattern(), subject)) {
+                    // Check guard condition if present
+                    if (caseClause.getGuard() != null) {
+                        PyObject guardResult = caseClause.getGuard().accept(this);
+                        if (!guardResult.isTruthy()) {
+                            continue; // Guard failed, try next case
+                        }
+                    }
+                    
+                    // Pattern matched and guard passed, execute the case body
+                    PyObject result = PyNone.INSTANCE;
+                    for (ASTNode stmt : caseClause.getBody()) {
+                        result = stmt.accept(this);
+                    }
+                    
+                    // Merge any captured variables back to the original environment
+                    mergePatternVariables(previous, caseEnvironment);
+                    
+                    return result;
+                }
+            } finally {
+                this.environment = previous;
+            }
+        }
+        if (statement.hasDefaultCase()) {
+            Environment caseEnvironment = new Environment(this.environment);
+            Environment previous = this.environment;
+            try {
+                this.environment = caseEnvironment;
+                PyObject result = PyNone.INSTANCE;
+                for (ASTNode stmt : statement.getDefaultBody()) {
+                    result = stmt.accept(this);
+                }
+                mergePatternVariables(previous, caseEnvironment);
+                return result;
+            } finally {
+                this.environment = previous;
+            }
+        }
+        
+        // No case matched - this is a runtime error in Python
+        throw new RuntimeException("No matching case in match statement");
+    }
+    
+    /**
+     * Match a pattern against a subject value
+     */
+    private boolean matchPattern(ASTNode pattern, PyObject subject) {
+        if (pattern instanceof WildcardPattern) {
+            return matchWildcardPattern((WildcardPattern) pattern, subject);
+        } else if (pattern instanceof CapturePattern) {
+            return matchCapturePattern((CapturePattern) pattern, subject);
+        } else if (pattern instanceof LiteralPattern) {
+            return matchLiteralPattern((LiteralPattern) pattern, subject);
+        } else if (pattern instanceof SequencePattern) {
+            return matchSequencePattern((SequencePattern) pattern, subject);
+        } else if (pattern instanceof OrPattern) {
+            return matchOrPattern((OrPattern) pattern, subject);
+        } else {
+            throw new RuntimeException("Unknown pattern type: " + pattern.getClass().getSimpleName());
+        }
+    }
+      /**
+     * Merge pattern variables from case environment to parent environment
+     */
+    private void mergePatternVariables(Environment parent, Environment caseEnv) {
+        // Get all variables defined in case environment that weren't in parent
+        Map<String, PyObject> caseVars = caseEnv.getValues();
+        Map<String, PyObject> parentVars = parent.getValues();
+        
+        for (Map.Entry<String, PyObject> entry : caseVars.entrySet()) {
+            String name = entry.getKey();
+            PyObject value = entry.getValue();
+            
+            // Only merge new variables (captured by patterns)
+            if (!parentVars.containsKey(name)) {
+                parent.define(name, value);
+            }
+        }
+    }
+    
+    private boolean matchWildcardPattern(WildcardPattern pattern, PyObject subject) {
+        // Wildcard pattern always matches
+        return true;
+    }
+    
+    private boolean matchCapturePattern(CapturePattern pattern, PyObject subject) {
+        // Capture pattern always matches and binds the subject to the variable
+        environment.define(pattern.getName(), subject);
+        return true;
+    }
+
+
+    private boolean matchLiteralPattern(LiteralPattern pattern, PyObject subject) {
+        // Evaluate the literal value and compare with subject
+        PyObject literalValue = pattern.getValue().accept(this);
+        // Use Python equality semantics instead of Java equals()
+        PyObject result = callMagicMethod(literalValue, "__eq__", subject, () -> PyBool.valueOf(literalValue.equals(subject)));
+        return ((PyBool) result).getValue();
+    }
+    
+    private boolean matchSequencePattern(SequencePattern pattern, PyObject subject) {
+        List<ASTNode> patterns = pattern.getPatterns();
+        
+        // Check if subject is a sequence type
+        if (pattern.isTuple() && !(subject instanceof PyTuple)) {
+            return false;
+        } else if (!pattern.isTuple() && !(subject instanceof PyList)) {
+            return false;
+        }
+        
+        // Get sequence elements
+        List<PyObject> elements;
+        if (subject instanceof PyTuple) {
+            elements = ((PyTuple) subject).getElements();
+        } else if (subject instanceof PyList) {
+            elements = ((PyList) subject).getElements();
+        } else {
+            return false;
+        }
+        
+        // Check if length matches
+        if (patterns.size() != elements.size()) {
+            return false;
+        }
+        
+        // Match each pattern with corresponding element
+        for (int i = 0; i < patterns.size(); i++) {
+            if (!matchPattern(patterns.get(i), elements.get(i))) {
+                return false;
+            }
+        }
+        
+        return true;
+    }
+    
+    private boolean matchOrPattern(OrPattern pattern, PyObject subject) {
+        // Try left pattern first
+        Environment leftEnv = new Environment(this.environment);
+        Environment previous = this.environment;
+        
+        try {
+            this.environment = leftEnv;
+            if (matchPattern(pattern.getLeft(), subject)) {
+                // Left pattern matched, merge variables and return true
+                mergePatternVariables(previous, leftEnv);
+                return true;
+            }
+        } finally {
+            this.environment = previous;
+        }
+        
+        // Try right pattern
+        Environment rightEnv = new Environment(this.environment);
+        try {
+            this.environment = rightEnv;
+            if (matchPattern(pattern.getRight(), subject)) {
+                // Right pattern matched, merge variables and return true
+                mergePatternVariables(previous, rightEnv);
+                return true;
+            }
+        } finally {
+            this.environment = previous;
+        }
+        
+        // Neither pattern matched
+        return false;
+    }
+    
+    @Override
+    public PyObject visitWildcardPattern(WildcardPattern pattern) {
+        // This method should not be called directly during matching
+        // Pattern matching is handled by matchPattern() method
+        throw new RuntimeException("Wildcard pattern should not be visited directly");
+    }
+    
+    @Override
+    public PyObject visitCapturePattern(CapturePattern pattern) {
+        // This method should not be called directly during matching
+        // Pattern matching is handled by matchPattern() method
+        throw new RuntimeException("Capture pattern should not be visited directly");
+    }
+    
+    @Override
+    public PyObject visitLiteralPattern(LiteralPattern pattern) {
+        // This method should not be called directly during matching
+        // Pattern matching is handled by matchPattern() method
+        throw new RuntimeException("Literal pattern should not be visited directly");
+    }
+    
+    @Override
+    public PyObject visitSequencePattern(SequencePattern pattern) {
+        // This method should not be called directly during matching
+        // Pattern matching is handled by matchPattern() method
+        throw new RuntimeException("Sequence pattern should not be visited directly");
+    }
+    
+    @Override
+    public PyObject visitOrPattern(OrPattern pattern) {
+        // This method should not be called directly during matching
+        // Pattern matching is handled by matchPattern() method
+        throw new RuntimeException("Or pattern should not be visited directly");
     }
     
     // 控制流异常
     public static class BreakException extends RuntimeException {}
+
     public static class ContinueException extends RuntimeException {}
 }

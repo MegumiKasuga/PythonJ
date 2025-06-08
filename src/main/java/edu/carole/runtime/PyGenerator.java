@@ -117,7 +117,9 @@ public class PyGenerator extends PyObject implements Iterable<PyObject> {
         private void generateValues() {
             values = new ArrayList<>();
             generateRecursive(0, new Environment(closure));
-        }          private void generateRecursive(int clauseIndex, Environment env) {
+        }
+
+        private void generateRecursive(int clauseIndex, Environment env) {
             if (clauseIndex >= clauses.size()) {
                 // 生成元素
                 Environment previous = interpreter.getEnvironment();
@@ -133,7 +135,8 @@ public class PyGenerator extends PyObject implements Iterable<PyObject> {
             
             ComprehensionClause clause = clauses.get(clauseIndex);
             Environment previous = interpreter.getEnvironment();
-            try {                interpreter.setEnvironment(env);
+            try {
+                interpreter.setEnvironment(env);
                 PyObject iterable = clause.getIterable().accept(interpreter);
                 
                 // Support all iterable objects

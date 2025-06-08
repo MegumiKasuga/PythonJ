@@ -106,6 +106,7 @@ public class PyString extends PyObjectWithMethods {
         
         // 算术方法
         methodRegistry.registerMethod("__add__", MethodBuilder.oneArg(this::__add__));
+        methodRegistry.registerMethod("__mod__", MethodBuilder.oneArg(this::__mod__));
         methodRegistry.registerMethod("__mul__", MethodBuilder.oneArg(this::__mul__));
         methodRegistry.registerMethod("__contains__", MethodBuilder.oneArg(this::__contains__));
         
@@ -212,7 +213,39 @@ public class PyString extends PyObjectWithMethods {
         }
         throw new RuntimeException("can only concatenate str (not \"" + other.getTypeName() + "\") to str");
     }
-      private PyObject __mul__(PyObject other) {
+
+    private PyObject __mod__(PyObject other) {
+        try {
+            PyObject iterator = other.getAttribute("__iter__");
+            PyObject iterResult = iterator.call(List.of());
+            Iterator<PyObject> iter = iterResult.iterator();
+            List<Object> strList = new ArrayList<>();
+            PyObject obj;
+            while (iter.hasNext()) {
+                obj = iter.next();
+                if (obj instanceof PyInt pyInt) {
+                    strList.add(pyInt.getValue());
+                } else if (obj instanceof PyFloat pyFloat) {
+                    strList.add(pyFloat.getValue());
+                } else {
+                    strList.add(obj.toString());
+                }
+            }
+            try {
+                return new PyString(String.format(value, strList.toArray(new Object[0])));
+            } catch (Exception e) {
+                throw new RuntimeException("not all arguments converted during string formatting", e);
+            }
+        } catch (Exception ignored) {
+            try {
+                return new PyString(String.format(value, other.toString()));
+            } catch (Exception e2) {
+                throw new RuntimeException("not all arguments converted during string formatting", e2);
+            }
+        }
+    }
+
+    private PyObject __mul__(PyObject other) {
         if (other instanceof PyInt) {
             long times = ((PyInt) other).getValue();
             if (times <= 0) {
@@ -616,7 +649,8 @@ public class PyString extends PyObjectWithMethods {
         
         return new PyString(sb.toString());
     }
-      private PyObject ljust(List<PyObject> args) {
+
+    private PyObject ljust(List<PyObject> args) {
         int width = (int) MethodBuilder.requireType(args.get(0), PyInt.class, "width").getValue();
         String fillChar = " ";
         
@@ -639,7 +673,8 @@ public class PyString extends PyObjectWithMethods {
         
         return new PyString(sb.toString());
     }
-      private PyObject rjust(List<PyObject> args) {
+
+    private PyObject rjust(List<PyObject> args) {
         int width = (int) MethodBuilder.requireType(args.get(0), PyInt.class, "width").getValue();
         String fillChar = " ";
         
@@ -663,7 +698,8 @@ public class PyString extends PyObjectWithMethods {
         
         return new PyString(sb.toString());
     }
-      private PyObject zfill(PyObject widthObj) {
+
+    private PyObject zfill(PyObject widthObj) {
         int width = (int) MethodBuilder.requireType(widthObj, PyInt.class, "width").getValue();
         
         if (width <= value.length()) {

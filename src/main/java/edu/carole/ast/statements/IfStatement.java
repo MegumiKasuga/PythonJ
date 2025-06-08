@@ -2,25 +2,29 @@ package edu.carole.ast.statements;
 
 import edu.carole.ast.ASTNode;
 import edu.carole.ast.ast.ASTVisitor;
+
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /**
  * if语句
  */
 public class IfStatement extends ASTNode {
-    private final ASTNode condition;
-    private final List<ASTNode> thenBranch;
+    private final List<Map.Entry<ASTNode, List<ASTNode>>> conditionBranches;
     private final List<ASTNode> elseBranch;
     
-    public IfStatement(ASTNode condition, List<ASTNode> thenBranch, List<ASTNode> elseBranch) {
-        this.condition = condition;
-        this.thenBranch = thenBranch;
+    public IfStatement(List<Map.Entry<ASTNode, List<ASTNode>>> conditionBranches,
+                       List<ASTNode> elseBranch) {
         this.elseBranch = elseBranch;
+        this.conditionBranches = conditionBranches; // 如果有elif分支，可以在这里初始化
     }
-    
-    public ASTNode getCondition() { return condition; }
-    public List<ASTNode> getThenBranch() { return thenBranch; }
+
     public List<ASTNode> getElseBranch() { return elseBranch; }
+
+    public List<Map.Entry<ASTNode, List<ASTNode>>> getConditionBranches() {
+        return conditionBranches;
+    }
     
     @Override
     public <T> T accept(ASTVisitor<T> visitor) {
