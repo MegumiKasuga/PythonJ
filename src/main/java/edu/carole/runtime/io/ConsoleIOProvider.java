@@ -13,6 +13,8 @@ public class ConsoleIOProvider implements IOProvider {
     
     // 可配置的输出流，默认为System.out
     private PrintStream outputStream = System.out;
+
+    private PrintStream errStream = System.err; // 错误输出流，默认为System.err
     
     /**
      * 设置输入流
@@ -29,6 +31,10 @@ public class ConsoleIOProvider implements IOProvider {
     public void setOutputStream(PrintStream outputStream) {
         this.outputStream = outputStream != null ? outputStream : System.out;
     }
+
+    public void setErrStream(PrintStream errStream) {
+        this.errStream = errStream != null ? errStream : System.err;
+    }
     
     /**
      * 获取当前输入流
@@ -44,6 +50,10 @@ public class ConsoleIOProvider implements IOProvider {
      */
     public PrintStream getOutputStream() {
         return outputStream;
+    }
+
+    public PrintStream getErrStream() {
+        return errStream;
     }
     
     @Override

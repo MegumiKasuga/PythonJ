@@ -8,13 +8,7 @@ import java.util.Map;
 import edu.carole.ast.ASTNode;
 import edu.carole.interpreter.Environment;
 import edu.carole.interpreter.Interpreter;
-import edu.carole.runtime.PyBuiltinFunction;
-import edu.carole.runtime.PyDict;
-import edu.carole.runtime.PyFunction;
-import edu.carole.runtime.PyModule;
-import edu.carole.runtime.PyNone;
-import edu.carole.runtime.PyObject;
-import edu.carole.runtime.PyString;
+import edu.carole.runtime.*;
 
 /**
  * Implementation of the Python functools module
@@ -67,7 +61,8 @@ public class functools {
     /**
      * Register the module in the global environment
      */
-    public static void registerModule(Map<String, PyObject> globals) {
-        globals.put("functools", createModule());
+    public static void registerModule(ModuleLoader moduleLoader) {
+        moduleLoader.getLoadedModules().put("functools", createModule());
+        // globals.put("functools", createModule());
     }
 }

@@ -1,6 +1,7 @@
 package edu.carole.runtime;
 
 import edu.carole.ast.ASTNode;
+import edu.carole.ast.statements.Decorator;
 import edu.carole.ast.statements.FunctionParameter;
 import edu.carole.interpreter.Environment;
 import edu.carole.interpreter.Interpreter;
@@ -22,7 +23,7 @@ public class PyFunction extends PyObject {
     private final String kwargsParam; // **kwargs parameter name
     private final Map<String, ASTNode> defaultValues; // parameter name -> default value expression
     private boolean isBoundMethod = false;
-    private PyObject boundInstance = null;  // For bound methods, the instance it's bound to
+    private PyObject boundInstance = null;
     
     // 静态工厂方法用于向后兼容
     public static PyFunction fromParameterNames(String name, List<String> parameters, List<ASTNode> body, Environment closure) {
@@ -31,7 +32,8 @@ public class PyFunction extends PyObject {
                 .collect(java.util.stream.Collectors.toList());
         return new PyFunction(name, functionParameters, body, closure);
     }
-      // 主要构造器，使用 FunctionParameter 结构
+
+    // 主要构造器，使用 FunctionParameter 结构
     public PyFunction(String name, List<FunctionParameter> functionParameters, List<ASTNode> body, Environment closure) {
         this.name = name;
         this.functionParameters = functionParameters;
@@ -71,7 +73,27 @@ public class PyFunction extends PyObject {
         this.kwargsParam = kwargsParam;
         this.defaultValues = defaultValues != null ? defaultValues : new HashMap<>();
     }
-      // 转换工具方法
+
+    public boolean hasSameFunctionHead(PyFunction other) {
+        if (other == null) return false;
+        if (this == other) return true;
+
+        // 比较函数名
+        if (!this.name.equals(other.name)) return false;
+
+        // 比较参数列表
+        if (this.functionParameters.size() != other.functionParameters.size()) return false;
+
+        // 比较可变参数
+        if (this.varargsParam == null && other.varargsParam != null) return false;
+        if (this.varargsParam != null && other.varargsParam == null) return false;
+
+        // 比较关键字参数
+        if (this.kwargsParam == null && other.kwargsParam != null) return false;
+        return !(this.kwargsParam != null && other.kwargsParam == null);
+    }
+
+    // 转换工具方法
     private List<FunctionParameter> convertToFunctionParameters(List<String> parameterNames) {
         return parameterNames.stream()
                 .map(FunctionParameter::new)
@@ -105,7 +127,7 @@ public class PyFunction extends PyObject {
         
         return result;
     }
-    
+
     // 从 FunctionParameter 列表中提取信息的工具方法
     private List<String> extractParameterNames(List<FunctionParameter> functionParameters) {
         return functionParameters.stream()
@@ -138,6 +160,24 @@ public class PyFunction extends PyObject {
             }
         }
         return result;
+    }
+
+    public boolean isStaticMethod() {
+        return attributes.containsKey("__isstaticmethod__") &&
+                attributes.get("__isstaticmethod__").isTruthy();
+    }
+
+    public void setStaticMethod(boolean isStaticMethod) {
+        attributes.put("__isstaticmethod__", PyBool.fromValue(isStaticMethod));
+    }
+
+    public boolean isAbstractMethod() {
+        return attributes.containsKey("__isabstractmethod__") &&
+                attributes.get("__isabstractmethod__").isTruthy();
+    }
+
+    public void setAbstractMethod(boolean isAbstract) {
+        attributes.put("__isabstractmethod__", PyBool.fromValue(isAbstract));
     }
 
     @Override
@@ -329,7 +369,7 @@ public class PyFunction extends PyObject {
         List<PyObject> actualArguments = new ArrayList<>(arguments);
         
         // Handle bound method behavior by injecting 'self' as first argument
-        if (isBoundMethod) {
+        if (isBoundMethod && !isStaticMethod()) {
             // Insert the instance as the first argument (self)
             actualArguments.add(0, boundInstance);
             System.out.println("DEBUG: Injecting self argument for bound method: " + boundInstance);
@@ -514,6 +554,7 @@ public class PyFunction extends PyObject {
         // Mark as bound method and keep reference to the instance
         boundFunction.isBoundMethod = true;
         boundFunction.boundInstance = instance;
+        boundFunction.setStaticMethod(isStaticMethod()); // Preserve static method status
 
         // Copy attributes to the bound function
         for (Map.Entry<String, PyObject> entry : attributes.entrySet()) {

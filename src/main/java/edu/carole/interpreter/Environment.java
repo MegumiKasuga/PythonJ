@@ -32,17 +32,17 @@ public class Environment {
     /**
      * 获取变量
      */
-    public PyObject get(String name) {
+    public PyObject get(String name, boolean allowFunc) {
         if (name.contains(".")) {
             String[] path = name.split("\\.");
-            Map<String, PyObject> attributes = getAttributeEnv(path, true);
+            Map<String, PyObject> attributes = getAttributeEnv(path, true, allowFunc);
             if (attributes != null && attributes.containsKey(path[path.length - 1])) {
                 return attributes.get(path[path.length - 1]);
             }
         } else if (values.containsKey(name)) {
             return values.get(name);
         } else if (enclosing != null) {
-            return enclosing.get(name);
+            return enclosing.get(name, allowFunc);
         }
 
         throw new Interpreter.PyExceptionWrapper(
@@ -53,7 +53,7 @@ public class Environment {
     public PyObject set(String name, PyObject value) {
         if (name.contains(".")) {
             String[] path = name.split("\\.");
-            Map<String, PyObject> attributes = getAttributeEnv(path, !path[0].equals("self"));
+            Map<String, PyObject> attributes = getAttributeEnv(path, !path[0].equals("self"), false);
             if (attributes != null) {
                 attributes.put(path[path.length - 1], value);
                 return value;
@@ -69,7 +69,7 @@ public class Environment {
         );
     }
 
-    public Map<String, PyObject> getAttributeEnv(String[] path, boolean allowClass) {
+    public Map<String, PyObject> getAttributeEnv(String[] path, boolean allowClass, boolean allowFunc) {
         Environment current = this;
 
         while (!current.values.containsKey(path[0])) {
@@ -92,8 +92,24 @@ public class Environment {
                     currentValues = module.getAttributes();
                 }
             } else if (obj instanceof PyClass cls) {
-                if (cls.getAttribute(path[i + 1]) != null) {
-                    currentValues = cls.getClassAttributes();
+                Map<String, PyObject> cache = cls.findMethodEnv(path[i + 1]);
+                if (allowFunc && cache != null) {
+                    PyFunction func = ((PyFunction) cache.get(path[i + 1]));
+                    if (!func.isStaticMethod()) {
+                        throw new Interpreter.PyExceptionWrapper(
+                                PyException.attributeError(
+                                        "Cannot access non-static method '" + path[i + 1] + "' from class '" + cls.getName() + "'"
+                                )
+                        );
+                    }
+                    currentValues = Map.of(path[i + 1], func);
+                } else {
+                    cache = cls.getAttributeEnv(path[i + 1]);
+                    if (cache != null) {
+                        currentValues = cache;
+                    } else {
+                        return null; // 属性不存在
+                    }
                 }
             } else if (obj instanceof PyInstance instance) {
                 if (!allowClass && i + 1 >= path.length - 1) {
@@ -107,10 +123,16 @@ public class Environment {
                         classAttributes.putAll(clazz.getClassAttributes());
                         classAttributes.putAll(clazz.getMethods());
                         if (i + 1 >= path.length - 1) {
-                            Map<String, PyObject> cache = null;
-                            cache = (clazz.findMethodEnv(path[i + 1]));
+                            Map<String, PyObject> cache = (clazz.findMethodEnv(path[i + 1]));
                             if (cache != null) {
                                 PyFunction func = ((PyFunction) cache.get(path[i + 1]));
+                                if (func.isAbstractMethod()) {
+                                    throw new Interpreter.PyExceptionWrapper(
+                                        PyException.attributeError(
+                                            "method '" + path[i + 1] + "' in class '" + clazz.getName() + "' is abstract, cannot be called directly."
+                                        )
+                                    );
+                                }
                                 func = func.bindToInstance(instance);
                                 return Map.of(path[i + 1], func);
                             }

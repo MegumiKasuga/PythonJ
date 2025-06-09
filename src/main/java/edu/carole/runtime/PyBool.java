@@ -11,11 +11,17 @@ public class PyBool extends PyObjectWithMethods {
     public static final PyBool FALSE = new PyBool(false);
     
     private final boolean value;
-      private PyBool(boolean value) {
+
+    private PyBool(boolean value) {
         super();
         this.value = value;
     }
-      @Override
+
+    public static PyBool fromValue(boolean value) {
+        return value ? TRUE : FALSE;
+    }
+
+    @Override
     protected void registerMethods() {
         // Logical operations
         methodRegistry.registerMethod("__and__", MethodBuilder.oneArg(this::and));

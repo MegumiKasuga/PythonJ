@@ -24,6 +24,7 @@ public class Parser {
     }
     
     public Program parse() {
+        scanAndRemoveUselessDedents();
         List<ASTNode> statements = new ArrayList<>();
         
         while (!isAtEnd()) {
@@ -40,6 +41,39 @@ public class Parser {
         }
         
         return new Program(statements);
+    }
+
+    private void scanAndRemoveUselessDedents() {
+        int index = 0;
+        boolean matching = false;
+        int indentDepth = 0, startIndex = -1;
+        while (index < tokens.size()) {
+            Token token = tokens.get(index);
+            if (token.getType() == Token.Type.DEDENT) {
+                indentDepth += token.getType() == Token.Type.INDENT ? 1 : -1;
+                startIndex = index;
+                index++;
+                matching = true;
+            } else if (token.getType() == Token.Type.NEWLINE) {
+                index++;
+            } else if (matching && token.getType() == Token.Type.INDENT) {
+                indentDepth++;
+                if (indentDepth >= 0) {
+                    for (int i = startIndex; i < index; i++) {
+                        tokens.remove(i);
+                    }
+                    index = startIndex; // Reset index to start of dedent block
+                    startIndex = -1;
+                    indentDepth = 0;
+                    matching = false; // Reset matching after indent
+                }
+            } else {
+                matching = false;
+                indentDepth = 0;
+                startIndex = -1;
+                index++;
+            }
+        }
     }
 
     private ASTNode statement() {
@@ -235,6 +269,9 @@ public class Parser {
         
         consume(Token.Type.COLON, "Expected ':' after class name");
         consume(Token.Type.NEWLINE, "Expected newline after ':'");
+        while (check(Token.Type.NEWLINE)) {
+            advance(); // Skip any additional newlines
+        }
         consume(Token.Type.INDENT, "Expected indentation after class definition");
         
         List<ASTNode> body = block(false);
@@ -1369,7 +1406,7 @@ public class Parser {
             do {
                 advance();
             } while (check(Token.Type.NEWLINE));
-            consume(Token.Type.INDENT, "Expected indentation after" + statementNameIndent);
+            consume(Token.Type.INDENT, "Expected indentation after " + statementNameIndent);
             return false;
         }
         return true;

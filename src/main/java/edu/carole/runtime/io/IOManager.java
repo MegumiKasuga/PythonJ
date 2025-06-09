@@ -107,6 +107,10 @@ public class IOManager {
     public PrintStream getConsoleOutputStream() {
         return consoleProvider != null ? consoleProvider.getOutputStream() : System.out;
     }
+
+    public PrintStream getConsoleErrStream() {
+        return consoleProvider != null ? consoleProvider.getErrStream() : System.err;
+    }
     
     /**
      * 从控制台输入流读取一行

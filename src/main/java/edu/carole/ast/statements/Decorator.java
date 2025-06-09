@@ -9,10 +9,19 @@ import edu.carole.ast.ast.ASTVisitor;
 public class Decorator extends ASTNode {
     private final ASTNode expression;  // 装饰器表达式
     private final ASTNode target;      // 被装饰的函数或类
+    private Decorator parent = null;
+    private ASTNode root = null;
     
     public Decorator(ASTNode expression, ASTNode target) {
         this.expression = expression;
         this.target = target;
+        if (target instanceof ClassDef || target instanceof FunctionDef) {
+            root = target;  // 设置父节点为装饰器
+        }
+        if (target instanceof Decorator decorator) {
+            decorator.parent = this;
+            root = decorator.root;
+        }
     }
     
     public ASTNode getExpression() {
@@ -22,7 +31,19 @@ public class Decorator extends ASTNode {
     public ASTNode getTarget() {
         return target;
     }
-    
+
+    public ASTNode getRoot() {
+        return root;
+    }
+
+    public Decorator getDecoratorEntry() {
+        if (parent != null) {
+            return parent.getDecoratorEntry();
+        } else {
+            return this;
+        }
+    }
+
     @Override
     public <T> T accept(ASTVisitor<T> visitor) {
         return visitor.visitDecorator(this);

@@ -6,7 +6,7 @@
 
     <groupId>edu.carole</groupId>
     <artifactId>PythonJ</artifactId>
-    <version>1.0-alpha-25060501</version>
+    <version>1.0-alpha-25060901</version>
 
     <properties>
         <maven.compiler.source>17</maven.compiler.source>

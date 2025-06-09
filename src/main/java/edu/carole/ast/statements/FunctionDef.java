@@ -13,7 +13,9 @@ public class FunctionDef extends ASTNode {
     private final List<FunctionParameter> parameters;  // 使用新的参数结构
     private final List<ASTNode> body;
     private final ASTNode returnTypeHint; // 返回值类型提示
-      // 主要构造器
+    private boolean isStaticMethod = false;
+
+    // 主要构造器
     public FunctionDef(String name, List<FunctionParameter> parameters, List<ASTNode> body) {
         this.name = name;
         this.parameters = parameters;
@@ -45,7 +47,8 @@ public class FunctionDef extends ASTNode {
         this.body = body;
         this.returnTypeHint = null;
     }
-      // 转换工具方法  
+
+    // 转换工具方法
     private List<FunctionParameter> convertLegacyParameters(List<String> parameterNames, 
                                                            String varargsParam, String kwargsParam, 
                                                            Map<String, ASTNode> defaultValues) {
@@ -69,6 +72,7 @@ public class FunctionDef extends ASTNode {
         
         return result;
     }
+
     // Getters
     public String getName() { return name; }
     public List<FunctionParameter> getParameters() { return parameters; }
@@ -118,6 +122,7 @@ public class FunctionDef extends ASTNode {
         return parameters.stream()
                 .anyMatch(p -> p.getIdentifier().equals(param) && p.hasDefaultValue());
     }
+
     public ASTNode getDefaultValue(String param) {
         return parameters.stream()
                 .filter(p -> p.getIdentifier().equals(param))
@@ -125,7 +130,15 @@ public class FunctionDef extends ASTNode {
                 .findFirst()
                 .orElse(null);
     }
-    
+
+    public void setStaticMethod(boolean staticMethod) {
+        isStaticMethod = staticMethod;
+    }
+
+    public boolean isStaticMethod() {
+        return isStaticMethod;
+    }
+
     @Override
     public <T> T accept(ASTVisitor<T> visitor) {
         return visitor.visitFunctionDef(this);

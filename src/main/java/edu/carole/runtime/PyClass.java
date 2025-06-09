@@ -1,6 +1,7 @@
 package edu.carole.runtime;
 
 import edu.carole.interpreter.Environment;
+import edu.carole.interpreter.Interpreter;
 
 import java.util.*;
 
@@ -118,6 +119,57 @@ public class PyClass extends PyObject {
         if (!mro.contains(cls)) {
             mro.add(cls);
         }
+    }
+
+    public boolean isAbstractClass(Interpreter interpreter) {
+        if (interpreter.getModuleLoader().getLoadedModules().containsKey("abc")) {
+            // 如果已经加载了abc模块，直接使用其中的ABC类
+            PyObject abcModule = interpreter.getModuleLoader().getLoadedModules().get("abc");
+            if (abcModule instanceof PyModule pyModule) {
+                PyObject abcClass = pyModule.getAttribute("ABC");
+                return this == abcClass || baseClasses.contains(abcClass);
+            }
+        }
+        return false;
+    }
+
+    public HashMap<String, PyFunction> scanMROForAbstractMethodsForImplementation(Interpreter interpreter) {
+        if (isAbstractClass(interpreter)) {
+            // 如果是抽象类，扫描MRO中的抽象方法
+            return new HashMap<>();
+        }
+
+        HashMap<String, PyFunction> abstractMethods = new HashMap<>();
+        for (int i = mro.size() - 1; i >= 0; i--) {
+            PyClass cls = mro.get(i);
+            for (Map.Entry<String, PyObject> entry : cls.methods.entrySet()) {
+                String methodName = entry.getKey();
+                PyObject method = entry.getValue();
+
+                // 如果是抽象方法，记录下来
+                if (method instanceof PyFunction pyFunc) {
+                    if (pyFunc.isAbstractMethod()) {
+                        if (!cls.isAbstractClass(interpreter)) {
+                            throw new RuntimeException(
+                                    "Cannot implement abstract method '" + methodName + "' in non-abstract class '" + cls.getName() + "'"
+                            );
+                        }
+                        if (!abstractMethods.containsKey(methodName)) {
+                            abstractMethods.putIfAbsent(methodName, pyFunc);
+                        }
+                    } else {
+                        if (!abstractMethods.isEmpty() &&
+                                abstractMethods.containsKey(methodName)) {
+                            PyFunction absFunc = abstractMethods.get(methodName);
+                            if (absFunc.hasSameFunctionHead(pyFunc)) {
+                                abstractMethods.remove(methodName);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return abstractMethods;
     }
     
     @Override

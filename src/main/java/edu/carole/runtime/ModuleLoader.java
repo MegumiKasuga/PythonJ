@@ -297,7 +297,7 @@ public class ModuleLoader {
      * Get all loaded modules
      */
     public Map<String, PyModule> getLoadedModules() {
-        return Collections.unmodifiableMap(loadedModules);
+        return loadedModules;
     }
     
     /**

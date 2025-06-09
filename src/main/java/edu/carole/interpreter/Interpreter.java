@@ -30,16 +30,20 @@ public class Interpreter implements ASTVisitor<PyObject> {
     
     public Interpreter(IOManager io) {
         this.io = io;
-        this.globals = BuiltinFunctions.createGlobalEnvironment();
-        this.environment = globals;
         this.moduleLoader = new ModuleLoader(io);
+        this.globals = BuiltinFunctions.createGlobalEnvironment(io, moduleLoader);
+        this.environment = globals;
     }
     
     // Getter and setter for environment access
     public Environment getEnvironment() {
         return environment;
     }
-    
+
+    public ModuleLoader getModuleLoader() {
+        return moduleLoader;
+    }
+
     public void setEnvironment(Environment environment) {
         this.environment = environment;
     }
@@ -48,7 +52,11 @@ public class Interpreter implements ASTVisitor<PyObject> {
         try {
             visitProgram(program);
         } catch (RuntimeException error) {
-            System.err.println("Runtime Error: " + error.getMessage());
+            if (error instanceof PyExceptionWrapper wrapper) {
+                io.getConsoleErrStream().println(wrapper.pyException.toString());
+            } else {
+                io.getConsoleErrStream().println(error.getMessage());
+            }
         }
     }
 
@@ -124,7 +132,7 @@ public class Interpreter implements ASTVisitor<PyObject> {
     @Override
     public PyObject visitCompoundAssignmentStatement(CompoundAssignmentStatement statement) {
         // Get current value of the variable
-        PyObject currentValue = environment.get(statement.getTarget());
+        PyObject currentValue = environment.get(statement.getTarget(), false);
         
         // Get the right-hand side value
         PyObject rightValue = statement.getValue().accept(this);
@@ -266,7 +274,8 @@ public class Interpreter implements ASTVisitor<PyObject> {
         }
         return PyNone.INSTANCE;
     }
-      @Override
+
+    @Override
     public PyObject visitWhileStatement(WhileStatement statement) {
         boolean brokeOut = false;
         
@@ -294,7 +303,8 @@ public class Interpreter implements ASTVisitor<PyObject> {
         
         return PyNone.INSTANCE;
     }
-      @Override
+
+    @Override
     public PyObject visitForStatement(ForStatement statement) {
         PyObject iterable = statement.getIterable().accept(this);
         Iterator<PyObject> iterator = iterable.iterator();
@@ -336,6 +346,7 @@ public class Interpreter implements ASTVisitor<PyObject> {
             function.getBody(),
             environment
         );
+        pyFunction.setStaticMethod(function.isStaticMethod());
         environment.define(function.getName(), pyFunction);
         return pyFunction;
     }
@@ -347,7 +358,7 @@ public class Interpreter implements ASTVisitor<PyObject> {
         // 解析父类
         List<PyClass> baseClasses = new ArrayList<>();
         for (String baseClassName : classDef.getBaseClasses()) {
-            PyObject baseObj = environment.get(baseClassName);
+            PyObject baseObj = environment.get(baseClassName, true);
             if (baseObj instanceof PyClass) {
                 baseClasses.add((PyClass) baseObj);
             } else {
@@ -364,15 +375,19 @@ public class Interpreter implements ASTVisitor<PyObject> {
             this.environment = classEnvironment;
               // 执行类体
             for (ASTNode statement : classDef.getBody()) {
-                if (statement instanceof FunctionDef) {
-                    FunctionDef method = (FunctionDef) statement;
+                if (statement instanceof FunctionDef method) {
                     PyFunction pyMethod = new PyFunction(
                         method.getName(),
                         method.getParameters(),
                         method.getBody(),
-                        classEnvironment
+                        environment
                     );
                     methods.put(method.getName(), pyMethod);
+                } else if (statement instanceof Decorator decorator) {
+                    PyObject result = visitDecorator(decorator, true);
+                    if (result instanceof PyFunction func) {
+                        methods.put(func.getName(), func);
+                    }
                 } else if (statement instanceof AssignmentStatement assign) {
                     PyObject obj = assign.accept(this);
                     classAttributes.put(assign.getTarget(), obj);
@@ -386,6 +401,17 @@ public class Interpreter implements ASTVisitor<PyObject> {
         PyClass pyClass = new PyClass(classDef.getName(), methods, baseClasses);
         pyClass.addClassAttributes(classAttributes);
         environment.define(classDef.getName(), pyClass);
+        HashMap<String, PyFunction> abstractMissImplementation =
+                pyClass.scanMROForAbstractMethodsForImplementation(this);
+        if (!abstractMissImplementation.isEmpty()) {
+            StringBuilder sb = new StringBuilder();
+            sb.append("class '").append(pyClass.getName()).append("' need to implement the following abstract methods: ");
+            for (String methodName : abstractMissImplementation.keySet()) {
+                sb.append(methodName).append(", ");
+            }
+            sb.setLength(sb.length() - 2); // 去掉最后的逗号和空格
+            throw new PyExceptionWrapper(PyException.typeError(sb.toString()));
+        }
         return pyClass;
     }
     
@@ -582,6 +608,11 @@ public class Interpreter implements ASTVisitor<PyObject> {
         
         public PyException getPyException() {
             return pyException;
+        }
+
+        @Override
+        public String getMessage() {
+            return pyException.toString();
         }
     }
 
@@ -794,16 +825,16 @@ public class Interpreter implements ASTVisitor<PyObject> {
         
         // Check if this variable is declared as global
         if (globalVariables.contains(name)) {
-            return globals.get(name);
+            return globals.get(name, true);
         }
         // Check if this variable is declared as nonlocal
         else if (nonlocalVariables.containsKey(name)) {
             Environment targetEnv = nonlocalVariables.get(name);
-            return targetEnv.get(name);
+            return targetEnv.get(name, true);
         }
         // Regular variable access (follows normal scope resolution)
         else {
-            return environment.get(name);
+            return environment.get(name, true);
         }
     }
 
@@ -1219,21 +1250,28 @@ public class Interpreter implements ASTVisitor<PyObject> {
             this.environment = previous;
         }
     }
-    
+
     @Override
     public PyObject visitDecorator(Decorator decorator) {
+        // Decorators are handled in a special way, they modify the function or class definition
+        return visitDecorator(decorator, false);
+    }
+
+    public PyObject visitDecorator(Decorator decorator, boolean inClass) {
         // First, evaluate the target function or class
         PyObject target = decorator.getTarget().accept(this);
-        
         // Then, evaluate the decorator expression
+
+        PyObject decorated;
         PyObject decoratorFunc = decorator.getExpression().accept(this);
-          // Apply the decorator to the target by calling the decorator with the target as argument
+        // Apply the decorator to the target by calling the decorator with the target as argument
         List<PyObject> args = new ArrayList<>();
         args.add(target);
-        
+
         // The result of applying a decorator is the decorated function/class - use context-aware call
-        PyObject decorated = decoratorFunc.call(args, this);
-        
+        decorated = decoratorFunc.call(args, this);
+
+
         // Update the environment binding if the target is a named function or class
         if (decorator.getTarget() instanceof FunctionDef) {
             String name = ((FunctionDef) decorator.getTarget()).getName();
