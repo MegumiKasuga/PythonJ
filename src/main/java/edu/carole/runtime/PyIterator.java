@@ -11,6 +11,7 @@ public class PyIterator extends PyObject implements Iterator<PyObject> {
     private final Iterator<PyObject> iterator;
     private PyObject pyObject;
     private final String sourceTypeName;
+    private boolean finished = false;
     
     public PyIterator(Iterator<PyObject> iterator, String sourceTypeName) {
         this.iterator = iterator;
@@ -20,7 +21,8 @@ public class PyIterator extends PyObject implements Iterator<PyObject> {
 
     public PyIterator(PyObject pyObject, String sourceTypeName) {
         this.iterator = null;
-        this.pyObject = runIterMethod(pyObject);
+        runIterMethod(pyObject);
+        this.pyObject = pyObject;
         this.sourceTypeName = sourceTypeName;
     }
 
@@ -45,7 +47,7 @@ public class PyIterator extends PyObject implements Iterator<PyObject> {
     }
     
     @Override
-    public boolean isTruthy() { 
+    public boolean isTruthy() {
         return true; 
     }
     
@@ -95,6 +97,9 @@ public class PyIterator extends PyObject implements Iterator<PyObject> {
      */
     @Override
     public Iterator<PyObject> iterator() {
+        if (iterator == null) {
+            return this;
+        }
         return iterator;
     }
     
@@ -102,7 +107,10 @@ public class PyIterator extends PyObject implements Iterator<PyObject> {
      * Check if iterator has more elements
      */
     public boolean hasNext() {
-        return iterator.hasNext();
+        if (iterator != null) {
+            return iterator.hasNext();
+        }
+        return !finished;
     }
     
     /**
@@ -110,13 +118,27 @@ public class PyIterator extends PyObject implements Iterator<PyObject> {
      */
     public PyObject next() {
         try {
-            if (iterator.hasNext()) {
-                return iterator.next();
+            if (iterator != null) {
+                if (hasNext()) {
+                    return iterator.next();
+                } else {
+                    throw new RuntimeException("StopIteration");
+                }
             } else {
-                throw new RuntimeException("StopIteration");
+                PyObject nextMethod = pyObject.getAttribute("__next__");
+                try {
+                    return nextMethod.call(List.of()); // Call the __next__ method on the PyObject
+                } catch (RuntimeException e) {
+                    if (e.getMessage().equals("StopIteration")) {
+                        finished = true; // Mark as finished if StopIteration is raised
+                        throw e;
+                    } else {
+                        throw e; // Rethrow other exceptions
+                    }
+                }
             }
-        } catch (NoSuchElementException e) {
-            throw new RuntimeException("StopIteration");
+        } catch(NoSuchElementException e){
+                throw new RuntimeException("StopIteration");
         }
     }
 }

@@ -8,11 +8,24 @@ import edu.carole.ast.ast.ASTVisitor;
  */
 public class StarredExpression extends ASTNode {
     private final ASTNode expression;
+    private final int line, column;
     
-    public StarredExpression(ASTNode expression) {
+    public StarredExpression(ASTNode expression, int line, int column) {
         this.expression = expression;
+        this.line = line;
+        this.column = column;
     }
-    
+
+    @Override
+    public int getLine() {
+        return line;
+    }
+
+    @Override
+    public int getColumn() {
+        return column;
+    }
+
     public ASTNode getExpression() {
         return expression;
     }

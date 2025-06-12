@@ -14,16 +14,12 @@ public abstract class PyObject {
      */
     public PyObject getAttribute(String name) {
         // 提供一些默认的魔术方法
-        switch (name) {
-            case "__str__":
-                return new PyBuiltinFunction("__str__", args -> new PyString(this.toString()));
-            case "__repr__":
-                return new PyBuiltinFunction("__repr__", args -> new PyString(this.toString()));
-            case "__bool__":
-                return new PyBuiltinFunction("__bool__", args -> PyBool.valueOf(this.isTruthy()));
-            default:
-                throw new RuntimeException("'" + getTypeName() + "' object has no attribute '" + name + "'");
-        }
+        return switch (name) {
+            case "__str__" -> new PyBuiltinFunction("__str__", args -> new PyString(this.toString()));
+            case "__repr__" -> new PyBuiltinFunction("__repr__", args -> new PyString(this.toString()));
+            case "__bool__" -> new PyBuiltinFunction("__bool__", args -> PyBool.valueOf(this.isTruthy()));
+            default -> throw new RuntimeException("'" + getTypeName() + "' object has no attribute '" + name + "'");
+        };
     }
     
     /**

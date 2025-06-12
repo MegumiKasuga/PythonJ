@@ -8,11 +8,24 @@ import edu.carole.ast.ast.ASTVisitor;
  */
 public class Literal extends ASTNode {
     private final Object value;
+    private final int line, column;
     
-    public Literal(Object value) {
+    public Literal(Object value, int line, int column) {
         this.value = value;
+        this.line = line;
+        this.column = column;
     }
-    
+
+    @Override
+    public int getLine() {
+        return line;
+    }
+
+    @Override
+    public int getColumn() {
+        return column;
+    }
+
     public Object getValue() {
         return value;
     }

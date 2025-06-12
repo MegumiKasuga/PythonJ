@@ -2,8 +2,12 @@ package edu.carole.runtime;
 
 import edu.carole.ast.ASTNode;
 import edu.carole.ast.expressions.ListComprehension.ComprehensionClause;
+import edu.carole.ast.statements.ForStatement;
+import edu.carole.ast.statements.TryExceptStatement;
 import edu.carole.interpreter.Environment;
 import edu.carole.interpreter.Interpreter;
+
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.ArrayList;
@@ -18,6 +22,7 @@ public class PyGenerator extends PyObject implements Iterable<PyObject> {
     private final Interpreter interpreter;
     private boolean exhausted = false;
     private GeneratorIterator currentIterator = null;
+    private boolean isFunctionGenerator = false;
     
     public PyGenerator(ASTNode element, List<ComprehensionClause> clauses, Environment closure, Interpreter interpreter) {
         this.element = element;
@@ -25,11 +30,29 @@ public class PyGenerator extends PyObject implements Iterable<PyObject> {
         this.closure = closure;
         this.interpreter = interpreter;
     }
-    
+
+    public PyGenerator(PyFunction.FunctionParameterPacket yieldException) {
+        interpreter = yieldException.interpreter();
+        clauses = new ArrayList<>();
+        closure = yieldException.environment();
+        element = null;
+        isFunctionGenerator = true;
+        FunctionGeneratorIterator generatorIterator = new FunctionGeneratorIterator(yieldException.func());
+        generatorIterator.setYieldingPoint(yieldException.lastYield());
+        currentIterator = generatorIterator;
+    }
+
+    public boolean isFunctionGenerator() {
+        return isFunctionGenerator;
+    }
+
     @Override
     public Iterator<PyObject> iterator() {
         // For for-loops, return a new iterator
-        return new GeneratorIterator();
+        if (currentIterator == null) {
+            return new GeneratorIterator();
+        }
+        return currentIterator;
     }
     
     /**
@@ -90,7 +113,7 @@ public class PyGenerator extends PyObject implements Iterable<PyObject> {
         }
     }
     
-    private class GeneratorIterator implements Iterator<PyObject> {
+    class GeneratorIterator implements Iterator<PyObject> {
         private List<PyObject> values = null;
         private int index = 0;
         
@@ -114,7 +137,7 @@ public class PyGenerator extends PyObject implements Iterable<PyObject> {
             return values.get(index++);
         }
         
-        private void generateValues() {
+        void generateValues() {
             values = new ArrayList<>();
             generateRecursive(0, new Environment(closure));
         }
@@ -165,6 +188,200 @@ public class PyGenerator extends PyObject implements Iterable<PyObject> {
                 }
             } finally {
                 interpreter.setEnvironment(previous);
+            }
+        }
+    }
+
+    class FunctionGeneratorIterator extends GeneratorIterator {
+        private final PyFunction function;
+        private PyFunction.YieldException yieldingPoint = null;
+        private PyObject cachedValue = null;
+        private final List<ASTNode> funcBody;
+
+        public FunctionGeneratorIterator(PyFunction function) {
+            this.function = function;
+            funcBody = function.getBody();
+        }
+
+        public void setYieldingPoint(PyFunction.YieldException yieldingPoint) {
+            this.yieldingPoint = yieldingPoint;
+            yieldingPoint.addFrom(
+                    new PyFunction.YieldingClause(
+                            null,
+                            funcBody,
+                            false,
+                            null
+                    )
+            );
+            cachedValue = yieldingPoint.getValue();
+        }
+
+        public PyFunction getFunction() {
+            return function;
+        }
+
+        public PyObject getCachedValue() {
+            return cachedValue;
+        }
+
+        @Override
+        public boolean hasNext() {
+            if (yieldingPoint == null) {
+                return cachedValue != null;
+            }
+            return true;
+        }
+
+        @Override
+        void generateValues() {
+
+        }
+
+        @Override
+        public PyObject next() {
+            if (!hasNext()) {
+                throw new RuntimeException("StopIteration");
+            }
+            if (yieldingPoint == null) {
+                if (cachedValue != null) {
+                    exhausted = true;
+                    PyObject retValue = cachedValue;
+                    cachedValue = null; // 重置缓存值
+                    return retValue; // 返回缓存的值
+                }
+            }
+            try {
+                return goToNextYield();
+            } catch (PyFunction.YieldException e) {
+                PyObject retValue = cachedValue;
+                if (e.getValue() != null) {
+                    cachedValue = e.getValue();
+                }
+                yieldingPoint = e;
+                return retValue;
+            } catch (PyFunction.ReturnException e) {
+                PyObject retValue = cachedValue;
+                yieldingPoint = null;
+                exhausted = true;
+                if (e.getValue() != null) {
+                    cachedValue = e.getValue();
+                } else {
+                    cachedValue = null; // 如果没有返回值，重置缓存值
+                    return retValue;
+                }
+                return retValue;
+            } catch (RuntimeException e) {
+                if (e.getMessage().equals("StopIteration")) {
+                    if (cachedValue == null) {
+                        throw new RuntimeException("StopIteration");
+                    }
+                    exhausted = true;
+                    yieldingPoint = null;
+                    PyObject retValue = cachedValue;
+                    cachedValue = null; // 重置缓存值
+                    return retValue; // 返回缓存的值
+                }
+                throw e; // 其他异常直接抛出
+            }
+        }
+
+        private PyObject goToNextYield() {
+            if (!hasNext()) {
+                throw new RuntimeException("StopIteration");
+            }
+            List<PyFunction.YieldingClause> clauses = yieldingPoint.getFrom();
+            if (clauses.size() < 2) {
+                throw new RuntimeException("Invalid yielding point, not enough clauses");
+            }
+            for (int i = 1; i < clauses.size(); i++) {
+                PyFunction.YieldingClause lower = clauses.get(i - 1);
+                PyFunction.YieldingClause upper = clauses.get(i);
+                try {
+                    runTree(upper, lower);
+                } catch (PyFunction.YieldException e) {
+                    // 如果遇到YieldException，说明需要返回值
+                    for (int j = i; j < clauses.size(); j++) {
+                        e.addFrom(clauses.get(j));
+                    }
+                    throw e;
+                } catch (PyFunction.ReturnException e) {
+                    // 如果遇到ReturnException，说明函数执行完毕
+                    exhausted = true;
+                    yieldingPoint = null;
+                    throw e;
+                }
+            }
+            return cachedValue;
+        }
+
+        private void runTree(PyFunction.YieldingClause upper,
+                             PyFunction.YieldingClause lower) {
+            ASTNode statement = lower.self();
+            List<ASTNode> body = upper.body();
+            int beginIndex = body.indexOf(statement) + (lower.isCirculate() ? 0 : 1);
+            Environment previous = interpreter.getEnvironment();
+            interpreter.setEnvironment(closure);
+            if (beginIndex >= body.size()) {
+                if (body == funcBody) {
+                    // 如果是函数体，说明已经执行完毕
+                    exhausted = true;
+                    yieldingPoint = null;
+                    interpreter.setEnvironment(previous);
+                    throw new PyFunction.ReturnException(null);
+                }
+                try {
+                    dealWithTryCatchFinally(upper, previous);
+                } catch (PyFunction.YieldException finallyYield) {
+                    ASTNode upperNode = upper.self();
+                    upper.setBody(((TryExceptStatement) upperNode).getFinallyBody());
+                    throw finallyYield;
+                }
+                interpreter.setEnvironment(previous);
+                // 如果已经到达最后一个语句，直接返回
+                return;
+            }
+            for (int i = beginIndex; i < body.size(); i++) {
+                ASTNode node = body.get(i);
+                if (i == beginIndex && lower.iterableCache() != null) {
+                    if (lower.isCirculate() && node instanceof ForStatement forStat) {
+                        interpreter.visitForStatement(forStat, lower.iterableCache());
+                    } else {
+                        node.accept(interpreter);
+                    }
+                } else {
+                    node.accept(interpreter);
+                }
+                if (body == funcBody && i >= body.size() - 1) {
+                    // 函数体已经执行完成
+                    yieldingPoint = null;
+                    exhausted = true;
+                    interpreter.setEnvironment(previous);
+                    throw new PyFunction.ReturnException(cachedValue);
+                }
+            }
+            try {
+                dealWithTryCatchFinally(upper, previous);
+            } catch (PyFunction.YieldException finallyYield) {
+                ASTNode upperNode = upper.self();
+                upper.setBody(((TryExceptStatement) upperNode).getFinallyBody());
+                throw finallyYield;
+            }
+            interpreter.setEnvironment(previous);
+        }
+
+        private void dealWithTryCatchFinally(PyFunction.YieldingClause upper, Environment previous) {
+            if (upper.self() instanceof TryExceptStatement tryExcept) {
+                List<ASTNode> finallyBody = tryExcept.getFinallyBody();
+                if (upper.body() == finallyBody) {
+                    // 如果finally块是当前执行的块，直接返回
+                    interpreter.setEnvironment(previous);
+                    return;
+                }
+                if (finallyBody != null && !finallyBody.isEmpty()) {
+                    for (ASTNode finallyNode : finallyBody) {
+                        finallyNode.accept(interpreter);
+                    }
+                }
             }
         }
     }

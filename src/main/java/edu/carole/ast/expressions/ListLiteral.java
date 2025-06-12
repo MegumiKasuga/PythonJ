@@ -9,11 +9,24 @@ import java.util.List;
  */
 public class ListLiteral extends ASTNode {
     private final List<ASTNode> elements;
+    private final int line, column;
     
-    public ListLiteral(List<ASTNode> elements) {
+    public ListLiteral(List<ASTNode> elements, int line, int column) {
         this.elements = elements;
+        this.line = line;
+        this.column = column;
     }
-    
+
+    @Override
+    public int getLine() {
+        return line;
+    }
+
+    @Override
+    public int getColumn() {
+        return column;
+    }
+
     public List<ASTNode> getElements() {
         return elements;
     }

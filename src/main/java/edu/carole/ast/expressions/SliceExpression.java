@@ -10,13 +10,26 @@ public class SliceExpression extends ASTNode {
     private final ASTNode start;   // 可以为 null
     private final ASTNode stop;    // 可以为 null  
     private final ASTNode step;    // 可以为 null
+    private final int line, column;
     
-    public SliceExpression(ASTNode start, ASTNode stop, ASTNode step) {
+    public SliceExpression(ASTNode start, ASTNode stop, ASTNode step, int line, int column) {
         this.start = start;
         this.stop = stop;
         this.step = step;
+        this.line = line;
+        this.column = column;
     }
-    
+
+    @Override
+    public int getLine() {
+        return line;
+    }
+
+    @Override
+    public int getColumn() {
+        return column;
+    }
+
     public ASTNode getStart() { return start; }
     public ASTNode getStop() { return stop; }
     public ASTNode getStep() { return step; }

@@ -9,12 +9,25 @@ import edu.carole.ast.ast.ASTVisitor;
 public class IndexExpression extends ASTNode {
     private final ASTNode object;
     private final ASTNode index;  // 可以是简单表达式或 SliceExpression
+    private final int line, column;
     
-    public IndexExpression(ASTNode object, ASTNode index) {
+    public IndexExpression(ASTNode object, ASTNode index, int line, int column) {
         this.object = object;
         this.index = index;
+        this.line = line;
+        this.column = column;
     }
-    
+
+    @Override
+    public int getLine() {
+        return line;
+    }
+
+    @Override
+    public int getColumn() {
+        return column;
+    }
+
     public ASTNode getObject() { return object; }
     public ASTNode getIndex() { return index; }
     

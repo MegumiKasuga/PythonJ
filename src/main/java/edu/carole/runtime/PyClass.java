@@ -15,6 +15,7 @@ public class PyClass extends PyObject {
     private List<PyClass> mro; // 方法解析顺序 (Method Resolution Order)
     private PyClasspath classpath; // Class path information
     private final Map<String, PyObject> classAttributes; // Class attributes
+    private final Map<String, PyProperty> properties = new HashMap<>(); // Class properties
     
     public PyClass(String name, Map<String, PyObject> methods) {
         this.name = name;
@@ -87,6 +88,14 @@ public class PyClass extends PyObject {
 
     public void addClassAttributes(Map<String, PyObject> attributes) {
         classAttributes.putAll(attributes);
+    }
+
+    public void addProperty(String name, PyProperty property) {
+        properties.put(name, property);
+    }
+
+    public void addProperties(Map<String, PyProperty> properties) {
+        this.properties.putAll(properties);
     }
     
     /**
@@ -237,6 +246,11 @@ public class PyClass extends PyObject {
     public PyObject call(List<PyObject> arguments, edu.carole.interpreter.Interpreter interpreter) {
         // 创建实例
         PyInstance instance = new PyInstance(this);
+        properties.forEach(
+                (name, prop) -> {
+                    instance.setAttribute(name, prop.boundToInstance(instance));
+                }
+        );
         
         // 调用__init__方法（如果存在）
         PyObject initMethod = findMethod("__init__");

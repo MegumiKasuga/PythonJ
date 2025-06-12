@@ -14,6 +14,7 @@ public class CallExpression extends ASTNode {
     private final ASTNode function;
     private final List<ASTNode> positionalArguments; // 位置参数
     private final Map<String, ASTNode> keywordArguments; // 关键字参数 name -> value expression
+    private final int line, column;
     
     // 原始构造器，保持向后兼容
     public CallExpression(ASTNode function, List<ASTNode> arguments) {
@@ -23,12 +24,25 @@ public class CallExpression extends ASTNode {
     }
     
     // 新构造器，支持关键字参数
-    public CallExpression(ASTNode function, List<ASTNode> positionalArguments, Map<String, ASTNode> keywordArguments) {
+    public CallExpression(ASTNode function, List<ASTNode> positionalArguments, Map<String, ASTNode> keywordArguments,
+                          int line, int column) {
         this.function = function;
         this.positionalArguments = positionalArguments;
         this.keywordArguments = keywordArguments;
+        this.line = line;
+        this.column = column;
     }
-    
+
+    @Override
+    public int getLine() {
+        return line;
+    }
+
+    @Override
+    public int getColumn() {
+        return column;
+    }
+
     public ASTNode getFunction() { return function; }
     
     public List<ASTNode> getArguments() { 

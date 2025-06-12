@@ -87,6 +87,7 @@ public class Parser {
             if (match(Token.Type.DEF)) return functionDef();
             if (match(Token.Type.CLASS)) return classDef();
             if (match(Token.Type.RETURN)) return returnStatement();
+            if (match(Token.Type.YIELD)) return yieldStatement();
             if (match(Token.Type.BREAK)) return new BreakStatement();
             if (match(Token.Type.CONTINUE)) return new ContinueStatement();
             if (match(Token.Type.PASS)) return new PassStatement();
@@ -133,7 +134,6 @@ public class Parser {
 
         List<ASTNode> elseBranch = new ArrayList<>();
         if (match(Token.Type.ELSE)) {
-            consume(Token.Type.COLON, "Expected ':' after else");
             singleLine = skipLineAndCheckIfSingleLine(
                     "else", "else statement"
             );
@@ -287,6 +287,14 @@ public class Parser {
         return new ReturnStatement(value);
     }
 
+    private ASTNode yieldStatement() {
+        ASTNode value = null;
+        if (!check(Token.Type.NEWLINE) && !isAtEnd()) {
+            value = tupleExpression(true); // Use tupleExpression to support comma-separated yields
+        }
+        return new YieldStatement(value);
+    }
+
     private List<ASTNode> block(boolean singleLine) {
         List<ASTNode> statements = new ArrayList<>();
         
@@ -389,6 +397,7 @@ public class Parser {
     }
 
     private ASTNode tupleExpression(boolean greedy) {
+        Token token = previous();
         ASTNode expr = or();
         
         // Check if this is a tuple (comma-separated expressions)
@@ -408,7 +417,8 @@ public class Parser {
             
             // Create a tuple if we have more than one element OR if there's a trailing comma
             // The trailing comma case is important for single-element tuple unpacking: "a, = ..."
-            return greedy ? new TupleLiteral(elements) : elements.get(0);
+            return greedy ? new TupleLiteral(elements, previous().getLine(), previous().getColumn()) :
+                    elements.get(0);
         }
         
         return expr;
@@ -417,8 +427,10 @@ public class Parser {
     private ASTNode or() {
         ASTNode expr = conditionalExpression();
             while (match(Token.Type.OR)) {
+                Token token = tokens.get(current - 1);
                 ASTNode right = conditionalExpression();
-                expr = new BinaryExpression(expr, BinaryExpression.Operator.OR, right);
+                expr = new BinaryExpression(expr, BinaryExpression.Operator.OR,
+                        right, token.getLine(), token.getColumn());
             }
         return expr;
     }
@@ -432,13 +444,15 @@ public class Parser {
         
         // Check for conditional expression (ternary operator)
         if (match(Token.Type.IF)) {
+            Token ifToken = tokens.get(current - 1);
             ASTNode condition = or(); // Parse condition with higher precedence
             ASTNode falseExpression = null;
             if (check(Token.Type.ELSE)) {
                 consume(Token.Type.ELSE, "Expected 'else' in conditional expression");
                 falseExpression = conditionalExpression(); // Right-associative
             }
-            return new ConditionalExpression(expr, condition, falseExpression);
+            return new ConditionalExpression(expr, condition, falseExpression,
+                    ifToken.getLine(), ifToken.getColumn());
         }
         return expr;
     }
@@ -448,8 +462,10 @@ public class Parser {
         ASTNode expr = bitwiseOr();
         
         while (match(Token.Type.AND)) {
+            Token token = tokens.get(current - 1);
             ASTNode right = bitwiseOr();
-            expr = new BinaryExpression(expr, BinaryExpression.Operator.AND, right);
+            expr = new BinaryExpression(expr, BinaryExpression.Operator.AND, right,
+                    token.getLine(), token.getColumn());
         }
         
         return expr;
@@ -459,8 +475,10 @@ public class Parser {
         ASTNode expr = bitwiseXor();
         
         while (match(Token.Type.BITWISE_OR)) {
+            Token token = tokens.get(current - 1);
             ASTNode right = bitwiseXor();
-            expr = new BinaryExpression(expr, BinaryExpression.Operator.BITWISE_OR, right);
+            expr = new BinaryExpression(expr, BinaryExpression.Operator.BITWISE_OR, right,
+                    token.getLine(), token.getColumn());
         }
         
         return expr;
@@ -470,8 +488,10 @@ public class Parser {
         ASTNode expr = bitwiseAnd();
         
         while (match(Token.Type.BITWISE_XOR)) {
+            Token token = tokens.get(current - 1);
             ASTNode right = bitwiseAnd();
-            expr = new BinaryExpression(expr, BinaryExpression.Operator.BITWISE_XOR, right);
+            expr = new BinaryExpression(expr, BinaryExpression.Operator.BITWISE_XOR, right,
+                    token.getLine(), token.getColumn());
         }
         
         return expr;
@@ -481,8 +501,10 @@ public class Parser {
         ASTNode expr = shift();
         
         while (match(Token.Type.BITWISE_AND)) {
+            Token token = tokens.get(current - 1);
             ASTNode right = shift();
-            expr = new BinaryExpression(expr, BinaryExpression.Operator.BITWISE_AND, right);
+            expr = new BinaryExpression(expr, BinaryExpression.Operator.BITWISE_AND, right,
+                    token.getLine(), token.getColumn());
         }
         
         return expr;
@@ -496,7 +518,7 @@ public class Parser {
             ASTNode right = equality();
             BinaryExpression.Operator op = operator.getType() == Token.Type.LEFT_SHIFT ? 
                 BinaryExpression.Operator.LEFT_SHIFT : BinaryExpression.Operator.RIGHT_SHIFT;
-            expr = new BinaryExpression(expr, op, right);
+            expr = new BinaryExpression(expr, op, right, operator.getLine(), operator.getColumn());
         }
         
         return expr;
@@ -511,7 +533,8 @@ public class Parser {
             ASTNode right = comparison();
             BinaryExpression.Operator op = operator.getType() == Token.Type.EQUAL ? 
                 BinaryExpression.Operator.EQUAL : BinaryExpression.Operator.NOT_EQUAL;
-            expr = new BinaryExpression(expr, op, right);
+            expr = new BinaryExpression(expr, op, right,
+                    operator.getLine(), operator.getColumn());
         }
         
         return expr;
@@ -532,7 +555,8 @@ public class Parser {
                 case IS -> BinaryExpression.Operator.IS;
                 default -> throw new RuntimeException("Unknown comparison operator");
             };
-            expr = new BinaryExpression(expr, op, right);
+            expr = new BinaryExpression(expr, op, right,
+                    operator.getLine(), operator.getColumn());
         }
         
         return expr;
@@ -546,7 +570,8 @@ public class Parser {
             ASTNode right = factor();
             BinaryExpression.Operator op = operator.getType() == Token.Type.MINUS ? 
                 BinaryExpression.Operator.MINUS : BinaryExpression.Operator.PLUS;
-            expr = new BinaryExpression(expr, op, right);
+            expr = new BinaryExpression(expr, op, right,
+                    operator.getLine(), operator.getColumn());
         }
         
         return expr;
@@ -566,7 +591,8 @@ public class Parser {
                 case FLOOR_DIVIDE -> BinaryExpression.Operator.FLOOR_DIVIDE;
                 default -> throw new RuntimeException("Unknown factor operator");
             };
-            expr = new BinaryExpression(expr, op, right);
+            expr = new BinaryExpression(expr, op, right,
+                    operator.getLine(), operator.getColumn());
         }
         
         return expr;
@@ -576,8 +602,10 @@ public class Parser {
         ASTNode expr = unary();
         
         if (match(Token.Type.POWER)) {
+            Token token = tokens.get(current - 1);
             ASTNode right = power(); // 右结合
-            expr = new BinaryExpression(expr, BinaryExpression.Operator.POWER, right);
+            expr = new BinaryExpression(expr, BinaryExpression.Operator.POWER, right,
+                    token.getLine(), token.getColumn());
         }
         
         return expr;
@@ -585,13 +613,15 @@ public class Parser {
     
     private ASTNode unary() {
         if (match(Token.Type.NOT)) {
+            Token token = previous();
             ASTNode expr = unary();
-            return new UnaryExpression(UnaryExpression.Operator.NOT, expr);
+            return new UnaryExpression(UnaryExpression.Operator.NOT, expr, token.getLine(), token.getColumn());
         }
         
         if (match(Token.Type.MINUS)) {
+            Token token = previous();
             ASTNode expr = unary();
-            return new UnaryExpression(UnaryExpression.Operator.MINUS, expr);
+            return new UnaryExpression(UnaryExpression.Operator.MINUS, expr, token.getLine(), token.getColumn());
         }
         
         return call();
@@ -599,17 +629,18 @@ public class Parser {
     
     private ASTNode call() {
         ASTNode expr = primary();
-        
+        Token token = tokens.get(current);
+
         while (true) {
             if (match(Token.Type.LEFT_PAREN)) {
-                expr = finishCall(expr);
+                expr = finishCall(expr, token.getLine(), token.getColumn());
             } else if (match(Token.Type.DOT)) {
                 Token name = consume(Token.Type.IDENTIFIER, "Expected property name after '.'");
-                expr = new AttributeExpression(expr, name.getValue());
+                expr = new AttributeExpression(expr, name.getValue(), name.getLine(), name.getColumn());
             } else if (match(Token.Type.LEFT_BRACKET)) {
-                ASTNode indexOrSlice = parseIndexOrSlice();
+                ASTNode indexOrSlice = parseIndexOrSlice(token);
                 consume(Token.Type.RIGHT_BRACKET, "Expected ']' after index");
-                expr = new IndexExpression(expr, indexOrSlice);
+                expr = new IndexExpression(expr, indexOrSlice, token.getLine(), token.getColumn());
             } else {
                 break;
             }
@@ -618,7 +649,7 @@ public class Parser {
         return expr;
     }
 
-    private ASTNode finishCall(ASTNode callee) {
+    private ASTNode finishCall(ASTNode callee, int line, int column) {
         List<ASTNode> positionalArguments = new ArrayList<>();
         Map<String, ASTNode> keywordArguments = new HashMap<>();
         boolean hasKeywordArg = false;  // 标记是否已经遇到了关键字参数
@@ -627,13 +658,14 @@ public class Parser {
             do {
                 // 检查是否是*args
                 if (check(Token.Type.MULTIPLY)) {
+                    Token token = tokens.get(current);
                     advance(); // consume the '*'
                     ASTNode args = or();
                     if (!(args instanceof Identifier)) {
                         throw error("Expected identifier after '*'");
                     }
                     // Create a special StarredExpression to mark this as *args
-                    positionalArguments.add(new StarredExpression(args));
+                    positionalArguments.add(new StarredExpression(args, token.getLine(), token.getColumn()));
                     continue;
                 }
 
@@ -675,7 +707,7 @@ public class Parser {
         }
         
         consume(Token.Type.RIGHT_PAREN, "Expected ')' after arguments");
-        return new CallExpression(callee, positionalArguments, keywordArguments);
+        return new CallExpression(callee, positionalArguments, keywordArguments, line, column);
     }
 
     private ASTNode primary() {
@@ -683,54 +715,59 @@ public class Parser {
 //            advance();
 //            return primary();
 //        }
-        if (match(Token.Type.TRUE)) return new Literal(true);
-        if (match(Token.Type.FALSE)) return new Literal(false);
-        if (match(Token.Type.NONE)) return new Literal(null);
+        if (match(Token.Type.TRUE)) return new Literal(true, previous().getLine(), previous().getColumn());
+        if (match(Token.Type.FALSE)) return new Literal(false, previous().getLine(), previous().getColumn());
+        if (match(Token.Type.NONE)) return new Literal(null, previous().getLine(), previous().getColumn());
           // Lambda expression
         if (match(Token.Type.LAMBDA)) {
-            return lambdaExpression();
+            return lambdaExpression(previous());
         }
         
         // Super expression
         if (match(Token.Type.SUPER)) {
-            return superExpression();
+            return superExpression(previous());
         }
         
         if (match(Token.Type.NUMBER)) {
+            Token token = previous();
             Long specialNum = dealWithSpecialNumbers();
             if (specialNum != null) {
-                return new Literal(specialNum);
+                return new Literal(specialNum, token.getLine(), token.getColumn());
             }
             String value = previous().getValue();
             if (value.contains(".")) {
-                return new Literal(Double.parseDouble(value));
+                return new Literal(Double.parseDouble(value), token.getLine(), token.getColumn());
             } else {
-                return new Literal(Long.parseLong(value));
+                return new Literal(Long.parseLong(value), token.getLine(), token.getColumn());
             }
         }
         if (match(Token.Type.STRING, Token.Type.TRIPLE_STRING)) {
-            return new Literal(decodeUnicode(previous().getValue()));
+            Token token = previous();
+            return new Literal(decodeUnicode(previous().getValue()), previous().getLine(), previous().getColumn());
         }
         if (match(Token.Type.RAW_STRING, Token.Type.TRIPLE_RAW_STRING)) {
-            return new Literal(previous().getValue());
+            Token token = previous();
+            return new Literal(previous().getValue(), token.getLine(), token.getColumn());
         }
         
         if (match(Token.Type.F_STRING, Token.Type.TRIPLE_F_STRING)) {
             Token token = previous();
             boolean isTriple = token.getType() == Token.Type.TRIPLE_F_STRING;
-            return new FStringLiteral(token.getValue(), false, isTriple);
+            return new FStringLiteral(token.getValue(), false, isTriple, token.getLine(), token.getColumn());
         }
         
         if (match(Token.Type.IDENTIFIER)) {
-            return new Identifier(previous().getValue());
+            return new Identifier(previous().getValue(),
+                    previous().getLine(), previous().getColumn());
         }
 
         if (match(Token.Type.LEFT_PAREN)) {
+            Token head = previous();
             // Handle both grouped expressions, tuple literals, and generator expressions
             if (check(Token.Type.RIGHT_PAREN)) {
                 // Empty tuple: ()
                 consume(Token.Type.RIGHT_PAREN, "Expected ')' after '('");
-                return new TupleLiteral(new ArrayList<>());
+                return new TupleLiteral(new ArrayList<>(), head.getLine(), head.getColumn());
             }
             
             // Use or() instead of expression() to avoid tuple parsing interference
@@ -738,7 +775,7 @@ public class Parser {
             
             // Check for generator expression: (x for x in range(10))
             if (match(Token.Type.FOR)) {
-                ASTNode result = parseGeneratorExpression(first);
+                ASTNode result = parseGeneratorExpression(first, head);
                 consume(Token.Type.RIGHT_PAREN, "Expected ')' after generator expression");
                 return result;
             }
@@ -756,7 +793,7 @@ public class Parser {
                 }
                 
                 consume(Token.Type.RIGHT_PAREN, "Expected ')' after tuple elements");
-                return new TupleLiteral(elements);
+                return new TupleLiteral(elements, head.getLine(), head.getColumn());
             } else {
                 // This is a grouped expression: (a)
                 consume(Token.Type.RIGHT_PAREN, "Expected ')' after expression");
@@ -764,21 +801,23 @@ public class Parser {
             }
         }
         if (match(Token.Type.LEFT_BRACKET)) {
+            Token head = previous();
             if (check(Token.Type.RIGHT_BRACKET)) {
             // Empty list
                 consume(Token.Type.RIGHT_BRACKET, "Expected ']' after '['");
-                return new ListLiteral(new ArrayList<>());
+                return new ListLiteral(new ArrayList<>(), head.getLine(), head.getColumn());
             }
             
-            ASTNode result = parseListOrComprehension();
+            ASTNode result = parseListOrComprehension(head);
             consume(Token.Type.RIGHT_BRACKET, "Expected ']' after list elements");
             return result;
         }
         if (match(Token.Type.LEFT_BRACE)) {
+            Token token = previous();
             // Handle empty braces as empty dictionary
             if (check(Token.Type.RIGHT_BRACE)) {
                 consume(Token.Type.RIGHT_BRACE, "Expected '}' after empty braces");
-                return new DictLiteral(new HashMap<>());
+                return new DictLiteral(new HashMap<>(), token.getLine(), token.getColumn());
             }
             
             // Parse first element to determine if it's a set or dict
@@ -801,7 +840,7 @@ public class Parser {
                 }
                 
                 consume(Token.Type.RIGHT_BRACE, "Expected '}' after dictionary entries");
-                return new DictLiteral(entries);
+                return new DictLiteral(entries, token.getLine(), token.getColumn());
             } else {
                 // It's a set
                 List<ASTNode> elements = new ArrayList<>();
@@ -814,7 +853,7 @@ public class Parser {
                 }
                 
                 consume(Token.Type.RIGHT_BRACE, "Expected '}' after set elements");
-                return new SetLiteral(elements);
+                return new SetLiteral(elements, token.getLine(), token.getColumn());
             }
         }
         
@@ -920,7 +959,7 @@ public class Parser {
             }
             
             consume(Token.Type.COLON, "Expected ':' after except clause");
-            if (match(Token.Type.NEWLINE)) {
+            if (check(Token.Type.NEWLINE)) {
                 advance(); // Consume the newline after ':'
                 consume(Token.Type.INDENT, "Expected indentation after except statement");
             } else singleLine = true;
@@ -1091,8 +1130,9 @@ public class Parser {
         ASTNode pattern = parseSequencePattern();
         
         while (match(Token.Type.BITWISE_OR)) {
+            Token token = previous();
             ASTNode right = parseSequencePattern();
-            pattern = new OrPattern(pattern, right);
+            pattern = new OrPattern(pattern, right, token.getLine(), token.getColumn());
         }
         
         return pattern;
@@ -1100,11 +1140,12 @@ public class Parser {
     
     private ASTNode parseSequencePattern() {
         if (match(Token.Type.LEFT_PAREN)) {
+            Token head = previous();
             // Tuple pattern: (a, b, c) or just grouped pattern: (a)
             if (check(Token.Type.RIGHT_PAREN)) {
                 // Empty tuple pattern: ()
                 consume(Token.Type.RIGHT_PAREN, "Expected ')' after '('");
-                return new SequencePattern(new ArrayList<>(), true);
+                return new SequencePattern(new ArrayList<>(), true, previous().getLine(), previous().getColumn());
             }
             
             List<ASTNode> patterns = new ArrayList<>();
@@ -1118,13 +1159,14 @@ public class Parser {
                     if (!match(Token.Type.COMMA)) break;
                 }
                 consume(Token.Type.RIGHT_PAREN, "Expected ')' after tuple pattern");
-                return new SequencePattern(patterns, true);
+                return new SequencePattern(patterns, true, head.getLine(), head.getColumn());
             } else {
                 // This is just a grouped pattern
                 consume(Token.Type.RIGHT_PAREN, "Expected ')' after pattern");
                 return patterns.get(0);
             }
         } else if (match(Token.Type.LEFT_BRACKET)) {
+            Token head = previous();
             // List pattern: [a, b, c]
             List<ASTNode> patterns = new ArrayList<>();
             
@@ -1137,7 +1179,7 @@ public class Parser {
             }
             
             consume(Token.Type.RIGHT_BRACKET, "Expected ']' after list pattern");
-            return new SequencePattern(patterns, false);
+            return new SequencePattern(patterns, false, head.getLine(), head.getColumn());
         }
         
         return parseAtomicPattern();
@@ -1151,12 +1193,14 @@ public class Parser {
             // Wildcard pattern: _
             if (identifier.getValue().equals("_")) {
                 advance(); // consume the token
-                return new WildcardPattern();
+                return new WildcardPattern(identifier.getLine(), identifier.getColumn());
             }
             
             // Capture pattern: variable name
+            Token token = tokens.get(current);
             advance(); // consume the token
-            return new CapturePattern(identifier.getValue());
+            return new CapturePattern(identifier.getValue(),
+                    token.getLine(), token.getColumn());
         }
         
         // Literal patterns: numbers, strings, booleans, None
@@ -1170,24 +1214,24 @@ public class Parser {
                 case NUMBER -> {
                     String val = literal.getValue();
                     if (val.contains(".")) {
-                        value = new Literal(Double.parseDouble(val));
+                        value = new Literal(Double.parseDouble(val), literal.getLine(), literal.getColumn());
                     } else {
-                        value = new Literal(Long.parseLong(val));
+                        value = new Literal(Long.parseLong(val), literal.getLine(), literal.getColumn());
                     }
                 }
                 case STRING, TRIPLE_STRING -> {
                     String v = decodeUnicode(literal.getValue());
-                    value = new Literal(v);
+                    value = new Literal(v, literal.getLine(), literal.getColumn());
                 }
                 case RAW_STRING, TRIPLE_RAW_STRING ->
-                    value = new Literal(literal.getValue());
-                case TRUE -> value = new Literal(true);
-                case FALSE -> value = new Literal(false);
-                case NONE -> value = new Literal(null);
+                    value = new Literal(literal.getValue(), literal.getLine(), literal.getColumn());
+                case TRUE -> value = new Literal(true, literal.getLine(), literal.getColumn());
+                case FALSE -> value = new Literal(false, literal.getLine(), literal.getColumn());
+                case NONE -> value = new Literal(null, literal.getLine(), literal.getColumn());
                 default -> throw new RuntimeException("Unexpected literal type in pattern");
             }
             
-            return new LiteralPattern(value);
+            return new LiteralPattern(value, literal.getLine(), literal.getColumn());
         }
         
         throw new RuntimeException("Expected pattern at line " + peek().getLine());
@@ -1195,7 +1239,7 @@ public class Parser {
 
 
     
-    private ASTNode lambdaExpression() {
+    private ASTNode lambdaExpression(Token token) {
         List<String> parameters = new ArrayList<>();
         
         // Parse parameters (optional)
@@ -1208,32 +1252,32 @@ public class Parser {
           consume(Token.Type.COLON, "Expected ':' after lambda parameters");
         ASTNode body = or(); // Use or() to avoid tuple parsing issues
         
-        return new LambdaExpression(parameters, body);
+        return new LambdaExpression(parameters, body, token.getLine(), token.getColumn());
     }
     
-    private ASTNode superExpression() {
+    private ASTNode superExpression(Token head) {
         consume(Token.Type.LEFT_PAREN, "Expected '(' after super");
         
         // Check if it's super() or super(ClassName)
         if (check(Token.Type.RIGHT_PAREN)) {
             // super() - automatic parent class resolution
             consume(Token.Type.RIGHT_PAREN, "Expected ')' after super");
-            return new SuperExpression();
+            return new SuperExpression(head.getLine(), head.getColumn());
         } else {
             // super(ClassName) - specific parent class
             Token className = consume(Token.Type.IDENTIFIER, "Expected class name in super()");
             consume(Token.Type.RIGHT_PAREN, "Expected ')' after class name");
-            return new SuperExpression(className.getValue());
+            return new SuperExpression(className.getValue(), head.getLine(), head.getColumn());
         }
     }
 
-    private ASTNode parseListOrComprehension() {
+    private ASTNode parseListOrComprehension(Token head) {
         // Parse first element
         ASTNode firstElement = or();
         
         // Check for comprehension
         if (match(Token.Type.FOR)) {
-            return parseListComprehension(firstElement);
+            return parseListComprehension(firstElement, head);
         }
         
         // Regular list
@@ -1245,10 +1289,10 @@ public class Parser {
             elements.add(or());
         }
         
-        return new ListLiteral(elements);
+        return new ListLiteral(elements, head.getLine(), head.getColumn());
     }
     
-    private ASTNode parseListComprehension(ASTNode element) {
+    private ASTNode parseListComprehension(ASTNode element, Token head) {
         List<ListComprehension.ComprehensionClause> clauses = new ArrayList<>();
         
         // Parse first for clause
@@ -1277,10 +1321,10 @@ public class Parser {
             clauses.add(new ListComprehension.ComprehensionClause(variable.getValue(), iterable, condition));
         }
         
-        return new ListComprehension(element, clauses);
+        return new ListComprehension(element, clauses, head.getLine(), head.getColumn());
     }
     
-    private ASTNode parseGeneratorExpression(ASTNode element) {
+    private ASTNode parseGeneratorExpression(ASTNode element, Token head) {
         List<ListComprehension.ComprehensionClause> clauses = new ArrayList<>();
         
         // Parse first for clause
@@ -1309,7 +1353,7 @@ public class Parser {
             clauses.add(new ListComprehension.ComprehensionClause(variable.getValue(), iterable, condition));
         }
         
-        return new GeneratorExpression(element, clauses);
+        return new GeneratorExpression(element, clauses, head.getLine(), head.getColumn());
     }
 
     private ASTNode decoratorStatement() {
@@ -1349,7 +1393,7 @@ public class Parser {
     /**
      * Parse index or slice expression: [expr], [start:], [:stop], [start:stop], [start:stop:step]
      */
-    private ASTNode parseIndexOrSlice() {
+    private ASTNode parseIndexOrSlice(Token head) {
         ASTNode start = null;
         ASTNode stop = null;
         ASTNode step = null;
@@ -1370,7 +1414,7 @@ public class Parser {
                 }
             }
             
-            return new SliceExpression(start, stop, step);
+            return new SliceExpression(start, stop, step, head.getLine(), head.getColumn());
         }
         
         // Parse first expression
@@ -1392,7 +1436,7 @@ public class Parser {
                 }
             }
             
-            return new SliceExpression(start, stop, step);
+            return new SliceExpression(start, stop, step, head.getLine(), head.getColumn());
         }
         
         // This is a simple index
@@ -1401,7 +1445,7 @@ public class Parser {
 
     private boolean skipLineAndCheckIfSingleLine(String statementNameColon,
                                                  String statementNameIndent) {
-        consume(Token.Type.COLON, "Expected ':' after" + statementNameColon);
+        consume(Token.Type.COLON, "Expected ':' after " + statementNameColon);
         if (check(Token.Type.NEWLINE)) {
             do {
                 advance();

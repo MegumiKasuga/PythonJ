@@ -10,12 +10,25 @@ import java.util.List;
 public class LambdaExpression extends ASTNode {
     private final List<String> parameters;
     private final ASTNode body;
+    private final int line, column;
     
-    public LambdaExpression(List<String> parameters, ASTNode body) {
+    public LambdaExpression(List<String> parameters, ASTNode body, int line, int column) {
         this.parameters = parameters;
         this.body = body;
+        this.line = line;
+        this.column = column;
     }
-    
+
+    @Override
+    public int getLine() {
+        return line;
+    }
+
+    @Override
+    public int getColumn() {
+        return column;
+    }
+
     public List<String> getParameters() {
         return parameters;
     }

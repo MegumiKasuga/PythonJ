@@ -318,7 +318,10 @@ public class BuiltinFunctions {
                     max = args.get(i);
                 }
             }
-            return max;        }));        // next函数
+            return max;
+        }));
+
+        // next函数
         globals.define("next", new PyBuiltinFunction("next", args -> {
             if (args.size() < 1 || args.size() > 2) {
                 throw new RuntimeException("next() takes from 1 to 2 positional arguments but " + args.size() + " were given");
@@ -1248,6 +1251,38 @@ public class BuiltinFunctions {
             return pyFunction;
         }));
 
+        globals.define("property", new PyBuiltinFunction("property", args -> {
+            if (args.size() != 1) {
+                throw new RuntimeException("property() takes exactly one argument (" + args.size() + " given)");
+            }
+
+            PyObject func = args.get(0);
+            if (!(func instanceof PyFunction pyFunc)) {
+                throw new RuntimeException("property() argument must be a function");
+            }
+            pyFunc.setAttribute("__isproperty__", PyBool.TRUE);
+
+            // 创建一个新的属性对象
+            return new PyProperty(pyFunc);
+        }));
+
+        globals.define("setter", new PyBuiltinFunction("setter", args -> {
+            if (args.size() != 2) {
+                throw new RuntimeException("setter() takes exactly two argument (" + args.size() + " given)");
+            }
+
+            PyObject func = args.get(0);
+            String propName = ((PyString) args.get(1)).getValue();
+            if (!(func instanceof PyFunction pyFunction)) {
+                throw new RuntimeException("setter() argument must be a function");
+            }
+            if (!propName.equals(pyFunction.getName())) {
+                throw new RuntimeException("setter() function name must match the property name");
+            }
+            func.setAttribute("__ispropertysetter__", PyBool.TRUE);
+            return func;
+        }));
+
         return globals;
     }
     
@@ -1630,11 +1665,13 @@ class PyRange extends PyObject implements Iterable<PyObject> {
     private final long start;
     private final long stop;
     private final long step;
+    private long current;
     
     public PyRange(long start, long stop, long step) {
         this.start = start;
         this.stop = stop;
         this.step = step;
+        current = start;
     }
     
     @Override
@@ -1672,41 +1709,43 @@ class PyRange extends PyObject implements Iterable<PyObject> {
     }
       @Override
     public Iterator<PyObject> iterator() {
-        return new Iterator<PyObject>() {
-            private long current = start;
-            
-            @Override
-            public boolean hasNext() {
-                if (step > 0) {
-                    return current < stop;
-                } else {
-                    return current > stop;
-                }
-            }
-            
-            @Override
-            public PyObject next() {
-                if (!hasNext()) throw new NoSuchElementException();
-                long value = current;
-                current += step;
-                return new PyInt(value);
-            }
-        };
+        return new PyIterator(this, "range");
     }
     
     @Override
     public PyObject getAttribute(String name) {
         switch (name) {
             case "__iter__":
-                return new PyBuiltinFunction("__iter__", args -> {
-                    if (args.size() != 0) {
-                        throw new RuntimeException("__iter__() takes no arguments (" + args.size() + " given)");
+                return new PyBuiltinFunction("__iter__", args -> this);
+            case "__next__":
+                return new PyBuiltinFunction("__next__", args -> {
+                    if (!args.isEmpty()) {
+                        throw new RuntimeException("__next__() takes no arguments (" + args.size() + " given)");
                     }
-                    return new PyIterator(iterator(), "range");
+                    if (step > 0 && start >= stop) {
+                        throw new RuntimeException("StopIteration");
+                    } else if (step < 0 && start <= stop) {
+                        throw new RuntimeException("StopIteration");
+                    }
+                    long current = getCurrent();
+                    setCurrent(current + step);
+                    if (step > 0 && getCurrent() > stop) {
+                        throw new RuntimeException("StopIteration");
+                    } else if (step < 0 && getCurrent() < stop) {
+                        throw new RuntimeException("StopIteration");
+                    }
+                    return new PyInt(current);
                 });
-                
             default:
                 return super.getAttribute(name);
         }
+    }
+
+    public void setCurrent(long current) {
+        this.current = current;
+    }
+
+    public long getCurrent() {
+        return current;
     }
 }

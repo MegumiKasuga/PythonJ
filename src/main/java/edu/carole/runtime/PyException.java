@@ -1,15 +1,30 @@
 package edu.carole.runtime;
 
+import edu.carole.ast.ASTNode;
+
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * Python异常对象
  */
 public class PyException extends PyObject {
     private final String message;
     private final String exceptionType;
+    private final List<ASTNode> stackTrace;
     
     public PyException(String exceptionType, String message) {
         this.exceptionType = exceptionType;
         this.message = message;
+        this.stackTrace = new ArrayList<>();
+    }
+
+    public void addStackTrace(ASTNode node) {
+        stackTrace.add(node);
+    }
+
+    public List<ASTNode> getStackTrace() {
+        return stackTrace;
     }
     
     @Override

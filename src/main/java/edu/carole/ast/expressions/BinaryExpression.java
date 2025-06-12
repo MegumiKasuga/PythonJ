@@ -16,13 +16,26 @@ public class BinaryExpression extends ASTNode {    public enum Operator {
     private final ASTNode left;
     private final Operator operator;
     private final ASTNode right;
+    private final int line, column;
     
-    public BinaryExpression(ASTNode left, Operator operator, ASTNode right) {
+    public BinaryExpression(ASTNode left, Operator operator, ASTNode right, int line, int column) {
         this.left = left;
         this.operator = operator;
         this.right = right;
+        this.line = line;
+        this.column = column;
     }
-    
+
+    @Override
+    public int getLine() {
+        return line;
+    }
+
+    @Override
+    public int getColumn() {
+        return column;
+    }
+
     public ASTNode getLeft() { return left; }
     public Operator getOperator() { return operator; }
     public ASTNode getRight() { return right; }

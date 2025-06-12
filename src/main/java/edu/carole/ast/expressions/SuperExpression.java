@@ -9,15 +9,30 @@ import edu.carole.ast.ast.ASTVisitor;
  */
 public class SuperExpression extends ASTNode {
     private final String className; // 可选，用于指定特定的父类
+    private final int line, column;
     
-    public SuperExpression() {
+    public SuperExpression(int line, int column) {
         this.className = null; // super() - 自动使用最近的父类
+        this.line = line;
+        this.column = column;
     }
     
-    public SuperExpression(String className) {
+    public SuperExpression(String className, int line, int column) {
         this.className = className; // super(ClassName) - 指定特定父类
+        this.line = line;
+        this.column = column;
     }
-    
+
+    @Override
+    public int getLine() {
+        return line;
+    }
+
+    @Override
+    public int getColumn() {
+        return column;
+    }
+
     public String getClassName() {
         return className;
     }

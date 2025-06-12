@@ -2,6 +2,7 @@ package edu.carole.interpreter;
 
 import edu.carole.runtime.*;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -26,9 +27,31 @@ public class Environment {
      * 定义变量
      */
     public void define(String name, PyObject value) {
-        values.put(name, value);
+        if (name.contains(".")) {
+            String[] path = name.split("\\.");
+            Map<String, PyObject> attributes = getAttributeEnv(path, !path[0].equals("self"), false);
+            if (attributes != null) {
+                dealWithPropertySet(path[path.length - 1], value, attributes);
+                return;
+            }
+        }
+        dealWithPropertySet(name, value, values);
     }
-    
+
+    public static void dealWithPropertySet(String name, PyObject value, Map<String, PyObject> values) {
+        if (values.containsKey(name) &&
+                values.get(name) instanceof PyProperty prop) {
+            ArrayList<PyObject> args = new ArrayList<>();
+            args.add(value);
+            PyObject result = prop.call(args);
+            if (result == prop) {
+                values.put(name, prop);
+            }
+        } else {
+            values.put(name, value);
+        }
+    }
+
     /**
      * 获取变量
      */
@@ -55,13 +78,15 @@ public class Environment {
             String[] path = name.split("\\.");
             Map<String, PyObject> attributes = getAttributeEnv(path, !path[0].equals("self"), false);
             if (attributes != null) {
-                attributes.put(path[path.length - 1], value);
+                dealWithPropertySet(path[path.length - 1], value, attributes);
                 return value;
             }
         } else if (values.containsKey(name)) {
-            return values.put(name, value);
+            this.define(name, value);
+            return value;
         } else if (enclosing != null) {
-            return enclosing.set(name, value);
+            enclosing.define(name, value);
+            return value;
         }
 
         throw new Interpreter.PyExceptionWrapper(

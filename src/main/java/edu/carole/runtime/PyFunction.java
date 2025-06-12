@@ -176,6 +176,11 @@ public class PyFunction extends PyObject {
                 attributes.get("__isabstractmethod__").isTruthy();
     }
 
+    public boolean isSetterMethod() {
+        return attributes.containsKey("__ispropertysetter__") &&
+                attributes.get("__ispropertysetter__").isTruthy();
+    }
+
     public void setAbstractMethod(boolean isAbstract) {
         attributes.put("__isabstractmethod__", PyBool.fromValue(isAbstract));
     }
@@ -476,6 +481,10 @@ public class PyFunction extends PyObject {
             interpreter.setEnvironment(previousEnv);
         }
     }
+
+    private PyGenerator defineGenerator(FunctionParameterPacket packet) {
+        return new PyGenerator(packet);
+    }
     
     /**
      * 使用指定的解释器调用函数，如果没有提供解释器则创建新的
@@ -519,13 +528,22 @@ public class PyFunction extends PyObject {
         
         // Add the function itself to its environment to support recursion
         executionEnvironment.define(name, this);
-        
+
         try {
-            for (ASTNode statement : body) {
-                statement.accept(interpreter);
+            for (ASTNode node : body) {
+                // Debug output for each node execution
+                node.accept(interpreter);
             }
         } catch (ReturnException returnException) {
             return returnException.getValue();
+        } catch (YieldException yieldException) {
+            FunctionParameterPacket packet = new FunctionParameterPacket(
+                    this,
+                    yieldException,
+                    functionEnvironment,
+                    interpreter
+            );
+            return defineGenerator(packet);
         } finally {
             // Restore the original environment
             interpreter.setEnvironment(previousEnv);
@@ -576,6 +594,75 @@ public class PyFunction extends PyObject {
 
         public PyObject getValue() {
             return value;
+        }
+    }
+
+    public static class YieldException extends RuntimeException {
+        private final PyObject value;
+        private final List<YieldingClause> from;
+
+        public YieldException(PyObject value) {
+            this.value = value;
+            this.from = new ArrayList<>();
+        }
+
+        public PyObject getValue() {
+            return value;
+        }
+
+        public void addFrom(YieldingClause node) {
+            this.from.add(node);
+        }
+
+        public List<YieldingClause> getFrom() {
+            return from;
+        }
+    }
+
+    public record FunctionParameterPacket(
+            PyFunction func,
+            YieldException lastYield,
+            Environment environment,
+            Interpreter interpreter
+    ) {}
+
+    public static class YieldingClause {
+
+        private final ASTNode self; // 可能是一个函数或生成器
+        private List<ASTNode> body;
+        private final boolean isCirculate; // 是否循环
+        private final PyObject iterableCache; // 用于缓存迭代器
+
+        public YieldingClause(
+                ASTNode self,
+                List<ASTNode> body,
+                boolean isCirculate,
+                PyObject iterableCache
+        ) {
+            this.self = self;
+            this.body = body;
+            this.isCirculate = isCirculate;
+            this.iterableCache = iterableCache;
+        }
+
+        public ASTNode self() {
+            return self;
+        }
+
+        public List<ASTNode> body() {
+            return body;
+        }
+
+        public boolean isCirculate() {
+            return isCirculate;
+        }
+
+        public PyObject iterableCache() {
+            return iterableCache;
+        }
+
+        public void setBody(List<ASTNode> body) {
+            this.body = body;
         }
     }
 }

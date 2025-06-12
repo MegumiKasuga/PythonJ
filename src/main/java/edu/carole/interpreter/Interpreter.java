@@ -116,11 +116,14 @@ public class Interpreter implements ASTVisitor<PyObject> {
         // Check if this variable is declared as global
         if (globalVariables.contains(target)) {
             globals.define(target, value);
-        }        // Check if this variable is declared as nonlocal
+        }
+
+        // Check if this variable is declared as nonlocal
         else if (nonlocalVariables.containsKey(target)) {
             Environment targetEnv = nonlocalVariables.get(target);
             targetEnv.define(target, value);
         }
+
         // Regular local assignment
         else {
             environment.define(target, value);
@@ -173,7 +176,6 @@ public class Interpreter implements ASTVisitor<PyObject> {
             Environment targetEnv = nonlocalVariables.get(target);
             targetEnv.define(target, newValue);
         }else {
-            environment.set(target, newValue);
             environment.define(target, newValue);
         }
         return newValue;
@@ -245,7 +247,6 @@ public class Interpreter implements ASTVisitor<PyObject> {
         for (int i = 0; i < targets.size(); i++) {
             environment.define(targets.get(i), elements.get(i));
         }
-        
         return value;
     }
     
@@ -262,14 +263,38 @@ public class Interpreter implements ASTVisitor<PyObject> {
             if (condition.isTruthy()) {
                 // If condition is true, execute the then branch
                 for (ASTNode stmt : branch.getValue()) {
-                    stmt.accept(this);
+                    try {
+                        stmt.accept(this);
+                    } catch (PyFunction.YieldException e) {
+                        // 如果在if分支中遇到yield，抛出异常以便外部处理
+                        PyFunction.YieldingClause clause = new PyFunction.YieldingClause(
+                                statement,
+                                branch.getValue(),
+                                false,
+                                null
+                        );
+                        e.addFrom(clause);
+                        throw e;
+                    }
                 }
                 return PyNone.INSTANCE; // Exit after executing the first true branch
             }
         }
         if (!statement.getElseBranch().isEmpty()) {
             for (ASTNode stmt : statement.getElseBranch()) {
-                stmt.accept(this);
+                try {
+                    stmt.accept(this);
+                } catch (PyFunction.YieldException e) {
+                    // 如果在if分支中遇到yield，抛出异常以便外部处理
+                    PyFunction.YieldingClause clause = new PyFunction.YieldingClause(
+                            statement,
+                            statement.getElseBranch(),
+                            false,
+                            null
+                    );
+                    e.addFrom(clause);
+                    throw e;
+                }
             }
         }
         return PyNone.INSTANCE;
@@ -283,7 +308,18 @@ public class Interpreter implements ASTVisitor<PyObject> {
             while (statement.getCondition().accept(this).isTruthy()) {
                 try {
                     for (ASTNode stmt : statement.getBody()) {
-                        stmt.accept(this);
+                        try {
+                            stmt.accept(this);
+                        } catch (PyFunction.YieldException yieldStat) {
+                            PyFunction.YieldingClause clause = new PyFunction.YieldingClause(
+                                    statement,
+                                    statement.getBody(),
+                                    true,
+                                    null
+                            );
+                            yieldStat.addFrom(clause);
+                            throw yieldStat;
+                        }
                     }
                 } catch (ContinueException e) {
                     continue;
@@ -297,7 +333,18 @@ public class Interpreter implements ASTVisitor<PyObject> {
         // 只有在没有通过break退出循环时才执行else块
         if (!brokeOut && !statement.getElseBody().isEmpty()) {
             for (ASTNode stmt : statement.getElseBody()) {
-                stmt.accept(this);
+                try {
+                    stmt.accept(this);
+                } catch (PyFunction.YieldException yieldStat) {
+                    PyFunction.YieldingClause clause = new PyFunction.YieldingClause(
+                            statement,
+                            statement.getElseBody(),
+                            false,
+                            null
+                    );
+                    yieldStat.addFrom(clause);
+                    throw yieldStat;
+                }
             }
         }
         
@@ -307,17 +354,40 @@ public class Interpreter implements ASTVisitor<PyObject> {
     @Override
     public PyObject visitForStatement(ForStatement statement) {
         PyObject iterable = statement.getIterable().accept(this);
+        return visitForStatement(statement, iterable);
+    }
+
+    public PyObject visitForStatement(ForStatement statement, PyObject iterable) {
         Iterator<PyObject> iterator = iterable.iterator();
         boolean brokeOut = false;
-        
-        try {
+        Circle: try {
             while (iterator.hasNext()) {
                 try {
-                    PyObject value = iterator.next();
+                    PyObject value;
+                    try {
+                        value = iterator.next();
+                    } catch (RuntimeException e) {
+                        if (e.getMessage().equals("StopIteration")) {
+                            break Circle;
+                        } else {
+                            throw e;
+                        }
+                    }
                     environment.define(statement.getVariable(), value);
-                    
+
                     for (ASTNode stmt : statement.getBody()) {
-                        stmt.accept(this);
+                        try {
+                            stmt.accept(this);
+                        } catch (PyFunction.YieldException yieldStat) {
+                            PyFunction.YieldingClause clause = new PyFunction.YieldingClause(
+                                    statement,
+                                    statement.getBody(),
+                                    true,
+                                    iterable
+                            );
+                            yieldStat.addFrom(clause);
+                            throw yieldStat;
+                        }
                     }
                 } catch (ContinueException e) {
                     continue;
@@ -327,14 +397,25 @@ public class Interpreter implements ASTVisitor<PyObject> {
             // 通过break退出循环
             brokeOut = true;
         }
-        
+
         // 只有在没有通过break退出循环时才执行else块
         if (!brokeOut && !statement.getElseBody().isEmpty()) {
             for (ASTNode stmt : statement.getElseBody()) {
-                stmt.accept(this);
+                try {
+                    stmt.accept(this);
+                } catch (PyFunction.YieldException yieldStat) {
+                    PyFunction.YieldingClause clause = new PyFunction.YieldingClause(
+                            statement,
+                            statement.getElseBody(),
+                            false,
+                            null
+                    );
+                    yieldStat.addFrom(clause);
+                    throw yieldStat;
+                }
             }
         }
-        
+
         return PyNone.INSTANCE;
     }
 
@@ -370,6 +451,7 @@ public class Interpreter implements ASTVisitor<PyObject> {
         Environment classEnvironment = new Environment(environment);
         Environment previous = this.environment;
         Map<String, PyObject> classAttributes = new HashMap<>();
+        Map<String, PyProperty> properties = new HashMap<>();
         
         try {
             this.environment = classEnvironment;
@@ -386,7 +468,18 @@ public class Interpreter implements ASTVisitor<PyObject> {
                 } else if (statement instanceof Decorator decorator) {
                     PyObject result = visitDecorator(decorator, true);
                     if (result instanceof PyFunction func) {
-                        methods.put(func.getName(), func);
+                        if (func.isSetterMethod()) {
+                            String funcName = func.getName();
+                            if (!properties.containsKey(funcName)) {
+                                throw new RuntimeException("No property found for setter method '" + funcName + "'");
+                            }
+                            PyProperty property = properties.get(funcName);
+                            property.setSetter(func);
+                        } else {
+                            methods.put(func.getName(), func);
+                        }
+                    } else if (result instanceof PyProperty property) {
+                        properties.put(property.getName(), property);
                     }
                 } else if (statement instanceof AssignmentStatement assign) {
                     PyObject obj = assign.accept(this);
@@ -400,6 +493,7 @@ public class Interpreter implements ASTVisitor<PyObject> {
         
         PyClass pyClass = new PyClass(classDef.getName(), methods, baseClasses);
         pyClass.addClassAttributes(classAttributes);
+        pyClass.addProperties(properties);
         environment.define(classDef.getName(), pyClass);
         HashMap<String, PyFunction> abstractMissImplementation =
                 pyClass.scanMROForAbstractMethodsForImplementation(this);
@@ -422,6 +516,23 @@ public class Interpreter implements ASTVisitor<PyObject> {
             value = statement.getValue().accept(this);
         }
         throw new PyFunction.ReturnException(value);
+    }
+
+    @Override
+    public PyObject visitYieldStatement(YieldStatement yieldStatement) {
+        PyObject value = PyNone.INSTANCE;
+        if (yieldStatement.getValue() != null) {
+            value = yieldStatement.getValue().accept(this);
+        }
+        PyFunction.YieldException exception = new PyFunction.YieldException(value);
+        PyFunction.YieldingClause clause = new PyFunction.YieldingClause(
+                yieldStatement,
+                null,
+                false,
+                null
+        );
+        exception.addFrom(clause);
+        throw exception;
     }
     
     @Override
@@ -510,12 +621,25 @@ public class Interpreter implements ASTVisitor<PyObject> {
     @Override
     public PyObject visitTryExceptStatement(TryExceptStatement statement) {
         PyObject result = PyNone.INSTANCE;
+        PyFunction.YieldException yieldCaught = null;
         boolean exceptionCaught = false;
         
         try {
             // 执行try块
             for (ASTNode stmt : statement.getTryBody()) {
-                result = stmt.accept(this);
+                try {
+                    result = stmt.accept(this);
+                } catch (PyFunction.YieldException e) {
+                    // 如果在分支中遇到yield，抛出异常以便外部处理
+                    PyFunction.YieldingClause clause = new PyFunction.YieldingClause(
+                            statement,
+                            statement.getTryBody(),
+                            false,
+                            null
+                    );
+                    e.addFrom(clause);
+                    throw e;
+                }
             }
         } catch (PyExceptionWrapper pyExceptionWrapper) {
             // Python异常处理
@@ -527,19 +651,41 @@ public class Interpreter implements ASTVisitor<PyObject> {
                 throw pyExceptionWrapper;
             }
         } catch (RuntimeException runtimeException) {
+            if (runtimeException instanceof PyFunction.ReturnException r) {
+                return r.getValue(); // 如果是return语句，直接返回值
+            }
             // Java运行时异常转换为Python异常
             PyException pyException = convertRuntimeExceptionToPyException(runtimeException);
-            exceptionCaught = handlePyException(statement, pyException);
+            try {
+                exceptionCaught = handlePyException(statement, pyException);
+            } catch (PyFunction.YieldException yieldException) {
+                yieldCaught = yieldException;
+            }
             
             if (!exceptionCaught) {
                 // 没有匹配的except子句，重新抛出原始异常
                 throw runtimeException;
             }
         } finally {
+            if (yieldCaught != null) {
+                throw yieldCaught;
+            }
             // 执行finally块
             if (!statement.getFinallyBody().isEmpty()) {
                 for (ASTNode stmt : statement.getFinallyBody()) {
-                    stmt.accept(this);
+                    try {
+                        stmt.accept(this);
+                    } catch (PyFunction.YieldException e) {
+                        // 如果在分支中遇到yield，抛出异常以便外部处理
+                        PyFunction.YieldingClause clause = new PyFunction.YieldingClause(
+                                statement,
+                                statement.getFinallyBody(),
+                                false,
+                                null
+                        );
+                        e.addFrom(clause);
+                        throw e;
+                    }
                 }
             }
         }
@@ -547,7 +693,7 @@ public class Interpreter implements ASTVisitor<PyObject> {
         return result;
     }
     
-    private boolean handlePyException(TryExceptStatement statement, PyException pyException) {
+    public boolean handlePyException(TryExceptStatement statement, PyException pyException) {
         for (TryExceptStatement.ExceptClause exceptClause : statement.getExceptClauses()) {
             // 检查异常类型是否匹配
             if (exceptClause.getExceptionType() == null || 
@@ -560,7 +706,19 @@ public class Interpreter implements ASTVisitor<PyObject> {
                 
                 // 执行except块
                 for (ASTNode stmt : exceptClause.getBody()) {
-                    stmt.accept(this);
+                    try {
+                        stmt.accept(this);
+                    } catch (PyFunction.YieldException e) {
+                        // 如果在分支中遇到yield，抛出异常以便外部处理
+                        PyFunction.YieldingClause clause = new PyFunction.YieldingClause(
+                                statement,
+                                exceptClause.getBody(),
+                                false,
+                                pyException
+                        );
+                        e.addFrom(clause);
+                        throw e;
+                    }
                 }
                 
                 return true; // 异常已被处理
@@ -775,7 +933,6 @@ public class Interpreter implements ASTVisitor<PyObject> {
         if (!keywordArguments.isEmpty()) {
             return function.call(positionalArguments, keywordArguments, this);
         } else {
-            // 保持向后兼容
             return function.call(positionalArguments, this);
         }
     }
@@ -825,17 +982,34 @@ public class Interpreter implements ASTVisitor<PyObject> {
         
         // Check if this variable is declared as global
         if (globalVariables.contains(name)) {
-            return globals.get(name, true);
+            return dealWithPropertyGet(globals.get(name, true));
         }
         // Check if this variable is declared as nonlocal
         else if (nonlocalVariables.containsKey(name)) {
             Environment targetEnv = nonlocalVariables.get(name);
-            return targetEnv.get(name, true);
+            return dealWithPropertyGet(targetEnv.get(name, true));
         }
         // Regular variable access (follows normal scope resolution)
         else {
-            return environment.get(name, true);
+            return dealWithPropertyGet(environment.get(name, true));
         }
+    }
+
+    public static PyObject dealWithPropertyGet(PyObject input) {
+        if (!(input instanceof PyProperty property)) {
+            return input;
+        }
+        return property.call(new ArrayList<>());
+    }
+
+    public static PyObject dealWithPropertySet(PyObject key, PyObject value) {
+        if (!(key instanceof PyProperty property)) {
+            return value;
+        }
+        ArrayList<PyObject> args = new ArrayList<>();
+        args.add(value);
+        property.call(args);
+        return value;
     }
 
     @Override
@@ -1263,10 +1437,25 @@ public class Interpreter implements ASTVisitor<PyObject> {
         // Then, evaluate the decorator expression
 
         PyObject decorated;
-        PyObject decoratorFunc = decorator.getExpression().accept(this);
+        PyObject decoratorFunc;
+        PyString setterName = null;
         // Apply the decorator to the target by calling the decorator with the target as argument
         List<PyObject> args = new ArrayList<>();
         args.add(target);
+
+        ASTNode decoratorExpression = decorator.getExpression();
+        if (decoratorExpression instanceof Identifier identifier &&
+                identifier.getName().endsWith("setter")) {
+            String name = identifier.getName().substring(0,
+                    identifier.getName().length() - 7);
+            setterName = new PyString(name);
+            Identifier identifier1 = new Identifier("setter",
+                    identifier.getLine(), identifier.getColumn());
+            decoratorFunc = identifier1.accept(this);
+            args.add(setterName);
+        } else {
+            decoratorFunc = decorator.getExpression().accept(this);
+        }
 
         // The result of applying a decorator is the decorated function/class - use context-aware call
         decorated = decoratorFunc.call(args, this);
@@ -1358,7 +1547,19 @@ public class Interpreter implements ASTVisitor<PyObject> {
                     // Pattern matched and guard passed, execute the case body
                     PyObject result = PyNone.INSTANCE;
                     for (ASTNode stmt : caseClause.getBody()) {
-                        result = stmt.accept(this);
+                        try {
+                            result = stmt.accept(this);
+                        } catch (PyFunction.YieldException e) {
+                            // 如果在分支中遇到yield，抛出异常以便外部处理
+                            PyFunction.YieldingClause clause = new PyFunction.YieldingClause(
+                                    statement,
+                                    caseClause.getBody(),
+                                    false,
+                                    null
+                            );
+                            e.addFrom(clause);
+                            throw e;
+                        }
                     }
                     
                     // Merge any captured variables back to the original environment
@@ -1377,7 +1578,19 @@ public class Interpreter implements ASTVisitor<PyObject> {
                 this.environment = caseEnvironment;
                 PyObject result = PyNone.INSTANCE;
                 for (ASTNode stmt : statement.getDefaultBody()) {
-                    result = stmt.accept(this);
+                    try {
+                        result = stmt.accept(this);
+                    } catch (PyFunction.YieldException e) {
+                        // 如果在分支中遇到yield，抛出异常以便外部处理
+                        PyFunction.YieldingClause clause = new PyFunction.YieldingClause(
+                                statement,
+                                statement.getDefaultBody(),
+                                false,
+                                null
+                        );
+                        e.addFrom(clause);
+                        throw e;
+                    }
                 }
                 mergePatternVariables(previous, caseEnvironment);
                 return result;

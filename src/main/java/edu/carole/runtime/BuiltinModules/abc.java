@@ -45,7 +45,8 @@ public class abc {
                     if (func.isStaticMethod()) {
                         throw new RuntimeException("@abstractproperty cannot be applied to static methods");
                     }
-                    return func;
+                    func.setAttribute("__isproperty__", PyBool.TRUE);
+                    return new PyProperty(func);
         }));
 
         return module;

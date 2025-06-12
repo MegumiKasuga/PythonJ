@@ -13,12 +13,25 @@ public class UnaryExpression extends ASTNode {
     
     private final Operator operator;
     private final ASTNode operand;
+    private final int line, column;
     
-    public UnaryExpression(Operator operator, ASTNode operand) {
+    public UnaryExpression(Operator operator, ASTNode operand, int line, int column) {
         this.operator = operator;
         this.operand = operand;
+        this.line = line;
+        this.column = column;
     }
-    
+
+    @Override
+    public int getLine() {
+        return line;
+    }
+
+    @Override
+    public int getColumn() {
+        return column;
+    }
+
     public Operator getOperator() { return operator; }
     public ASTNode getOperand() { return operand; }
     

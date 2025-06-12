@@ -9,11 +9,24 @@ import java.util.Map;
  */
 public class DictLiteral extends ASTNode {
     private final Map<ASTNode, ASTNode> entries;
+    private final int line, column;
     
-    public DictLiteral(Map<ASTNode, ASTNode> entries) {
+    public DictLiteral(Map<ASTNode, ASTNode> entries, int line, int column) {
         this.entries = entries;
+        this.line = line;
+        this.column = column;
     }
-    
+
+    @Override
+    public int getLine() {
+        return line;
+    }
+
+    @Override
+    public int getColumn() {
+        return column;
+    }
+
     public Map<ASTNode, ASTNode> getEntries() {
         return entries;
     }

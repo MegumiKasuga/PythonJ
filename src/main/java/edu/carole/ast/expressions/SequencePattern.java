@@ -10,12 +10,26 @@ import java.util.List;
 public class SequencePattern extends ASTNode {
     private final List<ASTNode> patterns;
     private final boolean isTuple; // true for tuple patterns, false for list patterns
+    private final int line, column;
     
-    public SequencePattern(List<ASTNode> patterns, boolean isTuple) {
+    public SequencePattern(List<ASTNode> patterns, boolean isTuple,
+                           int line, int column) {
         this.patterns = patterns;
         this.isTuple = isTuple;
+        this.line = line;
+        this.column = column;
     }
-    
+
+    @Override
+    public int getLine() {
+        return line;
+    }
+
+    @Override
+    public int getColumn() {
+        return column;
+    }
+
     public List<ASTNode> getPatterns() { return patterns; }
     public boolean isTuple() { return isTuple; }
     

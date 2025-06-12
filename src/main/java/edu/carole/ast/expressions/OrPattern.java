@@ -9,12 +9,25 @@ import edu.carole.ast.ast.ASTVisitor;
 public class OrPattern extends ASTNode {
     private final ASTNode left;
     private final ASTNode right;
+    private final int line, column;
     
-    public OrPattern(ASTNode left, ASTNode right) {
+    public OrPattern(ASTNode left, ASTNode right, int line, int column) {
         this.left = left;
         this.right = right;
+        this.line = line;
+        this.column = column;
     }
-    
+
+    @Override
+    public int getLine() {
+        return line;
+    }
+
+    @Override
+    public int getColumn() {
+        return column;
+    }
+
     public ASTNode getLeft() { return left; }
     public ASTNode getRight() { return right; }
     

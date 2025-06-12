@@ -8,11 +8,24 @@ import edu.carole.ast.ast.ASTVisitor;
  */
 public class Identifier extends ASTNode {
     private final String name;
+    private final int line, column;
     
-    public Identifier(String name) {
+    public Identifier(String name, int line, int column) {
         this.name = name;
+        this.line = line;
+        this.column = column;
     }
-    
+
+    @Override
+    public int getLine() {
+        return line;
+    }
+
+    @Override
+    public int getColumn() {
+        return column;
+    }
+
     public String getName() {
         return name;
     }
