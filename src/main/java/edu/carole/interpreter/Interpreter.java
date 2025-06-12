@@ -1494,33 +1494,54 @@ public class Interpreter implements ASTVisitor<PyObject> {
         
         PyObject result = PyNone.INSTANCE;
         Throwable exception = null;
-        
+        boolean yieldCaught = false;
+
         try {
             // Execute the body
             for (ASTNode stmt : statement.getBody()) {
                 result = stmt.accept(this);
             }
         } catch (Throwable e) {
-            exception = e;
+            if (e instanceof PyFunction.YieldException y) {
+                PyFunction.YieldingClause clause = new PyFunction.YieldingClause(
+                        statement,
+                        statement.getBody(),
+                        false,
+                        contextValue
+                );
+                y.addFrom(clause);
+                yieldCaught = true;
+                throw y;
+            }
+            if (!(e instanceof PyFunction.ReturnException)) {
+                exception = e;
+            }
             throw e;
         } finally {
-            // Always call __exit__, even if an exception occurred
-            try {
-                PyObject excType = exception != null ? new PyString(exception.getClass().getSimpleName()) : PyNone.INSTANCE;
-                PyObject excValue = exception != null ? new PyString(exception.getMessage()) : PyNone.INSTANCE;
-                PyObject excTraceback = PyNone.INSTANCE; // Simplified for now
-                
-                contextManager.contextExit(excType, excValue, excTraceback);
-            } catch (Exception exitException) {
-                // If __exit__ raises an exception, it replaces the original exception
-                if (exception == null) {
-                    throw new RuntimeException(exitException);
-                }
-                // If there was already an exception, the exit exception is ignored
+            if (!yieldCaught) {
+                // Always call __exit__, even if an exception occurred
+                exit(contextManager, exception);
             }
         }
         
-        return result;    }
+        return result;
+    }
+
+    public void exit(PyObject contextManager, Throwable exception) {
+        try {
+            PyObject excType = exception != null ? new PyString(exception.getClass().getSimpleName()) : PyNone.INSTANCE;
+            PyObject excValue = exception != null ? new PyString(exception.getMessage()) : PyNone.INSTANCE;
+            PyObject excTraceback = PyNone.INSTANCE; // Simplified for now
+
+            contextManager.contextExit(excType, excValue, excTraceback);
+        } catch (Exception exitException) {
+            // If __exit__ raises an exception, it replaces the original exception
+            if (exception == null) {
+                throw new RuntimeException(exitException);
+            }
+            // If there was already an exception, the exit exception is ignored
+        }
+    }
     
     // Match-case statement and pattern visitor methods
     

@@ -993,8 +993,7 @@ public class Parser {
             Token varToken = consume(Token.Type.IDENTIFIER, "Expected variable name after 'as'");
             targetVariable = varToken.getValue();
         }
-        
-        consume(Token.Type.COLON, "Expected ':' after with statement");
+
         boolean singleLine = skipLineAndCheckIfSingleLine(
                 "with statement", "with statement"
         );

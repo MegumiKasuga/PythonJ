@@ -4,6 +4,7 @@ import edu.carole.ast.ASTNode;
 import edu.carole.ast.expressions.ListComprehension.ComprehensionClause;
 import edu.carole.ast.statements.ForStatement;
 import edu.carole.ast.statements.TryExceptStatement;
+import edu.carole.ast.statements.WithStatement;
 import edu.carole.interpreter.Environment;
 import edu.carole.interpreter.Interpreter;
 
@@ -299,7 +300,7 @@ public class PyGenerator extends PyObject implements Iterable<PyObject> {
                     PyFunction.YieldingClause lower = clauses.get(i - 1);
                     PyFunction.YieldingClause upper = clauses.get(i);
                     try {
-                        runTree(upper, lower);
+                        runTree(upper, lower, closure);
                     } catch (PyFunction.YieldException e) {
                         // 如果遇到YieldException，说明需要返回值
                         for (int j = i; j < clauses.size(); j++) {
@@ -320,7 +321,8 @@ public class PyGenerator extends PyObject implements Iterable<PyObject> {
         }
 
         private void runTree(PyFunction.YieldingClause upper,
-                             PyFunction.YieldingClause lower) {
+                             PyFunction.YieldingClause lower,
+                             Environment environment) {
             ASTNode statement = lower.self();
             List<ASTNode> body = upper.body();
             int beginIndex = body.indexOf(statement) + (lower.isCirculate() ? 0 : 1);
@@ -332,6 +334,7 @@ public class PyGenerator extends PyObject implements Iterable<PyObject> {
                     throw new PyFunction.ReturnException(null);
                 }
                 try {
+                    dealWithWithExit(upper, null);
                     dealWithTryCatchFinally(upper);
                 } catch (PyFunction.YieldException finallyYield) {
                     ASTNode upperNode = upper.self();
@@ -340,6 +343,11 @@ public class PyGenerator extends PyObject implements Iterable<PyObject> {
                 }
                 // 如果已经到达最后一个语句，直接返回
                 return;
+            }
+            if (upper.self() instanceof WithStatement with) {
+                if (with.getTargetVariable() != null && upper.iterableCache() != null) {
+                    environment.define(with.getTargetVariable(), upper.iterableCache());
+                }
             }
             for (int i = beginIndex; i < body.size(); i++) {
                 ASTNode node = body.get(i);
@@ -356,7 +364,17 @@ public class PyGenerator extends PyObject implements Iterable<PyObject> {
                     } catch (RuntimeException e) {
                         dealWithTryCatchExcept(upper, e);
                     }
-                }  else {
+                } else if (upper.self() instanceof WithStatement) {
+                    try {
+                        node.accept(interpreter);
+                    } catch (Throwable e) {
+                        if (e instanceof PyFunction.YieldException y) {
+                            throw y;
+                        }
+                        dealWithWithExit(upper, e);
+                        throw e;
+                    }
+                } else {
                     node.accept(interpreter);
                 }
                 if (body == funcBody && i >= body.size() - 1) {
@@ -373,6 +391,13 @@ public class PyGenerator extends PyObject implements Iterable<PyObject> {
                 upper.setBody(((TryExceptStatement) upperNode).getFinallyBody());
                 throw finallyYield;
             }
+        }
+
+        private void dealWithWithExit(PyFunction.YieldingClause clause, Throwable exception) {
+            if (!(clause.self() instanceof WithStatement)) return;
+            PyObject obj = clause.iterableCache();
+            if (obj == null) return;
+            interpreter.exit(obj, exception);
         }
 
         private void dealWithTryCatchFinally(PyFunction.YieldingClause upper) {
