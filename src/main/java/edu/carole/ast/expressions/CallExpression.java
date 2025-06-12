@@ -17,10 +17,12 @@ public class CallExpression extends ASTNode {
     private final int line, column;
     
     // 原始构造器，保持向后兼容
-    public CallExpression(ASTNode function, List<ASTNode> arguments) {
+    public CallExpression(ASTNode function, List<ASTNode> arguments, int line, int column) {
         this.function = function;
         this.positionalArguments = arguments;
         this.keywordArguments = new HashMap<>();
+        this.line = line;
+        this.column = column;
     }
     
     // 新构造器，支持关键字参数

@@ -631,7 +631,7 @@ public class PyFunction extends PyObject {
         private final ASTNode self; // 可能是一个函数或生成器
         private List<ASTNode> body;
         private final boolean isCirculate; // 是否循环
-        private final PyObject iterableCache; // 用于缓存迭代器
+        private PyObject iterableCache; // 用于缓存迭代器
 
         public YieldingClause(
                 ASTNode self,
@@ -663,6 +663,10 @@ public class PyFunction extends PyObject {
 
         public void setBody(List<ASTNode> body) {
             this.body = body;
+        }
+
+        public void setIterableCache(PyObject iterableCache) {
+            this.iterableCache = iterableCache;
         }
     }
 }

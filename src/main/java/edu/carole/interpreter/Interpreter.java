@@ -651,20 +651,24 @@ public class Interpreter implements ASTVisitor<PyObject> {
                 throw pyExceptionWrapper;
             }
         } catch (RuntimeException runtimeException) {
-            if (runtimeException instanceof PyFunction.ReturnException r) {
-                return r.getValue(); // 如果是return语句，直接返回值
-            }
-            // Java运行时异常转换为Python异常
-            PyException pyException = convertRuntimeExceptionToPyException(runtimeException);
-            try {
-                exceptionCaught = handlePyException(statement, pyException);
-            } catch (PyFunction.YieldException yieldException) {
-                yieldCaught = yieldException;
-            }
-            
-            if (!exceptionCaught) {
-                // 没有匹配的except子句，重新抛出原始异常
-                throw runtimeException;
+            if (runtimeException instanceof PyFunction.YieldException y) {
+                yieldCaught = y;
+            } else {
+                if (runtimeException instanceof PyFunction.ReturnException r) {
+                    return r.getValue(); // 如果是return语句，直接返回值
+                }
+                // Java运行时异常转换为Python异常
+                PyException pyException = convertRuntimeExceptionToPyException(runtimeException);
+                try {
+                    exceptionCaught = handlePyException(statement, pyException);
+                } catch (PyFunction.YieldException yieldException) {
+                    yieldCaught = yieldException;
+                }
+
+                if (!exceptionCaught) {
+                    // 没有匹配的except子句，重新抛出原始异常
+                    throw runtimeException;
+                }
             }
         } finally {
             if (yieldCaught != null) {
@@ -727,7 +731,7 @@ public class Interpreter implements ASTVisitor<PyObject> {
         return false; // 没有匹配的except子句
     }
     
-    private PyException convertRuntimeExceptionToPyException(RuntimeException runtimeException) {
+    public PyException convertRuntimeExceptionToPyException(RuntimeException runtimeException) {
         String message = runtimeException.getMessage();
         if (message == null) {
             message = runtimeException.getClass().getSimpleName();

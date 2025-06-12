@@ -267,7 +267,6 @@ public class PyGenerator extends PyObject implements Iterable<PyObject> {
                     cachedValue = e.getValue();
                 } else {
                     cachedValue = null; // 如果没有返回值，重置缓存值
-                    return retValue;
                 }
                 return retValue;
             } catch (RuntimeException e) {
@@ -293,25 +292,31 @@ public class PyGenerator extends PyObject implements Iterable<PyObject> {
             if (clauses.size() < 2) {
                 throw new RuntimeException("Invalid yielding point, not enough clauses");
             }
-            for (int i = 1; i < clauses.size(); i++) {
-                PyFunction.YieldingClause lower = clauses.get(i - 1);
-                PyFunction.YieldingClause upper = clauses.get(i);
-                try {
-                    runTree(upper, lower);
-                } catch (PyFunction.YieldException e) {
-                    // 如果遇到YieldException，说明需要返回值
-                    for (int j = i; j < clauses.size(); j++) {
-                        e.addFrom(clauses.get(j));
+            Environment previous = interpreter.getEnvironment();
+            interpreter.setEnvironment(closure);
+            try {
+                for (int i = 1; i < clauses.size(); i++) {
+                    PyFunction.YieldingClause lower = clauses.get(i - 1);
+                    PyFunction.YieldingClause upper = clauses.get(i);
+                    try {
+                        runTree(upper, lower);
+                    } catch (PyFunction.YieldException e) {
+                        // 如果遇到YieldException，说明需要返回值
+                        for (int j = i; j < clauses.size(); j++) {
+                            e.addFrom(clauses.get(j));
+                        }
+                        throw e;
+                    } catch (PyFunction.ReturnException e) {
+                        // 如果遇到ReturnException，说明函数执行完毕
+                        exhausted = true;
+                        yieldingPoint = null;
+                        throw e;
                     }
-                    throw e;
-                } catch (PyFunction.ReturnException e) {
-                    // 如果遇到ReturnException，说明函数执行完毕
-                    exhausted = true;
-                    yieldingPoint = null;
-                    throw e;
                 }
+                return cachedValue;
+            } finally {
+                interpreter.setEnvironment(previous);
             }
-            return cachedValue;
         }
 
         private void runTree(PyFunction.YieldingClause upper,
@@ -319,24 +324,20 @@ public class PyGenerator extends PyObject implements Iterable<PyObject> {
             ASTNode statement = lower.self();
             List<ASTNode> body = upper.body();
             int beginIndex = body.indexOf(statement) + (lower.isCirculate() ? 0 : 1);
-            Environment previous = interpreter.getEnvironment();
-            interpreter.setEnvironment(closure);
             if (beginIndex >= body.size()) {
                 if (body == funcBody) {
                     // 如果是函数体，说明已经执行完毕
                     exhausted = true;
                     yieldingPoint = null;
-                    interpreter.setEnvironment(previous);
                     throw new PyFunction.ReturnException(null);
                 }
                 try {
-                    dealWithTryCatchFinally(upper, previous);
+                    dealWithTryCatchFinally(upper);
                 } catch (PyFunction.YieldException finallyYield) {
                     ASTNode upperNode = upper.self();
                     upper.setBody(((TryExceptStatement) upperNode).getFinallyBody());
                     throw finallyYield;
                 }
-                interpreter.setEnvironment(previous);
                 // 如果已经到达最后一个语句，直接返回
                 return;
             }
@@ -348,40 +349,61 @@ public class PyGenerator extends PyObject implements Iterable<PyObject> {
                     } else {
                         node.accept(interpreter);
                     }
-                } else {
+                } else if (upper.self() instanceof TryExceptStatement tryExcept &&
+                        body == tryExcept.getTryBody()) {
+                    try {
+                        node.accept(interpreter);
+                    } catch (RuntimeException e) {
+                        dealWithTryCatchExcept(upper, e);
+                    }
+                }  else {
                     node.accept(interpreter);
                 }
                 if (body == funcBody && i >= body.size() - 1) {
                     // 函数体已经执行完成
                     yieldingPoint = null;
                     exhausted = true;
-                    interpreter.setEnvironment(previous);
                     throw new PyFunction.ReturnException(cachedValue);
                 }
             }
             try {
-                dealWithTryCatchFinally(upper, previous);
+                dealWithTryCatchFinally(upper);
             } catch (PyFunction.YieldException finallyYield) {
                 ASTNode upperNode = upper.self();
                 upper.setBody(((TryExceptStatement) upperNode).getFinallyBody());
                 throw finallyYield;
             }
-            interpreter.setEnvironment(previous);
         }
 
-        private void dealWithTryCatchFinally(PyFunction.YieldingClause upper, Environment previous) {
-            if (upper.self() instanceof TryExceptStatement tryExcept) {
-                List<ASTNode> finallyBody = tryExcept.getFinallyBody();
-                if (upper.body() == finallyBody) {
-                    // 如果finally块是当前执行的块，直接返回
-                    interpreter.setEnvironment(previous);
-                    return;
-                }
-                if (finallyBody != null && !finallyBody.isEmpty()) {
-                    for (ASTNode finallyNode : finallyBody) {
-                        finallyNode.accept(interpreter);
-                    }
-                }
+        private void dealWithTryCatchFinally(PyFunction.YieldingClause upper) {
+            if (!(upper.self() instanceof TryExceptStatement tryExcept)) return;
+            List<ASTNode> finallyBody = tryExcept.getFinallyBody();
+            if (upper.body() == finallyBody) {
+                // 如果finally块是当前执行的块，直接返回
+                return;
+            }
+            if (!(finallyBody != null && !finallyBody.isEmpty())) return;
+            for (ASTNode finallyNode : finallyBody) {
+                finallyNode.accept(interpreter);
+            }
+        }
+
+        private void dealWithTryCatchExcept(PyFunction.YieldingClause upper, RuntimeException e) {
+            if (!(upper.self() instanceof TryExceptStatement tryExcept)) return;
+            if (e instanceof PyFunction.YieldException ||
+                    e instanceof PyFunction.ReturnException)
+                throw e;
+            PyException except;
+            if (!(e instanceof Interpreter.PyExceptionWrapper wrapper)) {
+                except = interpreter.convertRuntimeExceptionToPyException(e);
+            } else {
+                except = wrapper.getPyException();
+            }
+            try {
+                interpreter.handlePyException(tryExcept, except);
+            } catch (PyFunction.YieldException yield) {
+                yieldingPoint.getFrom().remove(upper);
+                throw yield;
             }
         }
     }
