@@ -6,6 +6,7 @@ import edu.carole.ast.statements.*;
 import edu.carole.ast.expressions.*;
 import edu.carole.runtime.*;
 import edu.carole.runtime.io.IOManager;
+import edu.carole.runtime.property.PyProperty;
 
 import java.util.*;
 import java.util.Set;
@@ -983,20 +984,7 @@ public class Interpreter implements ASTVisitor<PyObject> {
     @Override
     public PyObject visitIdentifier(Identifier identifier) {
         String name = identifier.getName();
-        
-        // Check if this variable is declared as global
-        if (globalVariables.contains(name)) {
-            return dealWithPropertyGet(globals.get(name, true));
-        }
-        // Check if this variable is declared as nonlocal
-        else if (nonlocalVariables.containsKey(name)) {
-            Environment targetEnv = nonlocalVariables.get(name);
-            return dealWithPropertyGet(targetEnv.get(name, true));
-        }
-        // Regular variable access (follows normal scope resolution)
-        else {
-            return dealWithPropertyGet(environment.get(name, true));
-        }
+        return environment.get(name, true);
     }
 
     public static PyObject dealWithPropertyGet(PyObject input) {

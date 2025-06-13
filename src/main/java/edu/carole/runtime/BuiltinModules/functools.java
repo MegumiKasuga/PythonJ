@@ -23,7 +23,7 @@ public class functools {
         PyModule module = new PyModule("functools", "Higher-order functions and operations on callable objects");
         
         // Add wraps function
-        module.setAttribute("wraps", new PyBuiltinFunction("wraps", args -> {
+        module.setAttribute("wraps", new PyBuiltinFunction("wraps", (args, kwargs) -> {
             if (args.size() != 1) {
                 throw new RuntimeException("wraps() takes exactly 1 argument (" + args.size() + " given)");
             }
@@ -34,7 +34,7 @@ public class functools {
             
             PyFunction wrapped = (PyFunction) args.get(0);
             
-            return new PyBuiltinFunction("wraps_decorator", decoratorArgs -> {
+            return new PyBuiltinFunction("wraps_decorator", (decoratorArgs, kwargs2) -> {
                 if (decoratorArgs.size() != 1) {
                     throw new RuntimeException("decorator returned by wraps() takes exactly 1 argument");
                 }

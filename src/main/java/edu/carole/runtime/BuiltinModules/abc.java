@@ -1,9 +1,9 @@
 package edu.carole.runtime.BuiltinModules;
 
 import edu.carole.runtime.*;
+import edu.carole.runtime.property.PyProperty;
 
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 public class abc {
@@ -16,7 +16,7 @@ public class abc {
 
         // Add abstractmethod decorator
         module.setAttribute("abstractmethod", new PyBuiltinFunction("abstractmethod",
-                args -> {
+                (args, kwargs) -> {
                     if (args.size() != 1) {
                         throw new RuntimeException("@abstractmethod takes exactly 1 argument");
                     }
@@ -33,7 +33,7 @@ public class abc {
 
         // Add abstractproperty decorator
         module.setAttribute("abstractproperty", new PyBuiltinFunction("abstractproperty",
-                args -> {
+                (args, kwargs) -> {
                     if (args.size() != 1) {
                         throw new RuntimeException("@abstractproperty takes exactly 1 argument");
                     }

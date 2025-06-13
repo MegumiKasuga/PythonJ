@@ -1,5 +1,7 @@
 package edu.carole.runtime.io;
 
+import edu.carole.runtime.file_context.PyFileContext;
+
 import java.io.*;
 import java.nio.file.*;
 
@@ -75,11 +77,6 @@ public class FileIOProvider implements IOProvider {
     
     @Override
     public boolean supportsMode(String mode) {
-        if (mode == null) {
-            return false;
-        }
-        
-        // 支持的模式：r, w, a (及其变体)
-        return mode.matches("^[rwa][bt]?\\+?$");
+        return PyFileContext.supportsMode(mode);
     }
 }

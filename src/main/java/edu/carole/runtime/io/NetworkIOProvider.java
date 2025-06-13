@@ -1,5 +1,7 @@
 package edu.carole.runtime.io;
 
+import edu.carole.runtime.file_context.PyFileContext;
+
 import java.io.*;
 import java.net.URL;
 import java.net.URLConnection;

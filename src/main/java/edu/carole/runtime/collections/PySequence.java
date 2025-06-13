@@ -43,7 +43,7 @@ public abstract class PySequence extends PyCollection {
     public PyObject getAttribute(String name) {
         switch (name) {
             case "__getitem__":
-                return new PyBuiltinFunction("__getitem__", args -> {
+                return new PyBuiltinFunction("__getitem__", (args, kwargs) -> {
                     if (args.size() != 1) {
                         throw new RuntimeException("__getitem__() takes exactly 1 argument (" + args.size() + " given)");
                     }
@@ -51,7 +51,7 @@ public abstract class PySequence extends PyCollection {
                 });
                 
             case "count":
-                return new PyBuiltinFunction("count", args -> {
+                return new PyBuiltinFunction("count", (args, kwargs) -> {
                     if (args.size() != 1) {
                         throw new RuntimeException("count() takes exactly one argument (" + args.size() + " given)");
                     }
@@ -59,7 +59,7 @@ public abstract class PySequence extends PyCollection {
                 });
                 
             case "index":
-                return new PyBuiltinFunction("index", args -> {
+                return new PyBuiltinFunction("index", (args, kwargs) -> {
                     if (args.size() < 1 || args.size() > 3) {
                         throw new RuntimeException("index() takes from 1 to 3 positional arguments but " + args.size() + " were given");
                     }

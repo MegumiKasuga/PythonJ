@@ -1,54 +1,124 @@
-package edu.carole.runtime;
+package edu.carole.runtime.file_context;
 
+import edu.carole.interpreter.Interpreter;
+import edu.carole.runtime.*;
 import edu.carole.runtime.io.IOManager;
+import edu.carole.runtime.property.BuiltinProperty;
+
 import java.io.*;
+import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.nio.charset.UnsupportedCharsetException;
 import java.util.List;
 import java.util.ArrayList;
+import java.util.Map;
 
 /**
  * File context manager that supports real file I/O operations
  * Implements the context manager protocol for Python 'with' statements
  * Now uses the pluggable IOManager for flexible I/O handling
  */
-public class PyFileContext extends PyObject {
-    private final String filename;
-    private final String mode;
-    private boolean isOpen;
+public class PyTextFileContext extends PyFileContext {
+    private final String charSet;
     private BufferedReader reader;
     private BufferedWriter writer;
     private final List<String> content; // For storing file content when reading
     private final IOManager ioManager; // Use IOManager for flexible I/O
+    private Charset charSetCache = null;
     
-    public PyFileContext(String filename) {
-        this(filename, "r"); // Default to read mode
+    public PyTextFileContext(String filename) {
+        this(filename, "r", "utf-8"); // Default to read mode
+    }
+
+    public PyTextFileContext(String filename, String mode) {
+        this(filename, mode, "utf-8");
     }
     
-    public PyFileContext(String filename, String mode) {
-        this(filename, mode, IOManager.getInstance());
+    public PyTextFileContext(String filename, String mode, String charSet) {
+        this(filename, mode, IOManager.getInstance(), charSet);
     }
     
-    public PyFileContext(String filename, String mode, IOManager ioManager) {
-        this.filename = filename;
-        this.mode = mode != null ? mode : "r";
-        this.isOpen = false;
+    public PyTextFileContext(String filename, String mode, IOManager ioManager, String charSet) {
+        super(filename, mode);
+        this.charSet = charSet;
         this.content = new ArrayList<>();
         this.ioManager = ioManager != null ? ioManager : IOManager.getInstance();
     }
-      @Override
-    public String getTypeName() {
-        return "file";
+
+    public Charset getCharSet() {
+        if (charSetCache != null) {
+            return charSetCache;
+        } else {
+            try {
+                charSetCache = Charset.forName(charSet);
+            } catch (UnsupportedCharsetException unsupported) {
+                PyException pyException = PyException.typeError("Unsupported charset '" + charSet + "'");
+                contextExit(pyException, new PyString(charSet), null);
+                throw new Interpreter.PyExceptionWrapper(
+                    pyException
+                );
+            }
+            return charSetCache;
+        }
     }
-      @Override
+
+    @Override
+    public void initAttributes(Map<String, PyObject> attributes) {
+        super.initAttributes(attributes);
+        attributes.put("charset", new BuiltinProperty("charset", (args, kwargs) -> new PyString(charSet)));
+        attributes.put("read", new PyBuiltinFunction("read", (args, kwargs) -> {
+            if (args.size() == 0) {
+                return read();
+            } else if (args.size() == 1) {
+                return read(args.get(0));
+            } else {
+                throw new RuntimeException("read() takes at most 1 argument (" + args.size() + " given)");
+            }
+        }));
+        attributes.put("readline", new PyBuiltinFunction("readline", (args, kwargs) -> {
+            if (args.size() != 0) {
+                throw new RuntimeException("readline() takes no arguments (" + args.size() + " given)");
+            }
+            return readline();
+        }));
+        attributes.put("readlines", new PyBuiltinFunction("readlines", (args, kwargs) -> {
+            if (args.size() != 0) {
+                throw new RuntimeException("readlines() takes no arguments (" + args.size() + " given)");
+            }
+            return readlines();
+        }));
+        attributes.put("write", new PyBuiltinFunction("write", (args, kwargs) -> {
+            if (args.size() != 1) {
+                throw new RuntimeException("write() takes exactly one argument (" + args.size() + " given)");
+            }
+            return write(args.get(0));
+        }));
+        attributes.put("writelines", new PyBuiltinFunction("writelines", (args, kwargs) -> {
+            if (args.size() != 1) {
+                throw new RuntimeException("writelines() takes exactly one argument (" + args.size() + " given)");
+            }
+            return writelines(args.get(0));
+        }));
+        attributes.put("flush", new PyBuiltinFunction("flush", (args, kwargs) -> {
+            if (args.size() != 0) {
+                throw new RuntimeException("flush() takes no arguments (" + args.size() + " given)");
+            }
+            return flush();
+        }));
+    }
+
+
+
+    @Override
     public PyObject contextEnter() {
         try {
-            this.isOpen = true;
+            setOpen(true);
             
-            if (mode.startsWith("r")) {
+            if (readingMode()) {
                 // Read mode - open file for reading using IOManager
-                InputStream inputStream = ioManager.createInputStream(filename, mode);
-                reader = new BufferedReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8));
-                System.out.println("Opening file for reading: " + filename);
+                InputStream inputStream = ioManager.createInputStream(getPath(), getMode());
+                reader = new BufferedReader(new InputStreamReader(inputStream, getCharSet()));
+//                System.out.println("Opening file for reading: " + filename);
                 
                 // Pre-read content for Python-like file operations
                 String line;
@@ -58,62 +128,59 @@ public class PyFileContext extends PyObject {
                 reader.close();
                 
                 // Reopen for reading operations
-                inputStream = ioManager.createInputStream(filename, mode);
-                reader = new BufferedReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8));
+                inputStream = createInputStream();
+                reader = new BufferedReader(new InputStreamReader(inputStream, getCharSet()));
                 
-            } else if (mode.startsWith("w")) {
+            } else if (writingMode()) {
                 // Write mode - open file for writing (truncate) using IOManager
-                OutputStream outputStream = ioManager.createOutputStream(filename, mode);
-                writer = new BufferedWriter(new OutputStreamWriter(outputStream, StandardCharsets.UTF_8));
-                System.out.println("Opening file for writing: " + filename);
+                OutputStream outputStream = createOutputStream();
+                writer = new BufferedWriter(new OutputStreamWriter(outputStream, getCharSet()));
+//                System.out.println("Opening file for writing: " + filename);
                 
-            } else if (mode.startsWith("a")) {
+            } else if (appendMode()) {
                 // Append mode - open file for appending using IOManager
-                OutputStream outputStream = ioManager.createOutputStream(filename, mode);
-                writer = new BufferedWriter(new OutputStreamWriter(outputStream, StandardCharsets.UTF_8));
-                System.out.println("Opening file for appending: " + filename);
+                OutputStream outputStream = createOutputStream();
+                writer = new BufferedWriter(new OutputStreamWriter(outputStream, getCharSet()));
+//                System.out.println("Opening file for appending: " + filename);
                 
             } else {
-                throw new RuntimeException("Unsupported file mode: " + mode);
+                throw new RuntimeException("Unsupported file mode: " + getMode());
             }
             
             return this; // Return self as the context value
             
         } catch (IOException e) {
-            this.isOpen = false;
-            throw new RuntimeException("Cannot open file '" + filename + "': " + e.getMessage());
+            setOpen(false);
+            throw new RuntimeException("Cannot open file '" + getPath() + "': " + e.getMessage());
         }
     }
-      @Override
+
+    @Override
     public PyObject contextExit(PyObject exceptionType, PyObject exceptionValue, PyObject traceback) {
         try {
-            if (this.isOpen) {
-                this.isOpen = false;
+            if (isOpen()) {
+                setOpen(false);
                 
                 // Close any open streams
                 if (reader != null) {
                     reader.close();
                     reader = null;
-                    System.out.println("Closing file (read mode): " + filename);
+//                    System.out.println("Closing file (read mode): " + filename);
                 }
                 
                 if (writer != null) {
                     writer.flush(); // Ensure all data is written
                     writer.close();
                     writer = null;
-                    System.out.println("Closing file (write mode): " + filename);
+//                    System.out.println("Closing file (write mode): " + filename);
                 }
             }
         } catch (IOException e) {
-            System.err.println("Error closing file '" + filename + "': " + e.getMessage());
+//            System.err.println("Error closing file '" + filename + "': " + e.getMessage());
         }
         
         // Don't suppress any exceptions - let them propagate
         return PyBool.FALSE;
-    }
-      @Override
-    public String toString() {
-        return "<file '" + filename + "' mode='" + mode + "' " + (isOpen ? "open" : "closed") + ">";
     }
     
     // File reading methods
@@ -122,11 +189,11 @@ public class PyFileContext extends PyObject {
     }
     
     public PyObject read(PyObject size) {
-        if (!isOpen) {
+        if (!isOpen()) {
             throw new RuntimeException("I/O operation on closed file");
         }
         
-        if (!mode.startsWith("r")) {
+        if (!readingMode()) {
             throw new RuntimeException("File not open for reading");
         }
         
@@ -166,11 +233,11 @@ public class PyFileContext extends PyObject {
     }
     
     public PyObject readline() {
-        if (!isOpen) {
+        if (!isOpen()) {
             throw new RuntimeException("I/O operation on closed file");
         }
         
-        if (!mode.startsWith("r")) {
+        if (!readingMode()) {
             throw new RuntimeException("File not open for reading");
         }
         
@@ -187,11 +254,11 @@ public class PyFileContext extends PyObject {
     }
     
     public PyObject readlines() {
-        if (!isOpen) {
+        if (!isOpen()) {
             throw new RuntimeException("I/O operation on closed file");
         }
         
-        if (!mode.startsWith("r")) {
+        if (!readingMode()) {
             throw new RuntimeException("File not open for reading");
         }
         
@@ -205,18 +272,17 @@ public class PyFileContext extends PyObject {
     
     // File writing methods
     public PyObject write(PyObject data) {
-        if (!isOpen) {
+        if (!isOpen()) {
             throw new RuntimeException("I/O operation on closed file");
         }
         
-        if (!mode.startsWith("w") && !mode.startsWith("a")) {
+        if (!writingMode() && !appendMode()) {
             throw new RuntimeException("File not open for writing");
         }
-        
+
         if (!(data instanceof PyString)) {
             throw new RuntimeException("write() argument must be a string");
         }
-        
         try {
             String text = ((PyString) data).getValue();
             writer.write(text);
@@ -227,11 +293,11 @@ public class PyFileContext extends PyObject {
     }
     
     public PyObject writelines(PyObject lines) {
-        if (!isOpen) {
+        if (!isOpen()) {
             throw new RuntimeException("I/O operation on closed file");
         }
         
-        if (!mode.startsWith("w") && !mode.startsWith("a")) {
+        if (!writingMode() && !appendMode()) {
             throw new RuntimeException("File not open for writing");
         }
         
@@ -254,7 +320,7 @@ public class PyFileContext extends PyObject {
     }
     
     public PyObject flush() {
-        if (!isOpen) {
+        if (!isOpen()) {
             throw new RuntimeException("I/O operation on closed file");
         }
         
@@ -267,67 +333,9 @@ public class PyFileContext extends PyObject {
             throw new RuntimeException("Error flushing file: " + e.getMessage());
         }
     }
-      // Add a method to check if file is open
+
     @Override
-    public PyObject getAttribute(String name) {
-        switch (name) {
-            case "is_open":
-                return PyBool.valueOf(isOpen);
-            case "filename":
-                return new PyString(filename);
-            case "mode":
-                return new PyString(mode);
-            case "read":
-                return new PyBuiltinFunction("read", args -> {
-                    if (args.size() == 0) {
-                        return read();
-                    } else if (args.size() == 1) {
-                        return read(args.get(0));
-                    } else {
-                        throw new RuntimeException("read() takes at most 1 argument (" + args.size() + " given)");
-                    }
-                });
-            case "readline":
-                return new PyBuiltinFunction("readline", args -> {
-                    if (args.size() != 0) {
-                        throw new RuntimeException("readline() takes no arguments (" + args.size() + " given)");
-                    }
-                    return readline();
-                });
-            case "readlines":
-                return new PyBuiltinFunction("readlines", args -> {
-                    if (args.size() != 0) {
-                        throw new RuntimeException("readlines() takes no arguments (" + args.size() + " given)");
-                    }
-                    return readlines();
-                });
-            case "write":
-                return new PyBuiltinFunction("write", args -> {
-                    if (args.size() != 1) {
-                        throw new RuntimeException("write() takes exactly one argument (" + args.size() + " given)");
-                    }
-                    return write(args.get(0));
-                });
-            case "writelines":
-                return new PyBuiltinFunction("writelines", args -> {
-                    if (args.size() != 1) {
-                        throw new RuntimeException("writelines() takes exactly one argument (" + args.size() + " given)");
-                    }
-                    return writelines(args.get(0));
-                });
-            case "flush":
-                return new PyBuiltinFunction("flush", args -> {
-                    if (args.size() != 0) {
-                        throw new RuntimeException("flush() takes no arguments (" + args.size() + " given)");
-                    }
-                    return flush();
-                });
-            default:
-                return super.getAttribute(name);
-        }    }
-    
-    @Override
-    public boolean isTruthy() {
-        return isOpen; // File context is truthy when the file is open
+    public String toString() {
+        return "<file '" + getPath() + "' mode='" + getMode() + "' charset='" + charSet + "' " + (isOpen() ? "open" : "closed") + ">";
     }
 }

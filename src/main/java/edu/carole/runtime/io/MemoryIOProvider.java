@@ -1,5 +1,7 @@
 package edu.carole.runtime.io;
 
+import edu.carole.runtime.file_context.PyFileContext;
+
 import java.io.*;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -51,12 +53,7 @@ public class MemoryIOProvider implements IOProvider {
     
     @Override
     public boolean supportsMode(String mode) {
-        if (mode == null) {
-            return false;
-        }
-        
-        // 支持的模式：r, w, a
-        return mode.matches("^[rwa][bt]?\\+?$");
+        return PyFileContext.supportsMode(mode);
     }
     
     /**

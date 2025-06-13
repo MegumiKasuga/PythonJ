@@ -54,13 +54,13 @@ public class PyIterator extends PyObject implements Iterator<PyObject> {
     @Override
     public PyObject getAttribute(String name) {
         return switch (name) {
-            case "__iter__" -> new PyBuiltinFunction("__iter__", args -> {
+            case "__iter__" -> new PyBuiltinFunction("__iter__", (args, kwargs) -> {
                 if (!args.isEmpty()) {
                     throw new RuntimeException("__iter__() takes no arguments (" + args.size() + " given)");
                 }
                 return this; // Iterators return themselves
             });
-            case "__next__" -> new PyBuiltinFunction("__next__", args -> {
+            case "__next__" -> new PyBuiltinFunction("__next__", (args, kwargs) -> {
                 if (!args.isEmpty()) {
                     throw new RuntimeException("__next__() takes no arguments (" + args.size() + " given)");
                 }

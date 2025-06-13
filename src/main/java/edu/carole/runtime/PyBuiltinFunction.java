@@ -1,6 +1,11 @@
 package edu.carole.runtime;
 
+import edu.carole.interpreter.Interpreter;
+
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Python内置函数
@@ -11,7 +16,7 @@ public class PyBuiltinFunction extends PyObject {
     
     @FunctionalInterface
     public interface BuiltinFunction {
-        PyObject call(List<PyObject> arguments);
+        PyObject call(List<PyObject> arguments, Map<String, PyObject> keywordArguments);
     }
     
     public PyBuiltinFunction(String name, BuiltinFunction function) {
@@ -30,6 +35,10 @@ public class PyBuiltinFunction extends PyObject {
     
     @Override
     public PyObject call(List<PyObject> arguments) {
-        return function.call(arguments);
+        return function.call(arguments, null);
+    }
+
+    public PyObject call(List<PyObject> posArgs, Map<String, PyObject> kwargs, Interpreter interpreter) {
+        return function.call(posArgs, kwargs);
     }
 }

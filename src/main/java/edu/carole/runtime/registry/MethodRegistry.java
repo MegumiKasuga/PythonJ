@@ -29,7 +29,7 @@ public class MethodRegistry {
      * @param implementation 方法实现
      */
     public void registerMethod(String methodName, Function<List<PyObject>, PyObject> implementation) {
-        methods.put(methodName, new PyBuiltinFunction(methodName, implementation::apply));
+        methods.put(methodName, new PyBuiltinFunction(methodName, (args, kwargs) -> implementation.apply(args)));
     }
     
     /**
@@ -46,7 +46,7 @@ public class MethodRegistry {
      * @param implementation 方法实现
      */
     public void registerStaticMethod(String methodName, Function<List<PyObject>, PyObject> implementation) {
-        staticMethods.put(methodName, new PyBuiltinFunction(methodName, implementation::apply));
+        staticMethods.put(methodName, new PyBuiltinFunction(methodName, (args, kwargs) -> implementation.apply(args)));
     }
     
     /**
@@ -65,10 +65,10 @@ public class MethodRegistry {
      */
     public void registerAbstractMethod(String methodName, Function<List<PyObject>, PyObject> implementation) {
         if (implementation != null) {
-            abstractMethods.put(methodName, new PyBuiltinFunction(methodName, implementation::apply));
+            abstractMethods.put(methodName, new PyBuiltinFunction(methodName, (args, kwargs) -> implementation.apply(args)));
         } else {
             // 抽象方法的默认实现，抛出NotImplementedError
-            abstractMethods.put(methodName, new PyBuiltinFunction(methodName, args -> {
+            abstractMethods.put(methodName, new PyBuiltinFunction(methodName, (args, kwargs) -> {
                 throw new RuntimeException("NotImplementedError: Abstract method '" + methodName + "' must be implemented by subclass");
             }));
         }

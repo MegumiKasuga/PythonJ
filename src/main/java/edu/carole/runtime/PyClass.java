@@ -1,7 +1,7 @@
 package edu.carole.runtime;
 
-import edu.carole.interpreter.Environment;
 import edu.carole.interpreter.Interpreter;
+import edu.carole.runtime.property.PyProperty;
 
 import java.util.*;
 

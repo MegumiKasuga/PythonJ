@@ -70,7 +70,7 @@ public abstract class PyMutableSequence extends PySequence {
     public PyObject getAttribute(String name) {
         switch (name) {
             case "__setitem__":
-                return new PyBuiltinFunction("__setitem__", args -> {
+                return new PyBuiltinFunction("__setitem__", (args, kwargs) -> {
                     if (args.size() != 2) {
                         throw new RuntimeException("__setitem__() takes exactly 2 arguments (" + args.size() + " given)");
                     }
@@ -79,7 +79,7 @@ public abstract class PyMutableSequence extends PySequence {
                 });
                 
             case "__delitem__":
-                return new PyBuiltinFunction("__delitem__", args -> {
+                return new PyBuiltinFunction("__delitem__", (args, kwargs) -> {
                     if (args.size() != 1) {
                         throw new RuntimeException("__delitem__() takes exactly 1 argument (" + args.size() + " given)");
                     }
@@ -88,7 +88,7 @@ public abstract class PyMutableSequence extends PySequence {
                 });
                 
             case "insert":
-                return new PyBuiltinFunction("insert", args -> {
+                return new PyBuiltinFunction("insert", (args, kwargs) -> {
                     if (args.size() != 2) {
                         throw new RuntimeException("insert() takes exactly two arguments (" + args.size() + " given)");
                     }
@@ -97,7 +97,7 @@ public abstract class PyMutableSequence extends PySequence {
                 });
                 
             case "append":
-                return new PyBuiltinFunction("append", args -> {
+                return new PyBuiltinFunction("append", (args, kwargs) -> {
                     if (args.size() != 1) {
                         throw new RuntimeException("append() takes exactly one argument (" + args.size() + " given)");
                     }
@@ -106,7 +106,7 @@ public abstract class PyMutableSequence extends PySequence {
                 });
                 
             case "remove":
-                return new PyBuiltinFunction("remove", args -> {
+                return new PyBuiltinFunction("remove", (args, kwargs) -> {
                     if (args.size() != 1) {
                         throw new RuntimeException("remove() takes exactly one argument (" + args.size() + " given)");
                     }
@@ -115,7 +115,7 @@ public abstract class PyMutableSequence extends PySequence {
                 });
                 
             case "pop":
-                return new PyBuiltinFunction("pop", args -> {
+                return new PyBuiltinFunction("pop", (args, kwargs) -> {
                     if (args.size() > 1) {
                         throw new RuntimeException("pop() takes at most 1 argument (" + args.size() + " given)");
                     }
@@ -124,7 +124,7 @@ public abstract class PyMutableSequence extends PySequence {
                 });
                 
             case "clear":
-                return new PyBuiltinFunction("clear", args -> {
+                return new PyBuiltinFunction("clear", (args, kwargs) -> {
                     if (args.size() != 0) {
                         throw new RuntimeException("clear() takes no arguments (" + args.size() + " given)");
                     }
@@ -133,7 +133,7 @@ public abstract class PyMutableSequence extends PySequence {
                 });
                 
             case "extend":
-                return new PyBuiltinFunction("extend", args -> {
+                return new PyBuiltinFunction("extend", (args, kwargs) -> {
                     if (args.size() != 1) {
                         throw new RuntimeException("extend() takes exactly one argument (" + args.size() + " given)");
                     }
@@ -142,7 +142,7 @@ public abstract class PyMutableSequence extends PySequence {
                 });
                 
             case "reverse":
-                return new PyBuiltinFunction("reverse", args -> {
+                return new PyBuiltinFunction("reverse", (args, kwargs) -> {
                     if (args.size() != 0) {
                         throw new RuntimeException("reverse() takes no arguments (" + args.size() + " given)");
                     }

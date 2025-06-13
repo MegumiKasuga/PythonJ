@@ -3,7 +3,10 @@ package edu.carole.interpreter;
 import edu.carole.runtime.*;
 import edu.carole.runtime.BuiltinModules.abc;
 import edu.carole.runtime.BuiltinModules.functools;
+import edu.carole.runtime.file_context.PyBinaryFileContext;
+import edu.carole.runtime.file_context.PyTextFileContext;
 import edu.carole.runtime.io.IOManager;
+import edu.carole.runtime.property.PyProperty;
 
 import java.io.*;
 import java.util.*;
@@ -24,7 +27,7 @@ public class BuiltinFunctions {
 
         // Add wraps as a global function for convenience
             globals.define("wraps",
-                    new PyBuiltinFunction("wraps", args -> {
+                    new PyBuiltinFunction("wraps", (args, kwargs) -> {
                         if (args.size() != 1) {
                             throw new RuntimeException("wraps() takes exactly 1 argument (" + args.size() + " given)");
                         }
@@ -35,7 +38,7 @@ public class BuiltinFunctions {
 
                         PyFunction wrapped = (PyFunction) args.get(0);
 
-                            return new PyBuiltinFunction("wraps_decorator", decoratorArgs -> {
+                            return new PyBuiltinFunction("wraps_decorator", (decoratorArgs, kwargs2) -> {
                                 if (decoratorArgs.size() != 1) {
                                     throw new RuntimeException("decorator returned by wraps() takes exactly 1 argument");
                                 }
@@ -60,7 +63,7 @@ public class BuiltinFunctions {
             );
 
         // print函数
-        globals.define("print", new PyBuiltinFunction("print", args -> {
+        globals.define("print", new PyBuiltinFunction("print", (args, kwargs) -> {
             StringBuilder output = new StringBuilder();
             for (int i = 0; i < args.size(); i++) {
                 if (i > 0) output.append(" ");
@@ -74,7 +77,7 @@ public class BuiltinFunctions {
         }));
         
         // len函数
-        globals.define("len", new PyBuiltinFunction("len", args -> {
+        globals.define("len", new PyBuiltinFunction("len", (args, kwargs) -> {
             if (args.size() != 1) {
                 throw new RuntimeException("len() takes exactly one argument (" + args.size() + " given)");
             }
@@ -82,7 +85,7 @@ public class BuiltinFunctions {
         }));
         
         // type函数
-        globals.define("type", new PyBuiltinFunction("type", args -> {
+        globals.define("type", new PyBuiltinFunction("type", (args, kwargs) -> {
             if (args.size() != 1) {
                 throw new RuntimeException("type() takes exactly one argument (" + args.size() + " given)");
             }
@@ -90,7 +93,7 @@ public class BuiltinFunctions {
         }));
         
         // str函数
-        globals.define("str", new PyBuiltinFunction("str", args -> {
+        globals.define("str", new PyBuiltinFunction("str", (args, kwargs) -> {
             if (args.size() == 0) {
                 return new PyString("");
             } else if (args.size() == 1) {
@@ -101,7 +104,7 @@ public class BuiltinFunctions {
         }));
         
         // int函数
-        globals.define("int", new PyBuiltinFunction("int", args -> {
+        globals.define("int", new PyBuiltinFunction("int", (args, kwargs) -> {
             if (args.size() == 0) {
                 return new PyInt(0);
             } else if (args.size() == 1) {
@@ -127,7 +130,7 @@ public class BuiltinFunctions {
         }));
         
         // float函数
-        globals.define("float", new PyBuiltinFunction("float", args -> {
+        globals.define("float", new PyBuiltinFunction("float", (args, kwargs) -> {
             if (args.size() == 0) {
                 return new PyFloat(0.0);
             } else if (args.size() == 1) {
@@ -153,7 +156,7 @@ public class BuiltinFunctions {
         }));
         
         // bool函数
-        globals.define("bool", new PyBuiltinFunction("bool", args -> {
+        globals.define("bool", new PyBuiltinFunction("bool", (args, kwargs) -> {
             if (args.size() == 0) {
                 return PyBool.FALSE;
             } else if (args.size() == 1) {
@@ -164,7 +167,7 @@ public class BuiltinFunctions {
         }));
         
         // list函数
-        globals.define("list", new PyBuiltinFunction("list", args -> {
+        globals.define("list", new PyBuiltinFunction("list", (args, kwargs) -> {
             if (args.size() == 0) {
                 return new PyList(new ArrayList<>());
             } else if (args.size() == 1) {
@@ -180,7 +183,7 @@ public class BuiltinFunctions {
             }
         }));
           // dict函数
-        globals.define("dict", new PyBuiltinFunction("dict", args -> {
+        globals.define("dict", new PyBuiltinFunction("dict", (args, kwargs) -> {
             if (args.size() == 0) {
                 return new PyDict(new HashMap<>());
             } else if (args.size() == 1) {
@@ -221,7 +224,7 @@ public class BuiltinFunctions {
         }));
         
         // range函数
-        globals.define("range", new PyBuiltinFunction("range", args -> {
+        globals.define("range", new PyBuiltinFunction("range", (args, kwargs) -> {
             if (args.size() == 1) {
                 if (!(args.get(0) instanceof PyInt)) {
                     throw new RuntimeException("'int' object cannot be interpreted as an integer");
@@ -250,7 +253,7 @@ public class BuiltinFunctions {
                 throw new RuntimeException("range expected at most 3 arguments, got " + args.size());
             }
         }));          // input函数
-        globals.define("input", new PyBuiltinFunction("input", args -> {
+        globals.define("input", new PyBuiltinFunction("input", (args, kwargs) -> {
             if (args.size() > 1) {
                 throw new RuntimeException("input expected at most 1 arguments, got " + args.size());
             }
@@ -272,7 +275,7 @@ public class BuiltinFunctions {
         }));
         
         // abs函数
-        globals.define("abs", new PyBuiltinFunction("abs", args -> {
+        globals.define("abs", new PyBuiltinFunction("abs", (args, kwargs) -> {
             if (args.size() != 1) {
                 throw new RuntimeException("abs() takes exactly one argument (" + args.size() + " given)");
             }
@@ -290,7 +293,7 @@ public class BuiltinFunctions {
         }));
         
         // min函数
-        globals.define("min", new PyBuiltinFunction("min", args -> {
+        globals.define("min", new PyBuiltinFunction("min", (args, kwargs) -> {
             if (args.size() == 0) {
                 throw new RuntimeException("min expected at least 1 argument, got 0");
             }
@@ -306,7 +309,7 @@ public class BuiltinFunctions {
         }));
         
         // max函数
-        globals.define("max", new PyBuiltinFunction("max", args -> {
+        globals.define("max", new PyBuiltinFunction("max", (args, kwargs) -> {
             if (args.size() == 0) {
                 throw new RuntimeException("max expected at least 1 argument, got 0");
             }
@@ -322,7 +325,7 @@ public class BuiltinFunctions {
         }));
 
         // next函数
-        globals.define("next", new PyBuiltinFunction("next", args -> {
+        globals.define("next", new PyBuiltinFunction("next", (args, kwargs) -> {
             if (args.size() < 1 || args.size() > 2) {
                 throw new RuntimeException("next() takes from 1 to 2 positional arguments but " + args.size() + " were given");
             }
@@ -379,7 +382,7 @@ public class BuiltinFunctions {
         }));
         
         // iter函数 - 调用对象的__iter__方法
-        globals.define("iter", new PyBuiltinFunction("iter", args -> {
+        globals.define("iter", new PyBuiltinFunction("iter", (args, kwargs) -> {
             if (args.size() != 1) {
                 throw new RuntimeException("iter() takes exactly one argument (" + args.size() + " given)");
             }
@@ -394,7 +397,7 @@ public class BuiltinFunctions {
             }
         }));
           // open函数 - 创建真正的文件对象用于文件I/O操作
-        globals.define("open", new PyBuiltinFunction("open", args -> {
+        globals.define("open", new PyBuiltinFunction("open", (args, kwargs) -> {
             if (args.size() < 1 || args.size() > 2) {
                 throw new RuntimeException("open() takes from 1 to 2 positional arguments but " + args.size() + " were given");
             }
@@ -411,11 +414,22 @@ public class BuiltinFunctions {
                     throw new RuntimeException("open() argument 2 must be a string");
                 }
                 mode = ((PyString) modeArg).getValue();
-            }          return new PyFileContext(((PyString) filename).getValue(), mode);
+            }
+            if (!mode.contains("b")) {
+                // text file mode
+                String charset = "utf-8";
+                if (kwargs != null && kwargs.containsKey("charset")) {
+                    charset = kwargs.get("charset").toString();
+                }
+                return new PyTextFileContext(((PyString) filename).getValue(), mode, charset);
+            } else {
+                // binary file mode
+                return new PyBinaryFileContext(((PyString) filename).getValue(), mode);
+            }
         }));
         
         // sorted函数 - 返回排序后的新列表
-        globals.define("sorted", new PyBuiltinFunction("sorted", args -> {
+        globals.define("sorted", new PyBuiltinFunction("sorted", (args, kwargs) -> {
             if (args.size() < 1 || args.size() > 1) {
                 // 目前仅实现基本版本，不支持key参数和reverse参数
                 throw new RuntimeException("sorted() takes 1 positional argument but " + args.size() + " were given");
@@ -442,7 +456,7 @@ public class BuiltinFunctions {
         }));
         
         // zip函数 - 将多个可迭代对象的对应元素打包成元组
-        globals.define("zip", new PyBuiltinFunction("zip", args -> {
+        globals.define("zip", new PyBuiltinFunction("zip", (args, kwargs) -> {
             if (args.size() == 0) {
                 return new PyList(new ArrayList<>());
             }
@@ -482,7 +496,7 @@ public class BuiltinFunctions {
         }));
         
         // filter函数 - 过滤可迭代对象中的元素
-        globals.define("filter", new PyBuiltinFunction("filter", args -> {
+        globals.define("filter", new PyBuiltinFunction("filter", (args, kwargs) -> {
             if (args.size() != 2) {
                 throw new RuntimeException("filter() takes exactly 2 arguments (" + args.size() + " given)");
             }
@@ -519,7 +533,7 @@ public class BuiltinFunctions {
         }));
         
         // map函数 - 对可迭代对象的每个元素应用函数
-        globals.define("map", new PyBuiltinFunction("map", args -> {
+        globals.define("map", new PyBuiltinFunction("map", (args, kwargs) -> {
             if (args.size() < 2) {
                 throw new RuntimeException("map() requires at least 2 arguments");
             }
@@ -563,7 +577,7 @@ public class BuiltinFunctions {
         }));
         
         // any函数 - 如果可迭代对象中任一元素为真，返回True
-        globals.define("any", new PyBuiltinFunction("any", args -> {
+        globals.define("any", new PyBuiltinFunction("any", (args, kwargs) -> {
             if (args.size() != 1) {
                 throw new RuntimeException("any() takes exactly one argument (" + args.size() + " given)");
             }
@@ -585,7 +599,7 @@ public class BuiltinFunctions {
         }));
         
         // all函数 - 如果可迭代对象中所有元素都为真，返回True
-        globals.define("all", new PyBuiltinFunction("all", args -> {
+        globals.define("all", new PyBuiltinFunction("all", (args, kwargs) -> {
             if (args.size() != 1) {
                 throw new RuntimeException("all() takes exactly one argument (" + args.size() + " given)");
             }
@@ -606,7 +620,7 @@ public class BuiltinFunctions {
             return PyBool.TRUE;
         }));
           // sum函数 - 对可迭代对象的元素求和
-        globals.define("sum", new PyBuiltinFunction("sum", args -> {
+        globals.define("sum", new PyBuiltinFunction("sum", (args, kwargs) -> {
             if (args.size() < 1 || args.size() > 2) {
                 throw new RuntimeException("sum() takes at most 2 arguments (" + args.size() + " given)");
             }
@@ -659,7 +673,7 @@ public class BuiltinFunctions {
         }));
         
         // round函数 - 对数字进行四舍五入
-        globals.define("round", new PyBuiltinFunction("round", args -> {
+        globals.define("round", new PyBuiltinFunction("round", (args, kwargs) -> {
             if (args.size() < 1 || args.size() > 2) {
                 throw new RuntimeException("round() takes at most 2 arguments (" + args.size() + " given)");
             }
@@ -686,7 +700,7 @@ public class BuiltinFunctions {
             }
         }));
           // pow函数 - 返回x的y次幂
-        globals.define("pow", new PyBuiltinFunction("pow", args -> {
+        globals.define("pow", new PyBuiltinFunction("pow", (args, kwargs) -> {
             if (args.size() < 2 || args.size() > 3) {
                 throw new RuntimeException("pow() takes 2 or 3 arguments (" + args.size() + " given)");
             }
@@ -764,7 +778,7 @@ public class BuiltinFunctions {
             return new PyFloat(result);
         }));
           // dir函数 - 返回对象的属性列表
-        globals.define("dir", new PyBuiltinFunction("dir", args -> {
+        globals.define("dir", new PyBuiltinFunction("dir", (args, kwargs) -> {
             if (args.size() > 1) {
                 throw new RuntimeException("dir() takes at most 1 argument (" + args.size() + " given)");
             }
@@ -822,7 +836,7 @@ public class BuiltinFunctions {
             return new PyList(attributes);
         }));
           // isinstance函数 - 检查对象是否是指定类型的实例
-        globals.define("isinstance", new PyBuiltinFunction("isinstance", args -> {
+        globals.define("isinstance", new PyBuiltinFunction("isinstance", (args, kwargs) -> {
             if (args.size() != 2) {
                 throw new RuntimeException("isinstance() takes exactly 2 arguments (" + args.size() + " given)");
             }
@@ -844,7 +858,7 @@ public class BuiltinFunctions {
         }));
         
         // issubclass函数 - 检查一个类是否是另一个类的子类
-        globals.define("issubclass", new PyBuiltinFunction("issubclass", args -> {
+        globals.define("issubclass", new PyBuiltinFunction("issubclass", (args, kwargs) -> {
             if (args.size() != 2) {
                 throw new RuntimeException("issubclass() takes exactly 2 arguments (" + args.size() + " given)");
             }
@@ -867,7 +881,7 @@ public class BuiltinFunctions {
         }));
         
         // id函数 - 返回对象的唯一标识符
-        globals.define("id", new PyBuiltinFunction("id", args -> {
+        globals.define("id", new PyBuiltinFunction("id", (args, kwargs) -> {
             if (args.size() != 1) {
                 throw new RuntimeException("id() takes exactly one argument (" + args.size() + " given)");
             }
@@ -878,7 +892,7 @@ public class BuiltinFunctions {
         }));
         
         // callable函数 - 检查对象是否可调用
-        globals.define("callable", new PyBuiltinFunction("callable", args -> {
+        globals.define("callable", new PyBuiltinFunction("callable", (args, kwargs) -> {
             if (args.size() != 1) {
                 throw new RuntimeException("callable() takes exactly one argument (" + args.size() + " given)");
             }
@@ -899,7 +913,7 @@ public class BuiltinFunctions {
             }
         }));
           // complex函数 - 创建复数
-        globals.define("complex", new PyBuiltinFunction("complex", args -> {
+        globals.define("complex", new PyBuiltinFunction("complex", (args, kwargs) -> {
             if (args.size() > 2) {
                 throw new RuntimeException("complex() takes at most 2 arguments (" + args.size() + " given)");
             }
@@ -950,7 +964,7 @@ public class BuiltinFunctions {
             return new PyComplex(real, imag);
         }));
           // set函数 - 创建集合
-        globals.define("set", new PyBuiltinFunction("set", args -> {
+        globals.define("set", new PyBuiltinFunction("set", (args, kwargs) -> {
             if (args.size() > 1) {
                 throw new RuntimeException("set() takes at most 1 argument (" + args.size() + " given)");
             }
@@ -971,7 +985,7 @@ public class BuiltinFunctions {
               // 返回真正的集合对象
             return new PySet(elements);
         }));        // bytes函数 - 创建字节对象
-        globals.define("bytes", new PyBuiltinFunction("bytes", args -> {
+        globals.define("bytes", new PyBuiltinFunction("bytes", (args, kwargs) -> {
             if (args.size() == 0) {
                 return new PyBytes(new byte[0]);
             } else if (args.size() == 1) {
@@ -1046,7 +1060,7 @@ public class BuiltinFunctions {
         }));
 
         // bytearray函数 - 创建可变字节数组对象
-        globals.define("bytearray", new PyBuiltinFunction("bytearray", args -> {
+        globals.define("bytearray", new PyBuiltinFunction("bytearray", (args, kwargs) -> {
             if (args.size() == 0) {
                 return new PyByteArray(new byte[0]);
             } else if (args.size() == 1) {
@@ -1083,7 +1097,7 @@ public class BuiltinFunctions {
                 throw new RuntimeException("bytearray() takes at most 1 argument (" + args.size() + " given)");
             }
         }));        // vars函数 - 返回对象的__dict__属性或当前作用域的局部变量
-        globals.define("vars", new PyBuiltinFunction("vars", args -> {
+        globals.define("vars", new PyBuiltinFunction("vars", (args, kwargs) -> {
             if (args.size() > 1) {
                 throw new RuntimeException("vars() takes at most 1 argument (" + args.size() + " given)");
             }
@@ -1128,7 +1142,7 @@ public class BuiltinFunctions {
         }));
 
         // tuple函数 - 创建元组
-        globals.define("tuple", new PyBuiltinFunction("tuple", args -> {
+        globals.define("tuple", new PyBuiltinFunction("tuple", (args, kwargs) -> {
             if (args.size() == 0) {
                 return new PyTuple(new ArrayList<>());
             } else if (args.size() == 1) {
@@ -1147,7 +1161,7 @@ public class BuiltinFunctions {
                 throw new RuntimeException("tuple() takes at most 1 argument (" + args.size() + " given)");
             }
         }));        // frozenset函数 - 创建不可变集合
-        globals.define("frozenset", new PyBuiltinFunction("frozenset", args -> {
+        globals.define("frozenset", new PyBuiltinFunction("frozenset", (args, kwargs) -> {
             if (args.size() > 1) {
                 throw new RuntimeException("frozenset() takes at most 1 argument (" + args.size() + " given)");
             }
@@ -1171,7 +1185,7 @@ public class BuiltinFunctions {
         }));
 
         // enumerate函数 - 返回枚举对象
-        globals.define("enumerate", new PyBuiltinFunction("enumerate", args -> {
+        globals.define("enumerate", new PyBuiltinFunction("enumerate", (args, kwargs) -> {
             if (args.isEmpty() || args.size() > 2) {
                 throw new RuntimeException("enumerate() takes from 1 to 2 positional arguments but " + args.size() + " were given");
             }
@@ -1208,7 +1222,7 @@ public class BuiltinFunctions {
         }));
 
         // reversed函数 - 返回反向迭代器
-        globals.define("reversed", new PyBuiltinFunction("reversed", args -> {
+        globals.define("reversed", new PyBuiltinFunction("reversed", (args, kwargs) -> {
             if (args.size() != 1) {
                 throw new RuntimeException("reversed() takes exactly one argument (" + args.size() + " given)");
             }
@@ -1239,7 +1253,7 @@ public class BuiltinFunctions {
         }));
 
 
-        globals.define("staticmethod", new PyBuiltinFunction("staticmethod", args -> {
+        globals.define("staticmethod", new PyBuiltinFunction("staticmethod", (args, kwargs) -> {
             PyObject func = args.get(0);
             if (!(func instanceof PyFunction pyFunction)) {
                 throw new RuntimeException("staticmethod() argument must be a function");
@@ -1251,7 +1265,7 @@ public class BuiltinFunctions {
             return pyFunction;
         }));
 
-        globals.define("property", new PyBuiltinFunction("property", args -> {
+        globals.define("property", new PyBuiltinFunction("property", (args, kwargs) -> {
             if (args.size() != 1) {
                 throw new RuntimeException("property() takes exactly one argument (" + args.size() + " given)");
             }
@@ -1266,7 +1280,7 @@ public class BuiltinFunctions {
             return new PyProperty(pyFunc);
         }));
 
-        globals.define("setter", new PyBuiltinFunction("setter", args -> {
+        globals.define("setter", new PyBuiltinFunction("setter", (args, kwargs) -> {
             if (args.size() != 2) {
                 throw new RuntimeException("setter() takes exactly two argument (" + args.size() + " given)");
             }
@@ -1716,9 +1730,9 @@ class PyRange extends PyObject implements Iterable<PyObject> {
     public PyObject getAttribute(String name) {
         switch (name) {
             case "__iter__":
-                return new PyBuiltinFunction("__iter__", args -> this);
+                return new PyBuiltinFunction("__iter__", (args, kwargs) -> this);
             case "__next__":
-                return new PyBuiltinFunction("__next__", args -> {
+                return new PyBuiltinFunction("__next__", (args, kwargs) -> {
                     if (!args.isEmpty()) {
                         throw new RuntimeException("__next__() takes no arguments (" + args.size() + " given)");
                     }

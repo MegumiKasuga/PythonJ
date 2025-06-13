@@ -189,7 +189,7 @@ public class PyComplex extends PyObjectWithMethods {
     }
 
     private PyObject bool() {
-        return new PyBuiltinFunction("__bool__", args -> {
+        return new PyBuiltinFunction("__bool__", (args, kwargs) -> {
             if (args.size() != 0) {
                 throw new RuntimeException("__bool__() takes no arguments (" + args.size() + " given)");
             }

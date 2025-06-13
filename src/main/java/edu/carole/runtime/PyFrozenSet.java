@@ -81,7 +81,8 @@ public class PyFrozenSet extends PyObjectWithMethods {
     public boolean isTruthy() { 
         return !elements.isEmpty(); 
     }
-      public PyObject len() {
+
+    public PyObject len() {
         return new PyInt(elements.size());
     }
     
@@ -108,7 +109,8 @@ public class PyFrozenSet extends PyObjectWithMethods {
         PyObject eqResult = __eq__(other);
         return PyBool.valueOf(!((PyBool) eqResult).getValue());
     }
-      private PyObject __len__() {
+
+    private PyObject __len__() {
         return new PyInt(this.elements.size());
     }
     
@@ -131,7 +133,8 @@ public class PyFrozenSet extends PyObjectWithMethods {
     private PyObject __xor__(PyObject other) {
         return symmetric_difference(other);
     }
-      private PyObject __repr__() {
+
+    private PyObject __repr__() {
         return new PyString(this.toString());
     }
     

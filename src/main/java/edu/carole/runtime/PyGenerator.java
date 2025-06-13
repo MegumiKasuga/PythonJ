@@ -7,8 +7,8 @@ import edu.carole.ast.statements.TryExceptStatement;
 import edu.carole.ast.statements.WithStatement;
 import edu.carole.interpreter.Environment;
 import edu.carole.interpreter.Interpreter;
+import edu.carole.runtime.file_context.PyTextFileContext;
 
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.ArrayList;
@@ -88,7 +88,7 @@ public class PyGenerator extends PyObject implements Iterable<PyObject> {
     public PyObject getAttribute(String name) {
         switch (name) {
             case "__iter__":
-                return new PyBuiltinFunction("__iter__", args -> {
+                return new PyBuiltinFunction("__iter__", (args, kwargs) -> {
                     if (args.size() != 0) {
                         throw new RuntimeException("__iter__() takes no arguments (" + args.size() + " given)");
                     }
@@ -96,7 +96,7 @@ public class PyGenerator extends PyObject implements Iterable<PyObject> {
                 });
                 
             case "__next__":
-                return new PyBuiltinFunction("__next__", args -> {
+                return new PyBuiltinFunction("__next__", (args, kwargs) -> {
                     if (args.size() != 0) {
                         throw new RuntimeException("__next__() takes no arguments (" + args.size() + " given)");
                     }
@@ -331,6 +331,7 @@ public class PyGenerator extends PyObject implements Iterable<PyObject> {
                     // 如果是函数体，说明已经执行完毕
                     exhausted = true;
                     yieldingPoint = null;
+                    dealWithWithExit(lower, null);
                     throw new PyFunction.ReturnException(null);
                 }
                 try {
@@ -396,7 +397,8 @@ public class PyGenerator extends PyObject implements Iterable<PyObject> {
         private void dealWithWithExit(PyFunction.YieldingClause clause, Throwable exception) {
             if (!(clause.self() instanceof WithStatement)) return;
             PyObject obj = clause.iterableCache();
-            if (obj == null) return;
+            if (!(obj instanceof PyTextFileContext context)) return;
+            if (!context.isOpen()) return;
             interpreter.exit(obj, exception);
         }
 

@@ -212,7 +212,7 @@ public class ModuleLoader {
         Environment env = new Environment();
         
         // Add functools.reduce - simplified implementation
-        env.define("reduce", new PyBuiltinFunction("reduce", args -> {
+        env.define("reduce", new PyBuiltinFunction("reduce", (args, kwargs) -> {
             if (args.size() < 2 || args.size() > 3) {
                 throw new RuntimeException("reduce expected 2 or 3 arguments, got " + args.size());
             }
@@ -247,7 +247,7 @@ public class ModuleLoader {
         }));
         
         // Add functools.partial (placeholder implementation)
-        env.define("partial", new PyBuiltinFunction("partial", args -> {
+        env.define("partial", new PyBuiltinFunction("partial", (args, kwargs) -> {
             if (args.size() < 1) {
                 throw new RuntimeException("partial expected at least 1 argument, got " + args.size());
             }
@@ -283,7 +283,7 @@ public class ModuleLoader {
     private Environment createOsModule() {
         Environment env = new Environment();
           // Add os.getcwd
-        env.define("getcwd", new PyBuiltinFunction("getcwd", args -> {
+        env.define("getcwd", new PyBuiltinFunction("getcwd", (args, kwargs) -> {
             if (args.size() != 0) {
                 throw new RuntimeException("getcwd() takes no arguments");
             }

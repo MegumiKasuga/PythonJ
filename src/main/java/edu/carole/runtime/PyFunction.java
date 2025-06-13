@@ -45,10 +45,10 @@ public class PyFunction extends PyObject {
         this.defaultValues = extractDefaultValues(functionParameters);
 
         // Debug output
-        System.out.println("DEBUG: Function " + name + " created with:");
-        System.out.println("  Regular parameters: " + parameters);
-        System.out.println("  Varargs param: " + varargsParam);
-        System.out.println("  Default values: " + defaultValues.keySet());
+//        System.out.println("DEBUG: Function " + name + " created with:");
+//        System.out.println("  Regular parameters: " + parameters);
+//        System.out.println("  Varargs param: " + varargsParam);
+//        System.out.println("  Default values: " + defaultValues.keySet());
     }
 
     public PyFunction(String name, List<String> parameters, List<ASTNode> body, Environment closure, String varargsParam) {
@@ -239,14 +239,14 @@ public class PyFunction extends PyObject {
         int posArgCount = positionalArguments.size();
         
         // Debug output
-        System.out.println("DEBUG: Calling function " + name + " with keywords");
-        System.out.println("DEBUG: regularParamCount = " + regularParamCount);
-        System.out.println("DEBUG: posArgCount = " + posArgCount);
-        System.out.println("DEBUG: keywordArgCount = " + 
-                      (keywordArguments != null ? keywordArguments.size() : 0));
-        System.out.println("DEBUG: parameters = " + parameters);
-        System.out.println("DEBUG: varargsParam = " + varargsParam);
-        System.out.println("DEBUG: kwargsParam = " + kwargsParam);
+//        System.out.println("DEBUG: Calling function " + name + " with keywords");
+//        System.out.println("DEBUG: regularParamCount = " + regularParamCount);
+//        System.out.println("DEBUG: posArgCount = " + posArgCount);
+//        System.out.println("DEBUG: keywordArgCount = " +
+//                      (keywordArguments != null ? keywordArguments.size() : 0));
+//        System.out.println("DEBUG: parameters = " + parameters);
+//        System.out.println("DEBUG: varargsParam = " + varargsParam);
+//        System.out.println("DEBUG: kwargsParam = " + kwargsParam);
         
         // 跟踪已经绑定的参数
         Set<String> boundParams = new HashSet<>();
@@ -261,12 +261,12 @@ public class PyFunction extends PyObject {
                 if (parameters.contains(paramName)) {
                     environment.define(paramName, value);
                     boundParams.add(paramName);
-                    System.out.println("DEBUG: Bound keyword parameter: " + paramName + " = " + value);
+//                    System.out.println("DEBUG: Bound keyword parameter: " + paramName + " = " + value);
                 } 
                 // 否则，如果有**kwargs参数，则放入kwargs字典
                 else if (kwargsParam != null) {
                     // 暂存，稍后会放入kwargs字典
-                    System.out.println("DEBUG: Found keyword for kwargs: " + paramName + " = " + value);
+//                    System.out.println("DEBUG: Found keyword for kwargs: " + paramName + " = " + value);
                 } else {
                     throw new RuntimeException(name + "() got an unexpected keyword argument '" + paramName + "'");
                 }
@@ -289,7 +289,7 @@ public class PyFunction extends PyObject {
             // 绑定位置参数
             environment.define(paramName, positionalArguments.get(argIndex));
             boundParams.add(paramName);
-            System.out.println("DEBUG: Bound positional parameter: " + paramName + " = " + positionalArguments.get(argIndex));
+//            System.out.println("DEBUG: Bound positional parameter: " + paramName + " = " + positionalArguments.get(argIndex));
             paramIndex++;
             argIndex++;
         }
@@ -352,7 +352,7 @@ public class PyFunction extends PyObject {
             }
             
             environment.define(kwargsParam, new PyDict(kwargsMap));
-            System.out.println("DEBUG: Bound kwargs parameter: " + kwargsParam + " = " + kwargsMap);
+//            System.out.println("DEBUG: Bound kwargs parameter: " + kwargsParam + " = " + kwargsMap);
         } else if (keywordArguments != null) {
             // 确保没有未处理的关键字参数
             for (String key : keywordArguments.keySet()) {
@@ -377,20 +377,20 @@ public class PyFunction extends PyObject {
         if (isBoundMethod && !isStaticMethod()) {
             // Insert the instance as the first argument (self)
             actualArguments.add(0, boundInstance);
-            System.out.println("DEBUG: Injecting self argument for bound method: " + boundInstance);
+            // System.out.println("DEBUG: Injecting self argument for bound method: " + boundInstance);
         }
         
         int regularParamCount = parameters.size();
         int argCount = actualArguments.size();
-        
+
         // Debug output
-        System.out.println("DEBUG: Calling function " + name);
-        System.out.println("DEBUG: regularParamCount = " + regularParamCount);
-        System.out.println("DEBUG: argCount = " + argCount);
-        System.out.println("DEBUG: parameters = " + parameters);
-        System.out.println("DEBUG: varargsParam = " + varargsParam);
-        System.out.println("DEBUG: kwargsParam = " + kwargsParam);
-        System.out.println("DEBUG: isBoundMethod = " + isBoundMethod);
+//        System.out.println("DEBUG: Calling function " + name);
+//        System.out.println("DEBUG: regularParamCount = " + regularParamCount);
+//        System.out.println("DEBUG: argCount = " + argCount);
+//        System.out.println("DEBUG: parameters = " + parameters);
+//        System.out.println("DEBUG: varargsParam = " + varargsParam);
+//        System.out.println("DEBUG: kwargsParam = " + kwargsParam);
+//        System.out.println("DEBUG: isBoundMethod = " + isBoundMethod);
         
         // Handle parameter binding with default values
         if (varargsParam == null && kwargsParam == null) {
@@ -420,22 +420,22 @@ public class PyFunction extends PyObject {
                     " positional arguments but " + argCount + " were given");
             }
         }        // Bind regular parameters
-        System.out.println("DEBUG: Binding parameters for " + name + "():");
-        System.out.println("  regularParamCount: " + regularParamCount);
-        System.out.println("  argCount: " + argCount);
-        System.out.println("  parameters: " + parameters);
-        System.out.println("  varargsParam: " + varargsParam);
+//        System.out.println("DEBUG: Binding parameters for " + name + "():");
+//        System.out.println("  regularParamCount: " + regularParamCount);
+//        System.out.println("  argCount: " + argCount);
+//        System.out.println("  parameters: " + parameters);
+//        System.out.println("  varargsParam: " + varargsParam);
         
         for (int i = 0; i < regularParamCount; i++) {
             String paramName = parameters.get(i);
-            System.out.println("  Processing parameter " + i + ": " + paramName);
+//            System.out.println("  Processing parameter " + i + ": " + paramName);
             if (i < argCount) {
                 // Use provided argument
-                System.out.println("    Using provided argument: " + actualArguments.get(i));
+//                System.out.println("    Using provided argument: " + actualArguments.get(i));
                 environment.define(paramName, actualArguments.get(i));
             } else if (defaultValues.containsKey(paramName)) {
                 // Use default value - evaluate it in the closure environment
-                System.out.println("    Using default value");
+//                System.out.println("    Using default value");
                 try {
                     PyObject defaultValue = evaluateDefaultValue(defaultValues.get(paramName), interpreter);
                     environment.define(paramName, defaultValue);
@@ -444,7 +444,7 @@ public class PyFunction extends PyObject {
                 }
             } else {
                 // Missing required parameter
-                System.out.println("    ERROR: Missing required parameter");
+//                System.out.println("    ERROR: Missing required parameter");
                 throw new RuntimeException(name + "() missing required positional argument: '" + paramName + "'");
             }
         }
@@ -512,7 +512,7 @@ public class PyFunction extends PyObject {
                 // Handle special case for varargs and kwargs parameters
                 if (varName.equals(varargsParam) || varName.equals(kwargsParam)) {
                     // These will be properly handled in call() method, just pass through
-                    System.out.println("DEBUG: Preserving special parameter " + varName + " in closure");
+//                    System.out.println("DEBUG: Preserving special parameter " + varName + " in closure");
                 }
                 
                 executionEnvironment.define(varName, varValue);

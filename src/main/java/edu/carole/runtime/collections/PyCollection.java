@@ -27,7 +27,7 @@ public abstract class PyCollection extends PyIterable {
     public PyObject getAttribute(String name) {
         switch (name) {
             case "__len__":
-                return new PyBuiltinFunction("__len__", args -> {
+                return new PyBuiltinFunction("__len__", (args, kwargs) -> {
                     if (args.size() != 0) {
                         throw new RuntimeException("__len__() takes no arguments (" + args.size() + " given)");
                     }
@@ -35,7 +35,7 @@ public abstract class PyCollection extends PyIterable {
                 });
                 
             case "__contains__":
-                return new PyBuiltinFunction("__contains__", args -> {
+                return new PyBuiltinFunction("__contains__", (args, kwargs) -> {
                     if (args.size() != 1) {
                         throw new RuntimeException("__contains__() takes exactly 1 argument (" + args.size() + " given)");
                     }

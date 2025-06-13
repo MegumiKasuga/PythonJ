@@ -21,7 +21,7 @@ public abstract class PyIterable extends PyObject {
     public PyObject getAttribute(String name) {
         switch (name) {
             case "__iter__":
-                return new PyBuiltinFunction("__iter__", args -> {
+                return new PyBuiltinFunction("__iter__", (args, kwargs) -> {
                     if (args.size() != 0) {
                         throw new RuntimeException("__iter__() takes no arguments (" + args.size() + " given)");
                     }

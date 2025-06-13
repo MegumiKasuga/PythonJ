@@ -49,7 +49,7 @@ public abstract class PyMapping extends PyCollection {
     public PyObject getAttribute(String name) {
         switch (name) {
             case "__getitem__":
-                return new PyBuiltinFunction("__getitem__", args -> {
+                return new PyBuiltinFunction("__getitem__", (args, kwargs) -> {
                     if (args.size() != 1) {
                         throw new RuntimeException("__getitem__() takes exactly 1 argument (" + args.size() + " given)");
                     }
@@ -57,7 +57,7 @@ public abstract class PyMapping extends PyCollection {
                 });
                 
             case "keys":
-                return new PyBuiltinFunction("keys", args -> {
+                return new PyBuiltinFunction("keys", (args, kwargs) -> {
                     if (args.size() != 0) {
                         throw new RuntimeException("keys() takes no arguments (" + args.size() + " given)");
                     }
@@ -65,7 +65,7 @@ public abstract class PyMapping extends PyCollection {
                 });
                 
             case "values":
-                return new PyBuiltinFunction("values", args -> {
+                return new PyBuiltinFunction("values", (args, kwargs) -> {
                     if (args.size() != 0) {
                         throw new RuntimeException("values() takes no arguments (" + args.size() + " given)");
                     }
@@ -73,7 +73,7 @@ public abstract class PyMapping extends PyCollection {
                 });
                 
             case "items":
-                return new PyBuiltinFunction("items", args -> {
+                return new PyBuiltinFunction("items", (args, kwargs) -> {
                     if (args.size() != 0) {
                         throw new RuntimeException("items() takes no arguments (" + args.size() + " given)");
                     }
@@ -81,7 +81,7 @@ public abstract class PyMapping extends PyCollection {
                 });
                 
             case "get":
-                return new PyBuiltinFunction("get", args -> {
+                return new PyBuiltinFunction("get", (args, kwargs) -> {
                     if (args.size() < 1 || args.size() > 2) {
                         throw new RuntimeException("get() takes from 1 to 2 arguments but " + args.size() + " were given");
                     }

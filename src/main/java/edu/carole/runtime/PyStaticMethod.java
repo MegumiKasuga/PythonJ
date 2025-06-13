@@ -24,7 +24,7 @@ public class PyStaticMethod extends PyObject {
      * @param implementation 方法实现
      */
     public PyStaticMethod(String methodName, Function<List<PyObject>, PyObject> implementation) {
-        this.function = new PyBuiltinFunction(methodName, implementation::apply);
+        this.function = new PyBuiltinFunction(methodName, (args, kwargs) -> implementation.apply(args));
     }
     
     /**

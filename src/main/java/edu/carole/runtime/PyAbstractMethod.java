@@ -25,7 +25,7 @@ public class PyAbstractMethod extends PyObject {
      * @param methodName 方法名
      */
     public PyAbstractMethod(String methodName) {
-        this.function = new PyBuiltinFunction(methodName, args -> {
+        this.function = new PyBuiltinFunction(methodName, (args, kwargs) -> {
             throw new RuntimeException("NotImplementedError: Abstract method '" + methodName + "' must be implemented by subclass");
         });
         this.isAbstract = true;
@@ -38,9 +38,9 @@ public class PyAbstractMethod extends PyObject {
      */
     public PyAbstractMethod(String methodName, Function<List<PyObject>, PyObject> implementation) {
         if (implementation != null) {
-            this.function = new PyBuiltinFunction(methodName, implementation::apply);
+            this.function = new PyBuiltinFunction(methodName, (args, kwargs) -> implementation.apply(args));
         } else {
-            this.function = new PyBuiltinFunction(methodName, args -> {
+            this.function = new PyBuiltinFunction(methodName, (args, kwargs) -> {
                 throw new RuntimeException("NotImplementedError: Abstract method '" + methodName + "' must be implemented by subclass");
             });
         }

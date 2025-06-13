@@ -1,6 +1,7 @@
 package edu.carole.interpreter;
 
 import edu.carole.runtime.*;
+import edu.carole.runtime.property.PyProperty;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -172,7 +173,13 @@ public class Environment {
                     }
                 }
             } else {
-                return null;
+                try {
+                    PyObject value = obj.getAttribute(path[i + 1]);
+                    currentValues = new HashMap<>();
+                    currentValues.put(path[i + 1], value);
+                } catch (Exception e) {
+                    return null;
+                }
             }
         }
         return null;

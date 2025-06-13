@@ -78,7 +78,8 @@ public class PyFloat extends PyObjectWithMethods {
             throw new RuntimeException("unsupported operand type(s) for +: 'float' and '" + other.getTypeName() + "'");
         }
     }
-      private PyObject subtract(PyObject other) {
+
+    private PyObject subtract(PyObject other) {
         if (other instanceof PyInt) {
             return new PyFloat(this.value - ((PyInt) other).getValue());
         } else if (other instanceof PyFloat) {
@@ -89,7 +90,8 @@ public class PyFloat extends PyObjectWithMethods {
             throw new RuntimeException("unsupported operand type(s) for -: 'float' and '" + other.getTypeName() + "'");
         }
     }
-      private PyObject multiply(PyObject other) {
+
+    private PyObject multiply(PyObject other) {
         if (other instanceof PyInt) {
             return new PyFloat(this.value * ((PyInt) other).getValue());
         } else if (other instanceof PyFloat) {
@@ -100,7 +102,8 @@ public class PyFloat extends PyObjectWithMethods {
             throw new RuntimeException("unsupported operand type(s) for *: 'float' and '" + other.getTypeName() + "'");
         }
     }
-      private PyObject trueDivide(PyObject other) {
+
+    private PyObject trueDivide(PyObject other) {
         if (other instanceof PyInt) {
             long otherValue = ((PyInt) other).getValue();
             if (otherValue == 0) {
@@ -117,7 +120,8 @@ public class PyFloat extends PyObjectWithMethods {
             throw new RuntimeException("unsupported operand type(s) for /: 'float' and '" + other.getTypeName() + "'");
         }
     }
-      private PyObject floorDivide(PyObject other) {
+
+    private PyObject floorDivide(PyObject other) {
         if (other instanceof PyInt) {
             long otherValue = ((PyInt) other).getValue();
             if (otherValue == 0) {
@@ -134,7 +138,8 @@ public class PyFloat extends PyObjectWithMethods {
             throw new RuntimeException("unsupported operand type(s) for //: 'float' and '" + other.getTypeName() + "'");
         }
     }
-      private PyObject modulo(PyObject other) {
+
+    private PyObject modulo(PyObject other) {
         if (other instanceof PyInt) {
             long otherValue = ((PyInt) other).getValue();
             if (otherValue == 0) {
@@ -151,7 +156,8 @@ public class PyFloat extends PyObjectWithMethods {
             throw new RuntimeException("unsupported operand type(s) for %: 'float' and '" + other.getTypeName() + "'");
         }
     }
-      private PyObject power(PyObject other) {
+
+    private PyObject power(PyObject other) {
         if (other instanceof PyInt) {
             long otherValue = ((PyInt) other).getValue();
             return new PyFloat(Math.pow(this.value, otherValue));
@@ -179,7 +185,8 @@ public class PyFloat extends PyObjectWithMethods {
     private PyObject notEquals(PyObject other) {
         return PyBool.valueOf(!this.equals(other));
     }
-      private PyObject lessThan(PyObject other) {
+
+    private PyObject lessThan(PyObject other) {
         if (other instanceof PyInt) {
             return PyBool.valueOf(this.value < ((PyInt) other).getValue());
         } else if (other instanceof PyFloat) {
@@ -188,7 +195,8 @@ public class PyFloat extends PyObjectWithMethods {
             throw new RuntimeException("'<' not supported between instances of 'float' and '" + other.getTypeName() + "'");
         }
     }
-      private PyObject lessEqual(PyObject other) {
+
+    private PyObject lessEqual(PyObject other) {
         if (other instanceof PyInt) {
             return PyBool.valueOf(this.value <= ((PyInt) other).getValue());
         } else if (other instanceof PyFloat) {
@@ -197,7 +205,8 @@ public class PyFloat extends PyObjectWithMethods {
             throw new RuntimeException("'<=' not supported between instances of 'float' and '" + other.getTypeName() + "'");
         }
     }
-      private PyObject greaterThan(PyObject other) {
+
+    private PyObject greaterThan(PyObject other) {
         if (other instanceof PyInt) {
             return PyBool.valueOf(this.value > ((PyInt) other).getValue());
         } else if (other instanceof PyFloat) {
@@ -206,7 +215,8 @@ public class PyFloat extends PyObjectWithMethods {
             throw new RuntimeException("'>' not supported between instances of 'float' and '" + other.getTypeName() + "'");
         }
     }
-      private PyObject greaterEqual(PyObject other) {
+
+    private PyObject greaterEqual(PyObject other) {
         if (other instanceof PyInt) {
             return PyBool.valueOf(this.value >= ((PyInt) other).getValue());
         } else if (other instanceof PyFloat) {
@@ -263,7 +273,8 @@ public class PyFloat extends PyObjectWithMethods {
         result.add(new PyInt(denominator));
         return new PyTuple(result);
     }
-      private PyObject hex() {
+
+    private PyObject hex() {
         if (Double.isNaN(this.value)) {
             return new PyString("nan");
         }
@@ -333,7 +344,8 @@ public class PyFloat extends PyObjectWithMethods {
             throw new RuntimeException("invalid hexadecimal floating-point string");
         }
     }
-      @Override
+
+    @Override
     public boolean equals(PyObject other) {
         if (other instanceof PyInt) {
             return ((PyInt) other).getValue() == value;
