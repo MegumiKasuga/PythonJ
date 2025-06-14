@@ -4,6 +4,7 @@ import edu.carole.runtime.*;
 import edu.carole.runtime.BuiltinModules.abc;
 import edu.carole.runtime.BuiltinModules.functools;
 import edu.carole.runtime.file_context.PyBinaryFileContext;
+import edu.carole.runtime.file_context.PyFileContext;
 import edu.carole.runtime.file_context.PyTextFileContext;
 import edu.carole.runtime.io.IOManager;
 import edu.carole.runtime.property.PyProperty;
@@ -213,10 +214,7 @@ public class BuiltinFunctions {
                     }
                     return new PyDict(entries);
                 } catch (Exception e) {
-                    if (e instanceof RuntimeException) {
-                        throw e;
-                    }
-                    throw new RuntimeException("TypeError: '" + arg.getTypeName() + "' object is not iterable");
+                    throw e;
                 }
             } else {
                 throw new RuntimeException("dict() takes at most 1 argument (" + args.size() + " given)");
@@ -415,16 +413,31 @@ public class BuiltinFunctions {
                 }
                 mode = ((PyString) modeArg).getValue();
             }
+            boolean hasKwArgs = kwargs != null;
+            int buffer = -1;
+            if (hasKwArgs && kwargs.containsKey("buffering")) {
+                PyObject buf = kwargs.get("buffering");
+                if (!(buf instanceof PyInt integer)) {
+                    throw new Interpreter.PyExceptionWrapper(
+                            PyException.typeError("buffering must be an integer")
+                    );
+                }
+                buffer = (int) integer.getValue();
+            }
             if (!mode.contains("b")) {
                 // text file mode
                 String charset = "utf-8";
-                if (kwargs != null && kwargs.containsKey("charset")) {
+                if (hasKwArgs && kwargs.containsKey("charset")) {
                     charset = kwargs.get("charset").toString();
                 }
-                return new PyTextFileContext(((PyString) filename).getValue(), mode, charset);
+                PyFileContext context = new PyTextFileContext(((PyString) filename).getValue(), mode, charset);
+                context.setBufferSize(buffer);
+                return context;
             } else {
                 // binary file mode
-                return new PyBinaryFileContext(((PyString) filename).getValue(), mode);
+                PyFileContext context = new PyBinaryFileContext(((PyString) filename).getValue(), mode);
+                context.setBufferSize(buffer);
+                return context;
             }
         }));
         

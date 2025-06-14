@@ -20,6 +20,7 @@ public abstract class PyFileContext extends PyObject {
     private final String path, mode;
     private final IOManager manager;
     private final HashMap<String, PyObject> attributes;
+    private int bufferSize = 32;
 
 
     public PyFileContext(String path, String mode) {
@@ -33,6 +34,15 @@ public abstract class PyFileContext extends PyObject {
         this.mode = mode;
         attributes = new HashMap<>();
         initAttributes(attributes);
+    }
+
+    public void setBufferSize(int bufferSize) {
+        if (bufferSize < 0) bufferSize = 32;
+        this.bufferSize = bufferSize;
+    }
+
+    public int getBufferSize() {
+        return bufferSize;
     }
 
     public void initAttributes(Map<String, PyObject> attributes) {

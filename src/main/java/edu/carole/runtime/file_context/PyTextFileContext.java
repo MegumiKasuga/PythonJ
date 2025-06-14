@@ -25,6 +25,7 @@ public class PyTextFileContext extends PyFileContext {
     private final List<String> content; // For storing file content when reading
     private final IOManager ioManager; // Use IOManager for flexible I/O
     private Charset charSetCache = null;
+    private static final PyInt ONE = new PyInt(1);
     
     public PyTextFileContext(String filename) {
         this(filename, "r", "utf-8"); // Default to read mode
@@ -43,6 +44,12 @@ public class PyTextFileContext extends PyFileContext {
         this.charSet = charSet;
         this.content = new ArrayList<>();
         this.ioManager = ioManager != null ? ioManager : IOManager.getInstance();
+    }
+
+    @Override
+    public void setBufferSize(int bufferSize) {
+        if (bufferSize == 0) bufferSize = 1;
+        super.setBufferSize(bufferSize);
     }
 
     public Charset getCharSet() {
@@ -116,8 +123,8 @@ public class PyTextFileContext extends PyFileContext {
             
             if (readingMode()) {
                 // Read mode - open file for reading using IOManager
-                InputStream inputStream = ioManager.createInputStream(getPath(), getMode());
-                reader = new BufferedReader(new InputStreamReader(inputStream, getCharSet()));
+                InputStream inputStream = createInputStream();
+                reader = new BufferedReader(new InputStreamReader(inputStream, getCharSet()), getBufferSize());
 //                System.out.println("Opening file for reading: " + filename);
                 
                 // Pre-read content for Python-like file operations
@@ -129,20 +136,13 @@ public class PyTextFileContext extends PyFileContext {
                 
                 // Reopen for reading operations
                 inputStream = createInputStream();
-                reader = new BufferedReader(new InputStreamReader(inputStream, getCharSet()));
+                reader = new BufferedReader(new InputStreamReader(inputStream, getCharSet()), getBufferSize());
                 
-            } else if (writingMode()) {
+            } else if (writingMode() || appendMode()) {
                 // Write mode - open file for writing (truncate) using IOManager
                 OutputStream outputStream = createOutputStream();
-                writer = new BufferedWriter(new OutputStreamWriter(outputStream, getCharSet()));
+                writer = new BufferedWriter(new OutputStreamWriter(outputStream, getCharSet()), getBufferSize());
 //                System.out.println("Opening file for writing: " + filename);
-                
-            } else if (appendMode()) {
-                // Append mode - open file for appending using IOManager
-                OutputStream outputStream = createOutputStream();
-                writer = new BufferedWriter(new OutputStreamWriter(outputStream, getCharSet()));
-//                System.out.println("Opening file for appending: " + filename);
-                
             } else {
                 throw new RuntimeException("Unsupported file mode: " + getMode());
             }
