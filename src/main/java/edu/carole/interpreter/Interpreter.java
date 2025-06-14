@@ -18,11 +18,11 @@ import java.util.HashMap;
  * Python解释器
  */
 public class Interpreter implements ASTVisitor<PyObject> {
-    private Environment globals;
+    private final Environment globals;
     private Environment environment;
-    private Set<String> globalVariables = new HashSet<>(); // Track variables declared as global in current scope
-    private Map<String, Environment> nonlocalVariables = new HashMap<>(); // Track nonlocal variables and their target environments
-    private ModuleLoader moduleLoader; // Module loading system
+    private final Set<String> globalVariables = new HashSet<>(); // Track variables declared as global in current scope
+    private final Map<String, Environment> nonlocalVariables = new HashMap<>(); // Track nonlocal variables and their target environments
+    private final ModuleLoader moduleLoader; // Module loading system
     private final IOManager io;
 
     public Interpreter() {
@@ -426,7 +426,9 @@ public class Interpreter implements ASTVisitor<PyObject> {
             function.getName(),
             function.getParameters(),
             function.getBody(),
-            environment
+            environment,
+            function.getLine(),
+            function.getColumn()
         );
         pyFunction.setStaticMethod(function.isStaticMethod());
         environment.define(function.getName(), pyFunction);
@@ -463,7 +465,9 @@ public class Interpreter implements ASTVisitor<PyObject> {
                         method.getName(),
                         method.getParameters(),
                         method.getBody(),
-                        environment
+                        environment,
+                        method.getLine(),
+                        method.getColumn()
                     );
                     methods.put(method.getName(), pyMethod);
                 } else if (statement instanceof Decorator decorator) {
