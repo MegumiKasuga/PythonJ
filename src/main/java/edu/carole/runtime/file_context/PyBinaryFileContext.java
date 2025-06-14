@@ -3,6 +3,7 @@ package edu.carole.runtime.file_context;
 import edu.carole.interpreter.Interpreter;
 import edu.carole.runtime.*;
 import edu.carole.runtime.io.IOManager;
+import edu.carole.runtime.property.BuiltinProperty;
 
 import java.io.*;
 import java.util.Map;
@@ -39,6 +40,17 @@ public class PyBinaryFileContext extends PyFileContext {
                 throw new RuntimeException("flush() takes no arguments (" + args.size() + " given)");
             }
             return flush();
+        }));
+        attributes.put("skip", new PyBuiltinFunction("skip", (args, kwargs) -> {
+            if (args.size() != 1) {
+                throw new RuntimeException("write() takes exactly one argument (" + args.size() + " given)");
+            }
+            return skip(args.get(0));
+        }));
+        attributes.put("available", new BuiltinProperty("available", (args, kwargs) -> {
+            if (!isOpen() || !readingMode()) return new PyInt(0);
+            if (inStream == null) return new PyInt(0);
+            return new PyInt(inStream.available());
         }));
         attributes.put("__iter__", new PyBuiltinFunction("__iter__", (args, kwargs) -> {
             return PyNone.INSTANCE;
@@ -91,6 +103,19 @@ public class PyBinaryFileContext extends PyFileContext {
         return PyBool.FALSE;
     }
 
+    public long getCount(PyObject size) {
+        long count = 1;
+        if (size instanceof PyInt || size instanceof PyFloat) {
+            if (size instanceof PyInt integer) {
+                count = Math.max(count, integer.getValue());
+            } else {
+                PyFloat f = (PyFloat) size;
+                count = Math.max(count, Math.round(f.getValue()));
+            }
+        }
+        return Math.min(count, inStream.available());
+    }
+
     public PyObject read(PyObject size) {
         if (!isOpen()) {
             throw new RuntimeException("I/O operation on closed file.");
@@ -105,16 +130,7 @@ public class PyBinaryFileContext extends PyFileContext {
             byte[] data = inStream.readAllBytes();
             return new PyBytes(data);
         }
-        long count = 1;
-        if (size instanceof PyInt || size instanceof PyFloat) {
-            if (size instanceof PyInt integer) {
-                count = Math.max(count, integer.getValue());
-            } else {
-                PyFloat f = (PyFloat) size;
-                count = Math.max(count, Math.round(f.getValue()));
-            }
-        }
-        count = Math.min(count, inStream.available());
+        long count = getCount(size);
         try {
             byte[] bytes = inStream.readNBytes((int) count);
             return new PyBytes(bytes);
@@ -143,6 +159,24 @@ public class PyBinaryFileContext extends PyFileContext {
         } catch (IOException e) {
             throw new RuntimeException("Error reading file: " + e.getMessage());
         }
+    }
+
+    public PyObject skip(PyObject size) {
+        if (!isOpen()) {
+            throw new RuntimeException("I/O operation on closed file.");
+        }
+        if (!readingMode()) {
+            throw new RuntimeException("File not open for reading");
+        }
+        if (inStream.available() < 1) {
+            throw new RuntimeException("EOF");
+        }
+        if (size == null) {
+            byte[] data = inStream.readAllBytes();
+            return new PyBytes(data);
+        }
+        long count = getCount(size);
+        return new PyInt(inStream.skip(count));
     }
 
     public PyObject write(PyObject bytes) {
