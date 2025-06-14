@@ -10,13 +10,26 @@ public class AttributeAssignmentStatement extends ASTNode {
     private final ASTNode object;
     private final String attribute;
     private final ASTNode value;
+    private final int line, column;
     
-    public AttributeAssignmentStatement(ASTNode object, String attribute, ASTNode value) {
+    public AttributeAssignmentStatement(ASTNode object, String attribute, ASTNode value, int line, int column) {
         this.object = object;
         this.attribute = attribute;
         this.value = value;
+        this.line = line;
+        this.column = column;
     }
-    
+
+    @Override
+    public int getLine() {
+        return line;
+    }
+
+    @Override
+    public int getColumn() {
+        return column;
+    }
+
     public ASTNode getObject() { return object; }
     public String getAttribute() { return attribute; }
     public ASTNode getValue() { return value; }

@@ -11,11 +11,24 @@ import java.util.List;
  */
 public class NonlocalStatement extends ASTNode {
     private final List<String> variables;
+    private final int line, column;
     
-    public NonlocalStatement(List<String> variables) {
+    public NonlocalStatement(List<String> variables, int line, int column) {
         this.variables = variables;
+        this.line = line;
+        this.column = column;
     }
-    
+
+    @Override
+    public int getLine() {
+        return line;
+    }
+
+    @Override
+    public int getColumn() {
+        return column;
+    }
+
     public List<String> getVariables() {
         return variables;
     }

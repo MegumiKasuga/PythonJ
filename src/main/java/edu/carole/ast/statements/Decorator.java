@@ -11,8 +11,9 @@ public class Decorator extends ASTNode {
     private final ASTNode target;      // 被装饰的函数或类
     private Decorator parent = null;
     private ASTNode root = null;
+    private final int line, column;
     
-    public Decorator(ASTNode expression, ASTNode target) {
+    public Decorator(ASTNode expression, ASTNode target, int line, int column) {
         this.expression = expression;
         this.target = target;
         if (target instanceof ClassDef || target instanceof FunctionDef) {
@@ -22,8 +23,20 @@ public class Decorator extends ASTNode {
             decorator.parent = this;
             root = decorator.root;
         }
+        this.line = line;
+        this.column = column;
     }
-    
+
+    @Override
+    public int getLine() {
+        return line;
+    }
+
+    @Override
+    public int getColumn() {
+        return column;
+    }
+
     public ASTNode getExpression() {
         return expression;
     }

@@ -9,12 +9,25 @@ import edu.carole.ast.ast.ASTVisitor;
 public class AssignmentStatement extends ASTNode {
     private final String target;
     private final ASTNode value;
+    private final int line, column;
     
-    public AssignmentStatement(String target, ASTNode value) {
+    public AssignmentStatement(String target, ASTNode value, int line, int column) {
         this.target = target;
         this.value = value;
+        this.line = line;
+        this.column = column;
     }
-    
+
+    @Override
+    public int getLine() {
+        return line;
+    }
+
+    @Override
+    public int getColumn() {
+        return column;
+    }
+
     public String getTarget() { return target; }
     public ASTNode getValue() { return value; }
     

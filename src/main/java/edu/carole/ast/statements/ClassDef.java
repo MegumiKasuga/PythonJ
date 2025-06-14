@@ -12,19 +12,35 @@ public class ClassDef extends ASTNode {
     private final String name;
     private final List<ASTNode> body;
     private final List<String> baseClasses; // 父类名列表
+
+    private final int line, column;
     
-    public ClassDef(String name, List<ASTNode> body) {
+    public ClassDef(String name, List<ASTNode> body, int line, int column) {
         this.name = name;
         this.body = body;
         this.baseClasses = new ArrayList<>(); // 无父类
+        this.line = line;
+        this.column = column;
     }
     
-    public ClassDef(String name, List<String> baseClasses, List<ASTNode> body) {
+    public ClassDef(String name, List<String> baseClasses, List<ASTNode> body, int line, int column) {
         this.name = name;
         this.body = body;
         this.baseClasses = new ArrayList<>(baseClasses);
+        this.line = line;
+        this.column = column;
     }
-    
+
+    @Override
+    public int getLine() {
+        return line;
+    }
+
+    @Override
+    public int getColumn() {
+        return column;
+    }
+
     public String getName() { return name; }
     public List<ASTNode> getBody() { return body; }
     public List<String> getBaseClasses() { return baseClasses; }

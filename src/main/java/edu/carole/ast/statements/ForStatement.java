@@ -13,18 +13,32 @@ public class ForStatement extends ASTNode {
     private final ASTNode iterable;
     private final List<ASTNode> body;
     private final List<ASTNode> elseBody;
+
+    private final int line, column;
     
-    public ForStatement(String variable, ASTNode iterable, List<ASTNode> body) {
-        this(variable, iterable, body, new ArrayList<>());
+    public ForStatement(String variable, ASTNode iterable, List<ASTNode> body, int line, int column) {
+        this(variable, iterable, body, new ArrayList<>(), line, column);
     }
     
-    public ForStatement(String variable, ASTNode iterable, List<ASTNode> body, List<ASTNode> elseBody) {
+    public ForStatement(String variable, ASTNode iterable, List<ASTNode> body, List<ASTNode> elseBody, int line, int column) {
         this.variable = variable;
         this.iterable = iterable;
         this.body = body;
         this.elseBody = elseBody;
+        this.line = line;
+        this.column = column;
     }
-    
+
+    @Override
+    public int getLine() {
+        return line;
+    }
+
+    @Override
+    public int getColumn() {
+        return column;
+    }
+
     public String getVariable() { return variable; }
     public ASTNode getIterable() { return iterable; }
     public List<ASTNode> getBody() { return body; }

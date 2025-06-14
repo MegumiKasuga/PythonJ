@@ -24,17 +24,19 @@ public class PyFunction extends PyObject {
     private final Map<String, ASTNode> defaultValues; // parameter name -> default value expression
     private boolean isBoundMethod = false;
     private PyObject boundInstance = null;
+
+    private final int line, column;
     
     // 静态工厂方法用于向后兼容
-    public static PyFunction fromParameterNames(String name, List<String> parameters, List<ASTNode> body, Environment closure) {
+    public static PyFunction fromParameterNames(String name, List<String> parameters, List<ASTNode> body, Environment closure, int line, int column) {
         List<FunctionParameter> functionParameters = parameters.stream()
-                .map(FunctionParameter::new)
+                .map(paramName -> new FunctionParameter(paramName, line, column))
                 .collect(java.util.stream.Collectors.toList());
-        return new PyFunction(name, functionParameters, body, closure);
+        return new PyFunction(name, functionParameters, body, closure, line, column);
     }
 
     // 主要构造器，使用 FunctionParameter 结构
-    public PyFunction(String name, List<FunctionParameter> functionParameters, List<ASTNode> body, Environment closure) {
+    public PyFunction(String name, List<FunctionParameter> functionParameters, List<ASTNode> body, Environment closure, int line, int column) {
         this.name = name;
         this.functionParameters = functionParameters;
         this.parameters = extractParameterNames(functionParameters);
@@ -43,6 +45,8 @@ public class PyFunction extends PyObject {
         this.varargsParam = extractVarargsParam(functionParameters);
         this.kwargsParam = extractKwargsParam(functionParameters);
         this.defaultValues = extractDefaultValues(functionParameters);
+        this.line = line;
+        this.column = column;
 
         // Debug output
 //        System.out.println("DEBUG: Function " + name + " created with:");
@@ -51,7 +55,7 @@ public class PyFunction extends PyObject {
 //        System.out.println("  Default values: " + defaultValues.keySet());
     }
 
-    public PyFunction(String name, List<String> parameters, List<ASTNode> body, Environment closure, String varargsParam) {
+    public PyFunction(String name, List<String> parameters, List<ASTNode> body, Environment closure, String varargsParam, int line, int column) {
         this.name = name;
         this.parameters = parameters;
         this.functionParameters = convertToFunctionParameters(parameters, varargsParam, null);
@@ -60,10 +64,13 @@ public class PyFunction extends PyObject {
         this.varargsParam = varargsParam;
         this.kwargsParam = null;
         this.defaultValues = new HashMap<>();
+        this.line = line;
+        this.column = column;
     }
     
     public PyFunction(String name, List<String> parameters, List<ASTNode> body, Environment closure, 
-                      String varargsParam, String kwargsParam, Map<String, ASTNode> defaultValues) {
+                      String varargsParam, String kwargsParam, Map<String, ASTNode> defaultValues,
+                      int line, int column) {
         this.name = name;
         this.parameters = parameters;
         this.functionParameters = convertToFunctionParameters(parameters, varargsParam, kwargsParam, defaultValues);
@@ -72,6 +79,8 @@ public class PyFunction extends PyObject {
         this.varargsParam = varargsParam;
         this.kwargsParam = kwargsParam;
         this.defaultValues = defaultValues != null ? defaultValues : new HashMap<>();
+        this.line = line;
+        this.column = column;
     }
 
     public boolean hasSameFunctionHead(PyFunction other) {
@@ -96,7 +105,7 @@ public class PyFunction extends PyObject {
     // 转换工具方法
     private List<FunctionParameter> convertToFunctionParameters(List<String> parameterNames) {
         return parameterNames.stream()
-                .map(FunctionParameter::new)
+                .map(paramName -> new FunctionParameter(paramName, line, column))
                 .collect(Collectors.toList());
     }
     
@@ -112,17 +121,17 @@ public class PyFunction extends PyObject {
         // 添加普通参数
         for (String paramName : parameterNames) {
             ASTNode defaultValue = (defaultValues != null) ? defaultValues.get(paramName) : null;
-            result.add(new FunctionParameter(paramName, defaultValue));
+            result.add(new FunctionParameter(paramName, defaultValue, line, column));
         }
         
         // 添加 *args 参数
         if (varargsParam != null) {
-            result.add(new FunctionParameter(varargsParam, FunctionParameter.ParameterType.VARARGS));
+            result.add(new FunctionParameter(varargsParam, FunctionParameter.ParameterType.VARARGS, line, column));
         }
         
         // 添加 **kwargs 参数
         if (kwargsParam != null) {
-            result.add(new FunctionParameter(kwargsParam, FunctionParameter.ParameterType.KWARGS));
+            result.add(new FunctionParameter(kwargsParam, FunctionParameter.ParameterType.KWARGS, line, column));
         }
         
         return result;
@@ -566,7 +575,9 @@ public class PyFunction extends PyObject {
                 name,
                 functionParameters,
                 body,
-                closure
+                closure,
+                line,
+                column
         );
 
         // Mark as bound method and keep reference to the instance

@@ -13,11 +13,24 @@ import java.util.Map;
 public class IfStatement extends ASTNode {
     private final List<Map.Entry<ASTNode, List<ASTNode>>> conditionBranches;
     private final List<ASTNode> elseBranch;
+    private final int line, column;
     
     public IfStatement(List<Map.Entry<ASTNode, List<ASTNode>>> conditionBranches,
-                       List<ASTNode> elseBranch) {
+                       List<ASTNode> elseBranch, int line, int column) {
         this.elseBranch = elseBranch;
         this.conditionBranches = conditionBranches; // 如果有elif分支，可以在这里初始化
+        this.line = line;
+        this.column = column;
+    }
+
+    @Override
+    public int getLine() {
+        return line;
+    }
+
+    @Override
+    public int getColumn() {
+        return column;
     }
 
     public List<ASTNode> getElseBranch() { return elseBranch; }

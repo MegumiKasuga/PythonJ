@@ -79,29 +79,29 @@ public class Parser {
     private ASTNode statement() {
         try {
             // Check for decorators (must come before function and class definitions)
-            if (match(Token.Type.AT)) return decoratorStatement();
+            if (match(Token.Type.AT)) return decoratorStatement(previous());
             
-            if (match(Token.Type.IF)) return ifStatement();
-            if (match(Token.Type.WHILE)) return whileStatement();
-            if (match(Token.Type.FOR)) return forStatement();
-            if (match(Token.Type.DEF)) return functionDef();
+            if (match(Token.Type.IF)) return ifStatement(previous());
+            if (match(Token.Type.WHILE)) return whileStatement(previous());
+            if (match(Token.Type.FOR)) return forStatement(previous());
+            if (match(Token.Type.DEF)) return functionDef(previous());
             if (match(Token.Type.CLASS)) return classDef();
-            if (match(Token.Type.RETURN)) return returnStatement();
-            if (match(Token.Type.YIELD)) return yieldStatement();
-            if (match(Token.Type.BREAK)) return new BreakStatement();
-            if (match(Token.Type.CONTINUE)) return new ContinueStatement();
-            if (match(Token.Type.PASS)) return new PassStatement();
-            if (match(Token.Type.TRY)) return tryExceptStatement();
-            if (match(Token.Type.WITH)) return withStatement();
-            if (match(Token.Type.GLOBAL)) return globalStatement();
-            if (match(Token.Type.NONLOCAL)) return nonlocalStatement();
-            if (match(Token.Type.IMPORT)) return importStatement();
-            if (match(Token.Type.FROM)) return fromImportStatement();
-            if (match(Token.Type.MATCH)) return matchStatement();
+            if (match(Token.Type.RETURN)) return returnStatement(previous());
+            if (match(Token.Type.YIELD)) return yieldStatement(previous());
+            if (match(Token.Type.BREAK)) return new BreakStatement(previous().getLine(), previous().getColumn());
+            if (match(Token.Type.CONTINUE)) return new ContinueStatement(previous().getLine(), previous().getColumn());
+            if (match(Token.Type.PASS)) return new PassStatement(previous().getLine(), previous().getColumn());
+            if (match(Token.Type.TRY)) return tryExceptStatement(previous());
+            if (match(Token.Type.WITH)) return withStatement(previous());
+            if (match(Token.Type.GLOBAL)) return globalStatement(previous());
+            if (match(Token.Type.NONLOCAL)) return nonlocalStatement(previous());
+            if (match(Token.Type.IMPORT)) return importStatement(previous());
+            if (match(Token.Type.FROM)) return fromImportStatement(previous());
+            if (match(Token.Type.MATCH)) return matchStatement(previous());
 //            if (checkNext(Token.Type.LEFT_PAREN) && match(Token.Type.IDENTIFIER)) {
 //                return call();
 //            }
-            return expressionStatement();
+            return expressionStatement(tokens.get(current));
         } catch (Exception e) {
             // 错误恢复：跳到下一行
             e.printStackTrace();
@@ -110,7 +110,7 @@ public class Parser {
         }
     }
     
-    private ASTNode ifStatement() {
+    private ASTNode ifStatement(Token token) {
         ASTNode condition = expression(true);
         boolean singleLine = skipLineAndCheckIfSingleLine(
                 "if condition", "if statement"
@@ -140,10 +140,10 @@ public class Parser {
             elseBranch = block(singleLine);
         }
         
-        return new IfStatement(conditionBranches, elseBranch);
+        return new IfStatement(conditionBranches, elseBranch, token.getLine(), token.getColumn());
     }
 
-    private ASTNode whileStatement() {
+    private ASTNode whileStatement(Token token) {
         ASTNode condition = expression(true);
         boolean singleLine = skipLineAndCheckIfSingleLine(
                 "while condition", "while statement"
@@ -160,10 +160,10 @@ public class Parser {
             elseBody = block(singleLine);
         }
         
-        return new WhileStatement(condition, body, elseBody);
+        return new WhileStatement(condition, body, elseBody, token.getLine(), token.getColumn());
     }
 
-    private ASTNode forStatement() {
+    private ASTNode forStatement(Token token) {
         Token variable = consume(Token.Type.IDENTIFIER, "Expected variable name in for loop");
         consume(Token.Type.IN, "Expected 'in' in for loop");
         ASTNode iterable = expression(true);
@@ -180,10 +180,10 @@ public class Parser {
             );
             elseBody = block(singleLine);
         }
-        return new ForStatement(variable.getValue(), iterable, body, elseBody);
+        return new ForStatement(variable.getValue(), iterable, body, elseBody, token.getLine(), token.getColumn());
     }
 
-    private ASTNode functionDef() {
+    private ASTNode functionDef(Token token) {
         Token name = consume(Token.Type.IDENTIFIER, "Expected function name");
         consume(Token.Type.LEFT_PAREN, "Expected '(' after function name");
         
@@ -208,7 +208,7 @@ public class Parser {
         );
 
         List<ASTNode> body = block(singleLine);
-        return new FunctionDef(name.getValue(), parameters, body, returnTypeHint);
+        return new FunctionDef(name.getValue(), parameters, body, returnTypeHint, token.getLine(), token.getColumn());
     }
 
     private FunctionParameter parseParameter() {
@@ -247,8 +247,8 @@ public class Parser {
         if (paramType == FunctionParameter.ParameterType.NORMAL && match(Token.Type.ASSIGN)) {
             defaultValue = expression(false);
         }
-        
-        return new FunctionParameter(paramName, paramType, defaultValue, typeHint);
+
+        return new FunctionParameter(paramName, paramType, defaultValue, typeHint, paramToken.getLine(), paramToken.getColumn());
     }
 
     private ASTNode classDef() {
@@ -275,24 +275,24 @@ public class Parser {
         consume(Token.Type.INDENT, "Expected indentation after class definition");
         
         List<ASTNode> body = block(false);
-        return new ClassDef(name.getValue(), baseClasses, body);
+        return new ClassDef(name.getValue(), baseClasses, body, name.getLine(), name.getColumn());
     }
 
 
-    private ASTNode returnStatement() {
+    private ASTNode returnStatement(Token t) {
         ASTNode value = null;
         if (!check(Token.Type.NEWLINE) && !isAtEnd()) {
             value = tupleExpression(true); // Use tupleExpression to support comma-separated returns
         }
-        return new ReturnStatement(value);
+        return new ReturnStatement(value, t.getLine(), t.getColumn());
     }
 
-    private ASTNode yieldStatement() {
+    private ASTNode yieldStatement(Token token) {
         ASTNode value = null;
         if (!check(Token.Type.NEWLINE) && !isAtEnd()) {
             value = tupleExpression(true); // Use tupleExpression to support comma-separated yields
         }
-        return new YieldStatement(value);
+        return new YieldStatement(value, token.getLine(), token.getColumn());
     }
 
     private List<ASTNode> block(boolean singleLine) {
@@ -319,7 +319,7 @@ public class Parser {
         return statements;
     }
 
-    private ASTNode expressionStatement() {
+    private ASTNode expressionStatement(Token token) {
         ASTNode expr = assignment(true);
           // If assignment() returned a statement (like AssignmentStatement), don't wrap it
         if (expr instanceof AssignmentStatement || 
@@ -330,20 +330,24 @@ public class Parser {
             return expr;
         }
         
-        return new ExpressionStatement(expr);
+        return new ExpressionStatement(expr, token.getLine(), token.getColumn());
     }
 
     private ASTNode assignment(boolean greedy) {
         ASTNode expr = tupleExpression(greedy);
         
         if (match(Token.Type.ASSIGN)) {
+            Token assign = previous();
             ASTNode value = assignment(greedy);
               if (expr instanceof Identifier) {
-                return new AssignmentStatement(((Identifier) expr).getName(), value);
+                return new AssignmentStatement(((Identifier) expr).getName(), value,
+                        assign.getLine(), assign.getColumn());
             } else if (expr instanceof AttributeExpression attrExpr) {
-                  return new AttributeAssignmentStatement(attrExpr.getObject(), attrExpr.getAttribute(), value);
+                  return new AttributeAssignmentStatement(attrExpr.getObject(), attrExpr.getAttribute(), value,
+                          assign.getLine(), assign.getColumn());
             } else if (expr instanceof IndexExpression indexExpr) {
-                  return new IndexAssignmentStatement(indexExpr.getObject(), indexExpr.getIndex(), value);
+                  return new IndexAssignmentStatement(indexExpr.getObject(), indexExpr.getIndex(), value,
+                          assign.getLine(), assign.getColumn());
             } else if (expr instanceof TupleLiteral tuple) {
                 // Handle tuple unpacking assignment: a, b, c = expression
                   List<String> targets = new ArrayList<>();
@@ -353,7 +357,7 @@ public class Parser {
                     }
                     targets.add(((Identifier) element).getName());
                 }
-                return new TupleUnpackingAssignment(targets, value);
+                return new TupleUnpackingAssignment(targets, value, previous().getLine(), previous().getColumn());
             }
             throw new RuntimeException("Invalid assignment target");
         } else if (match(Token.Type.PLUS_ASSIGN, Token.Type.MINUS_ASSIGN,
@@ -363,6 +367,7 @@ public class Parser {
                           Token.Type.OR_ASSIGN, Token.Type.XOR_ASSIGN,
                           Token.Type.LEFT_SHIFT_ASSIGN, Token.Type.RIGHT_SHIFT_ASSIGN)) {
             // Handle compound assignments
+            Token token = previous();
             Token.Type operatorType = previous().getType();
             ASTNode value = assignment(greedy);
 
@@ -385,9 +390,11 @@ public class Parser {
                     default -> throw new RuntimeException("Unknown compound assignment operator: " + operatorType);
                 };
                 if (expr instanceof AttributeExpression) {
-                    return new CompoundAssignmentStatement(expr.toString(), operator, value);
+                    return new CompoundAssignmentStatement(expr.toString(), operator, value,
+                            token.getLine(), token.getColumn());
                 }
-                return new CompoundAssignmentStatement(((Identifier) expr).getName(), operator, value);
+                return new CompoundAssignmentStatement(((Identifier) expr).getName(), operator,
+                        value, token.getLine(), token.getColumn());
             } else {
                 throw new RuntimeException("Invalid compound assignment target - must be identifier");
             }
@@ -930,7 +937,7 @@ public class Parser {
         }
     }
 
-    private ASTNode tryExceptStatement() {
+    private ASTNode tryExceptStatement(Token token) {
         // try:
         boolean singleLine = skipLineAndCheckIfSingleLine(
                 "try", "try statement"
@@ -965,7 +972,8 @@ public class Parser {
             } else singleLine = true;
 
             List<ASTNode> exceptBody = block(singleLine);
-            exceptClauses.add(new TryExceptStatement.ExceptClause(exceptionType, variable, exceptBody));
+            exceptClauses.add(new TryExceptStatement.ExceptClause(exceptionType, variable,
+                    exceptBody, token.getLine(), token.getColumn()));
         }
         
         // 可选的finally块
@@ -983,7 +991,7 @@ public class Parser {
         return new TryExceptStatement(tryBody, exceptClauses, finallyBody);
     }
     
-    private ASTNode withStatement() {
+    private ASTNode withStatement(Token token) {
         // with context_expression as target_variable:
         ASTNode contextExpression = expression(true);
         String targetVariable = null;
@@ -999,10 +1007,10 @@ public class Parser {
         );
 
         List<ASTNode> body = block(singleLine);
-        return new WithStatement(contextExpression, targetVariable, body);
+        return new WithStatement(contextExpression, targetVariable, body, token.getLine(), token.getColumn());
     }
     
-    private ASTNode globalStatement() {
+    private ASTNode globalStatement(Token token) {
         List<String> variables = new ArrayList<>();
         
         // Parse variable names: global x, y, z
@@ -1011,10 +1019,10 @@ public class Parser {
             variables.add(variable.getValue());
         } while (match(Token.Type.COMMA));
         
-        return new GlobalStatement(variables);
+        return new GlobalStatement(variables, token.getLine(), token.getColumn());
     }
     
-    private ASTNode nonlocalStatement() {
+    private ASTNode nonlocalStatement(Token token) {
         List<String> variables = new ArrayList<>();
         
         // Parse variable names: nonlocal x, y, z
@@ -1023,10 +1031,10 @@ public class Parser {
             variables.add(variable.getValue());
         } while (match(Token.Type.COMMA));
         
-        return new NonlocalStatement(variables);
+        return new NonlocalStatement(variables, token.getLine(), token.getColumn());
     }
     
-    private ASTNode importStatement() {
+    private ASTNode importStatement(Token token) {
         List<ImportStatement.ImportClause> imports = new ArrayList<>();
         
         // Parse import clauses: import module1, module2 as alias
@@ -1043,10 +1051,10 @@ public class Parser {
             imports.add(new ImportStatement.ImportClause(moduleName.getValue(), alias));
         } while (match(Token.Type.COMMA));
         
-        return new ImportStatement(imports);
+        return new ImportStatement(imports, token.getLine(), token.getColumn());
     }
     
-    private ASTNode fromImportStatement() {
+    private ASTNode fromImportStatement(Token token) {
         // from module import ...
         Token moduleToken = consume(Token.Type.IDENTIFIER, "Expected module name after 'from'");
         String moduleName = moduleToken.getValue();
@@ -1055,7 +1063,7 @@ public class Parser {
         
         // Check for 'import *'
         if (match(Token.Type.MULTIPLY)) {
-            return new FromImportStatement(moduleName, true);
+            return new FromImportStatement(moduleName, true, token.getLine(), token.getColumn());
         }
         
         // Parse import items: import item1, item2 as alias
@@ -1072,10 +1080,10 @@ public class Parser {
             
             imports.add(new FromImportStatement.ImportClause(itemName.getValue(), alias));
         } while (match(Token.Type.COMMA));
-          return new FromImportStatement(moduleName, imports);
+          return new FromImportStatement(moduleName, imports, token.getLine(), token.getColumn());
     }
     
-    private ASTNode matchStatement() {
+    private ASTNode matchStatement(Token token) {
         // match subject:
         ASTNode subject = expression(true);
         consume(Token.Type.COLON, "Expected ':' after match subject");
@@ -1118,7 +1126,7 @@ public class Parser {
             throw new RuntimeException("Match statement must have at least one case");
         }
         
-        return new MatchStatement(subject, cases, defaultBody);
+        return new MatchStatement(subject, cases, defaultBody, token.getLine(), token.getColumn());
     }
     
     private ASTNode parsePattern() {
@@ -1355,7 +1363,7 @@ public class Parser {
         return new GeneratorExpression(element, clauses, head.getLine(), head.getColumn());
     }
 
-    private ASTNode decoratorStatement() {
+    private ASTNode decoratorStatement(Token token) {
         // Parse the decorator expression (can be a simple identifier or a call)
         ASTNode expression = expression(true);
         
@@ -1365,12 +1373,13 @@ public class Parser {
         ASTNode decorated;
         
         if (check(Token.Type.AT)) {
+            Token t = previous();
             advance();
             // This is a stacked decorator, parse the next one in the stack
-            decorated = decoratorStatement();
+            decorated = decoratorStatement(t);
         } else if (check(Token.Type.DEF)) {
             advance();  // Consume DEF token
-            decorated = functionDef();
+            decorated = functionDef(previous());
         } else if (check(Token.Type.CLASS)) {
             advance();  // Consume CLASS token
             decorated = classDef();
@@ -1379,7 +1388,7 @@ public class Parser {
         }
         
         // Create a decorator node
-        return new Decorator(expression, decorated);
+        return new Decorator(expression, decorated, token.getLine(), token.getColumn());
     }
 
     /**

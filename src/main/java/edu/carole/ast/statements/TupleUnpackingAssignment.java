@@ -10,12 +10,25 @@ import java.util.List;
 public class TupleUnpackingAssignment extends ASTNode {
     private final List<String> targets;
     private final ASTNode value;
+    private final int line, column;
     
-    public TupleUnpackingAssignment(List<String> targets, ASTNode value) {
+    public TupleUnpackingAssignment(List<String> targets, ASTNode value, int line, int column) {
         this.targets = targets;
         this.value = value;
+        this.line = line;
+        this.column = column;
     }
-    
+
+    @Override
+    public int getLine() {
+        return line;
+    }
+
+    @Override
+    public int getColumn() {
+        return column;
+    }
+
     public List<String> getTargets() { return targets; }
     public ASTNode getValue() { return value; }
     

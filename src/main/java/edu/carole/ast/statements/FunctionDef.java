@@ -14,38 +14,46 @@ public class FunctionDef extends ASTNode {
     private final List<ASTNode> body;
     private final ASTNode returnTypeHint; // 返回值类型提示
     private boolean isStaticMethod = false;
+    private final int line, column;
 
     // 主要构造器
-    public FunctionDef(String name, List<FunctionParameter> parameters, List<ASTNode> body) {
+    public FunctionDef(String name, List<FunctionParameter> parameters, List<ASTNode> body, int line, int column) {
         this.name = name;
         this.parameters = parameters;
         this.body = body;
         this.returnTypeHint = null;
+        this.line = line;
+        this.column = column;
     }
     
     // 静态工厂方法用于向后兼容
-    public static FunctionDef fromParameterNames(String name, List<String> parameterNames, List<ASTNode> body) {
+    public static FunctionDef fromParameterNames(String name, List<String> parameterNames, List<ASTNode> body, int line, int column) {
         List<FunctionParameter> parameters = parameterNames.stream()
-                .map(FunctionParameter::new)
+                .map(paramName -> new FunctionParameter(paramName, line, column))
                 .collect(java.util.stream.Collectors.toList());
-        return new FunctionDef(name, parameters, body);
+        return new FunctionDef(name, parameters, body, line, column);
     }
     
     // 带返回值类型提示的构造器
-    public FunctionDef(String name, List<FunctionParameter> parameters, List<ASTNode> body, ASTNode returnTypeHint) {
+    public FunctionDef(String name, List<FunctionParameter> parameters, List<ASTNode> body, ASTNode returnTypeHint, int line, int column) {
         this.name = name;
         this.parameters = parameters;
         this.body = body;
         this.returnTypeHint = returnTypeHint;
+        this.line = line;
+        this.column = column;
     }
     
     // 向后兼容的构造器
     public FunctionDef(String name, List<String> parameterNames, List<ASTNode> body, 
-                       String varargsParam, String kwargsParam, Map<String, ASTNode> defaultValues) {
+                       String varargsParam, String kwargsParam, Map<String, ASTNode> defaultValues,
+                       int line, int column) {
         this.name = name;
         this.parameters = convertLegacyParameters(parameterNames, varargsParam, kwargsParam, defaultValues);
         this.body = body;
         this.returnTypeHint = null;
+        this.line = line;
+        this.column = column;
     }
 
     // 转换工具方法
@@ -57,20 +65,30 @@ public class FunctionDef extends ASTNode {
         // 添加普通参数
         for (String paramName : parameterNames) {
             ASTNode defaultValue = (defaultValues != null) ? defaultValues.get(paramName) : null;
-            result.add(new FunctionParameter(paramName, defaultValue));
+            result.add(new FunctionParameter(paramName, defaultValue, line, column));
         }
         
         // 添加 *args 参数
         if (varargsParam != null) {
-            result.add(new FunctionParameter(varargsParam, FunctionParameter.ParameterType.VARARGS));
+            result.add(new FunctionParameter(varargsParam, FunctionParameter.ParameterType.VARARGS, line, column));
         }
         
         // 添加 **kwargs 参数
         if (kwargsParam != null) {
-            result.add(new FunctionParameter(kwargsParam, FunctionParameter.ParameterType.KWARGS));
+            result.add(new FunctionParameter(kwargsParam, FunctionParameter.ParameterType.KWARGS, line, column));
         }
         
         return result;
+    }
+
+    @Override
+    public int getLine() {
+        return line;
+    }
+
+    @Override
+    public int getColumn() {
+        return column;
     }
 
     // Getters

@@ -10,11 +10,24 @@ import java.util.List;
  */
 public class ImportStatement extends ASTNode {
     private final List<ImportClause> imports;
+    private final int line, column;
     
-    public ImportStatement(List<ImportClause> imports) {
+    public ImportStatement(List<ImportClause> imports, int line, int column) {
         this.imports = imports;
+        this.line = line;
+        this.column = column;
     }
-    
+
+    @Override
+    public int getLine() {
+        return line;
+    }
+
+    @Override
+    public int getColumn() {
+        return column;
+    }
+
     public List<ImportClause> getImports() {
         return imports;
     }

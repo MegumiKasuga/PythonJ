@@ -12,13 +12,24 @@ public class TryExceptStatement extends ASTNode {
         private final String exceptionType; // 异常类型，可以为null（捕获所有异常）
         private final String variable;      // 异常变量名，可以为null
         private final List<ASTNode> body;   // except块的语句
+        private final int line, column;
         
-        public ExceptClause(String exceptionType, String variable, List<ASTNode> body) {
+        public ExceptClause(String exceptionType, String variable, List<ASTNode> body, int line, int column) {
             this.exceptionType = exceptionType;
             this.variable = variable;
             this.body = body;
+            this.line = line;
+            this.column = column;
         }
-        
+
+        public int getLine() {
+            return line;
+        }
+
+        public int getColumn() {
+            return column;
+        }
+
         public String getExceptionType() { return exceptionType; }
         public String getVariable() { return variable; }
         public List<ASTNode> getBody() { return body; }

@@ -12,19 +12,34 @@ public class FromImportStatement extends ASTNode {
     private final String moduleName;
     private final List<ImportClause> imports;
     private final boolean importAll; // for "from module import *"
+    private final int line, column;
     
-    public FromImportStatement(String moduleName, List<ImportClause> imports) {
+    public FromImportStatement(String moduleName, List<ImportClause> imports, int line, int column) {
         this.moduleName = moduleName;
         this.imports = imports;
         this.importAll = false;
+        this.line = line;
+        this.column = column;
     }
     
-    public FromImportStatement(String moduleName, boolean importAll) {
+    public FromImportStatement(String moduleName, boolean importAll, int line, int column) {
         this.moduleName = moduleName;
         this.imports = null;
         this.importAll = importAll;
+        this.line = line;
+        this.column = column;
     }
-    
+
+    @Override
+    public int getLine() {
+        return line;
+    }
+
+    @Override
+    public int getColumn() {
+        return column;
+    }
+
     public String getModuleName() {
         return moduleName;
     }
