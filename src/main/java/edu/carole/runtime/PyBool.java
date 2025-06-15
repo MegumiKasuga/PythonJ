@@ -54,7 +54,8 @@ public class PyBool extends PyObjectWithMethods {
         throw new RuntimeException("unsupported operand type(s) for &: 'bool' and '" + other.getTypeName() + "'");
     }
     
-    private PyObject or(PyObject other) {        if (other instanceof PyBool) {
+    private PyObject or(PyObject other) {
+        if (other instanceof PyBool) {
             return PyBool.valueOf(this.value || ((PyBool) other).value);
         } else if (other instanceof PyInt) {
             return new PyInt(this.value ? 1 | ((PyInt) other).getValue() : ((PyInt) other).getValue());
@@ -62,7 +63,8 @@ public class PyBool extends PyObjectWithMethods {
         throw new RuntimeException("unsupported operand type(s) for |: 'bool' and '" + other.getTypeName() + "'");
     }
     
-    private PyObject xor(PyObject other) {        if (other instanceof PyBool) {
+    private PyObject xor(PyObject other) {
+        if (other instanceof PyBool) {
             return PyBool.valueOf(this.value ^ ((PyBool) other).value);
         } else if (other instanceof PyInt) {
             return new PyInt((this.value ? 1 : 0) ^ ((PyInt) other).getValue());
@@ -102,113 +104,7 @@ public class PyBool extends PyObjectWithMethods {
     public boolean equals(PyObject other) {
         return other instanceof PyBool && ((PyBool) other).value == value;
     }
-    
-    @Override
-    public PyObject getAttribute(String name) {
-        /*
-          switch (name) {
-            case "__and__":
-                return new PyBuiltinFunction("__and__", args -> {                    if (args.size() != 1) {
-                        throw new RuntimeException("__and__() takes exactly 1 argument (" + args.size() + " given)");
-                    }
-                    PyObject other = args.get(0);                    if (other instanceof PyBool) {
-                        return PyBool.valueOf(this.value && ((PyBool) other).value);                    } else if (other instanceof PyIntNew) {
-                        return new PyIntNew(this.value ? ((PyIntNew) other).getValue() : 0);
-                    }
-                    throw new RuntimeException("unsupported operand type(s) for &: 'bool' and '" + other.getTypeName() + "'");
-                });
-                
-            case "__or__":
-                return new PyBuiltinFunction("__or__", args -> {
-                    if (args.size() != 1) {
-                        throw new RuntimeException("__or__() takes exactly 1 argument (" + args.size() + " given)");                    }
-                    PyObject other = args.get(0);                    if (other instanceof PyBool) {
-                        return PyBool.valueOf(this.value || ((PyBool) other).value);
-                    } else if (other instanceof PyIntNew) {
-                        return new PyIntNew(this.value ? 1 | ((PyIntNew) other).getValue() : ((PyIntNew) other).getValue());
-                    } else if (other instanceof PyIntNew) {
-                        return new PyIntNew(this.value ? 1 | ((PyIntNew) other).getValue() : ((PyIntNew) other).getValue());
-                    }
-                    throw new RuntimeException("unsupported operand type(s) for |: 'bool' and '" + other.getTypeName() + "'");
-                });
-                
-            case "__xor__":
-                return new PyBuiltinFunction("__xor__", args -> {
-                    if (args.size() != 1) {
-                        throw new RuntimeException("__xor__() takes exactly 1 argument (" + args.size() + " given)");
-                    }
-                    PyObject other = args.get(0);                    if (other instanceof PyBool) {
-                        return PyBool.valueOf(this.value ^ ((PyBool) other).value);                    } else if (other instanceof PyIntNew) {
-                        return new PyIntNew((this.value ? 1 : 0) ^ ((PyIntNew) other).getValue());
-                    }
-                    throw new RuntimeException("unsupported operand type(s) for ^: 'bool' and '" + other.getTypeName() + "'");
-                });
-                
-            case "__eq__":
-                return new PyBuiltinFunction("__eq__", args -> {
-                    if (args.size() != 1) {
-                        throw new RuntimeException("__eq__() takes exactly 1 argument (" + args.size() + " given)");
-                    }
-                    PyObject other = args.get(0);
-                    if (other instanceof PyBool) {
-                        return PyBool.valueOf(this.value == ((PyBool) other).value);
-                    }
-                    return PyBool.FALSE;
-                });
-                
-            case "__ne__":
-                return new PyBuiltinFunction("__ne__", args -> {
-                    if (args.size() != 1) {
-                        throw new RuntimeException("__ne__() takes exactly 1 argument (" + args.size() + " given)");
-                    }
-                    PyObject eqResult = this.getAttribute("__eq__").call(args);
-                    return PyBool.valueOf(!((PyBool) eqResult).getValue());
-                });
-                
-            case "__bool__":
-                return new PyBuiltinFunction("__bool__", args -> {
-                    if (args.size() != 0) {
-                        throw new RuntimeException("__bool__() takes no arguments (" + args.size() + " given)");
-                    }
-                    return this;
-                });
-                
-            case "__int__":
-                return new PyBuiltinFunction("__int__", args -> {
-                    if (args.size() != 0) {
-                        throw new RuntimeException("__int__() takes no arguments (" + args.size() + " given)");
-                    }
-                    return new PyIntNew(this.value ? 1 : 0);
-                });
-                  case "__str__":
-                return new PyBuiltinFunction("__str__", args -> {
-                    if (args.size() != 0) {
-                        throw new RuntimeException("__str__() takes no arguments (" + args.size() + " given)");
-                    }
-                    return new PyStringNew(this.toString());
-                });
-                  case "__repr__":
-                return new PyBuiltinFunction("__repr__", args -> {
-                    if (args.size() != 0) {
-                        throw new RuntimeException("__repr__() takes no arguments (" + args.size() + " given)");
-                    }
-                    return new PyStringNew(this.toString());
-                });
-                  case "__hash__":
-                return new PyBuiltinFunction("__hash__", args -> {
-                    if (args.size() != 0) {
-                        throw new RuntimeException("__hash__() takes no arguments (" + args.size() + " given)");
-                    }
-                    return new PyIntNew(this.hashCode());
-                });
-                
-            default:
-                return super.getAttribute(name);
-        }
 
-         */
-        return super.getAttribute(name);
-    }
     
     // Java Object.equals() and hashCode() for proper HashMap functionality
     @Override

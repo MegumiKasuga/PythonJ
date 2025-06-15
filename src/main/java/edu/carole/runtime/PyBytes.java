@@ -522,7 +522,8 @@ public class PyBytes extends PyObjectWithMethods {
         methodRegistry.registerMethod("rstrip", MethodBuilder.varArgs(this::rstrip));
         methodRegistry.registerMethod("strip", MethodBuilder.varArgs(this::strip));
         methodRegistry.registerMethod("title", MethodBuilder.noArgs(this::title));
-        methodRegistry.registerMethod("upper", MethodBuilder.noArgs(this::upper));        methodRegistry.registerMethod("zfill", MethodBuilder.oneArg(this::zfill));
+        methodRegistry.registerMethod("upper", MethodBuilder.noArgs(this::upper));
+        methodRegistry.registerMethod("zfill", MethodBuilder.oneArg(this::zfill));
     }
     
     private PyObject __getslice__(PyObject start, PyObject stop, PyObject step) {

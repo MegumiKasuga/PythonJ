@@ -4,6 +4,7 @@ import edu.carole.interpreter.Interpreter;
 import edu.carole.runtime.*;
 import edu.carole.runtime.io.IOManager;
 import edu.carole.runtime.property.BuiltinProperty;
+import lombok.Getter;
 
 import java.io.*;
 import java.nio.charset.Charset;
@@ -23,27 +24,20 @@ public class PyTextFileContext extends PyFileContext {
     private BufferedReader reader;
     private BufferedWriter writer;
     private final List<String> content; // For storing file content when reading
-    private final IOManager ioManager; // Use IOManager for flexible I/O
     private Charset charSetCache = null;
-    private static final PyInt ONE = new PyInt(1);
     
-    public PyTextFileContext(String filename) {
-        this(filename, "r", "utf-8"); // Default to read mode
+    public PyTextFileContext(IOManager io, String filename) {
+        this(io, filename, "r", "utf-8"); // Default to read mode
     }
 
-    public PyTextFileContext(String filename, String mode) {
-        this(filename, mode, "utf-8");
+    public PyTextFileContext(IOManager io, String filename, String mode) {
+        this(io, filename, mode, "utf-8");
     }
     
-    public PyTextFileContext(String filename, String mode, String charSet) {
-        this(filename, mode, IOManager.getInstance(), charSet);
-    }
-    
-    public PyTextFileContext(String filename, String mode, IOManager ioManager, String charSet) {
-        super(filename, mode);
+    public PyTextFileContext(IOManager ioManager, String filename, String mode, String charSet) {
+        super(ioManager, filename, mode);
         this.charSet = charSet;
         this.content = new ArrayList<>();
-        this.ioManager = ioManager != null ? ioManager : IOManager.getInstance();
     }
 
     @Override

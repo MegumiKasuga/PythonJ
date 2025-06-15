@@ -39,11 +39,9 @@ public class PyBoundMethod extends PyObject {
         boundArgs.addAll(arguments);
 
         // 设置方法调用上下文（用于super()）
-        if (interpreter != null) {
-            edu.carole.interpreter.Environment env = interpreter.getEnvironment();
-            env.setCurrentClass(instance.getPyClass());
-            env.setCurrentInstance(instance);
-        }
+        edu.carole.interpreter.Environment env = interpreter.getEnvironment();
+        env.setCurrentClass(instance.getPyClass());
+        env.setCurrentInstance(instance);
 
         if (keywordArguments != null && !keywordArguments.isEmpty()) {
             return method.call(boundArgs, keywordArguments, interpreter);

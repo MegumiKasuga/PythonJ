@@ -54,7 +54,9 @@ public class PyTuple extends PyObjectWithMethods {
     @Override
     public boolean isTruthy() { 
         return !elements.isEmpty(); 
-    }    @Override
+    }
+
+    @Override
     public PyObject len() {
         return new PyInt(elements.size());
     }
@@ -192,7 +194,9 @@ public class PyTuple extends PyObjectWithMethods {
 
     private PyObject __iter__() {
         return new PyIterator(elements.iterator(), "tuple");
-    }    private PyObject __repr__() {
+    }
+
+    private PyObject __repr__() {
         return new PyString(this.toString());
     }
 
@@ -236,7 +240,9 @@ public class PyTuple extends PyObjectWithMethods {
             }
         }
         return false;
-    }    public PyObject index(PyObject item) {
+    }
+
+    public PyObject index(PyObject item) {
         for (int i = 0; i < elements.size(); i++) {
             if (elements.get(i).equals(item)) {
                 return new PyInt(i);
@@ -298,7 +304,9 @@ public class PyTuple extends PyObjectWithMethods {
         if (obj == null || getClass() != obj.getClass()) return false;
         PyTuple pyTuple = (PyTuple) obj;
         return elements.equals(pyTuple.elements);
-    }    @Override
+    }
+
+    @Override
     public int hashCode() {
         return elements.hashCode();
     }

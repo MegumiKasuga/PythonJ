@@ -33,6 +33,11 @@ public class PyBuiltinFunction extends PyObject {
     @Override
     public boolean isTruthy() { return true; }
 
+    @Override
+    public PyObject call(List<PyObject> arguments, Interpreter interpreter) {
+        return call(arguments, null, interpreter);
+    }
+
     public PyObject call(List<PyObject> posArgs, Map<String, PyObject> kwargs, Interpreter interpreter) {
         return function.call(posArgs, kwargs, interpreter);
     }

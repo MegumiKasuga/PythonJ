@@ -65,8 +65,10 @@ public class PyModule extends PyObjectWithMethods {
         MethodRegistry methodRegistry = getMethodRegistry();
         
         // 添加标准模块方法
-        methodRegistry.registerMethod("__repr__", (Function<List<PyObject>, PyObject>) args -> new PyString("<module '" + name + "'>"));
-        methodRegistry.registerMethod("__str__", (Function<List<PyObject>, PyObject>) args -> new PyString("<module '" + name + "'>"));
+        methodRegistry.registerMethod("__repr__",
+                (Function<List<PyObject>, PyObject>) args -> new PyString("<module '" + name + "'>"));
+        methodRegistry.registerMethod("__str__",
+                (Function<List<PyObject>, PyObject>) args -> new PyString("<module '" + name + "'>"));
     }
     
     @Override

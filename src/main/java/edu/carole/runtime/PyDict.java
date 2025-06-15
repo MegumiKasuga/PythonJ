@@ -123,7 +123,9 @@ public class PyDict extends PyObjectWithMethods {
     
     public PyObject len() {
         return new PyInt(entries.size());
-    }    public PyObject getItem(PyObject key) {
+    }
+
+    public PyObject getItem(PyObject key) {
         // Try direct lookup
         PyObject value = entries.get(key);
         
@@ -145,7 +147,9 @@ public class PyDict extends PyObjectWithMethods {
             throw new RuntimeException("KeyError: " + key.toString());
         }
         return value;
-    }    public void setItem(PyObject key, PyObject value) {
+    }
+
+    public void setItem(PyObject key, PyObject value) {
         entries.put(key, value);
     }
     
@@ -223,7 +227,9 @@ public class PyDict extends PyObjectWithMethods {
     
     private PyObject __repr__() {
         return new PyString(this.toString());
-    }    private PyObject __str__() {
+    }
+
+    private PyObject __str__() {
         return new PyString(this.toString());
     }
     
@@ -298,7 +304,9 @@ public class PyDict extends PyObjectWithMethods {
         pair.add(key);
         pair.add(value);
         return new PyTuple(pair);
-    }    private PyObject clear() {
+    }
+
+    private PyObject clear() {
         entries.clear();
         return PyNone.INSTANCE;
     }

@@ -2,6 +2,7 @@ package edu.carole.runtime;
 
 import edu.carole.interpreter.Interpreter;
 
+import java.util.Map;
 import java.util.function.Function;
 import java.util.List;
 
@@ -68,6 +69,11 @@ public class PyAbstractMethod extends PyObject {
     @Override
     public PyObject call(List<PyObject> arguments, Interpreter interpreter) {
         return function.call(arguments, interpreter);
+    }
+
+    @Override
+    public PyObject call(List<PyObject> arguments, Map<String, PyObject> keywordArguments, Interpreter interpreter) {
+        return function.call(arguments, keywordArguments, interpreter);
     }
 
     /**

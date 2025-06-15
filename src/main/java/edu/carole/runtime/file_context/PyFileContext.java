@@ -29,7 +29,7 @@ public abstract class PyFileContext extends PyObject {
 
     public PyFileContext(IOManager manager, String path, String mode) {
         isOpen = false;
-        this.manager = manager == null ? IOManager.getInstance() : manager;
+        this.manager = manager;
         this.path = path;
         this.mode = mode;
         attributes = new HashMap<>();

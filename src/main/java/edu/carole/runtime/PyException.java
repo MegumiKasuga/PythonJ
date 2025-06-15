@@ -8,6 +8,7 @@ import java.util.List;
 /**
  * Python异常对象
  */
+@Deprecated
 public class PyException extends PyObject {
     private final String message;
     private final String exceptionType;

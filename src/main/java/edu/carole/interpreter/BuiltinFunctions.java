@@ -27,41 +27,37 @@ public class BuiltinFunctions {
         abc.registerModule(moduleLoader);
 
         // Add wraps as a global function for convenience
-            globals.define("wraps",
-                    new PyBuiltinFunction("wraps", (args, kwargs, inter) -> {
-                        if (args.size() != 1) {
-                            throw new RuntimeException("wraps() takes exactly 1 argument (" + args.size() + " given)");
-                        }
-
-                        if (!(args.get(0) instanceof PyFunction)) {
-                            throw new RuntimeException("wraps() requires a function as its argument");
-                        }
-
-                        PyFunction wrapped = (PyFunction) args.get(0);
-
-                            return new PyBuiltinFunction("wraps_decorator", (decoratorArgs, kwargs2, interpreter3) -> {
-                                if (decoratorArgs.size() != 1) {
-                                    throw new RuntimeException("decorator returned by wraps() takes exactly 1 argument");
-                                }
-
-                                if (!(decoratorArgs.get(0) instanceof PyFunction)) {
-                                    throw new RuntimeException("Function wrapper must be a function");
-                                }
-
-                                PyFunction wrapper = (PyFunction) decoratorArgs.get(0);
-
-                                // Copy metadata from wrapped to wrapper
-                                wrapper.setAttribute("__name__", new PyString(wrapped.getName()));
-                                wrapper.setAttribute("__doc__", wrapped.getAttribute("__doc__"));
-                                wrapper.setAttribute("__module__", wrapped.getAttribute("__module__"));
-                                wrapper.setAttribute("__wrapped__", wrapped);
-
-                                return wrapper;
-                            }
-                        );
+        globals.define("wraps",
+                new PyBuiltinFunction("wraps", (args, kwargs, inter) -> {
+                    if (args.size() != 1) {
+                        throw new RuntimeException("wraps() takes exactly 1 argument (" + args.size() + " given)");
                     }
-                )
-            );
+
+                    if (!(args.get(0) instanceof PyFunction wrapped)) {
+                        throw new RuntimeException("wraps() requires a function as its argument");
+                    }
+
+                    return new PyBuiltinFunction("wraps_decorator", (decoratorArgs, kwargs2, interpreter3) -> {
+                            if (decoratorArgs.size() != 1) {
+                                throw new RuntimeException("decorator returned by wraps() takes exactly 1 argument");
+                            }
+
+                            if (!(decoratorArgs.get(0) instanceof PyFunction wrapper)) {
+                                throw new RuntimeException("Function wrapper must be a function");
+                            }
+
+                            // Copy metadata from wrapped to wrapper
+                            wrapper.setAttribute("__name__", new PyString(wrapped.getName()));
+                            wrapper.setAttribute("__doc__", wrapped.getAttribute("__doc__"));
+                            wrapper.setAttribute("__module__", wrapped.getAttribute("__module__"));
+                            wrapper.setAttribute("__wrapped__", wrapped);
+
+                            return wrapper;
+                        }
+                    );
+                }
+            )
+        );
 
         // print函数
         globals.define("print", new PyBuiltinFunction("print", (args, kwargs, inter) -> {
@@ -72,8 +68,8 @@ public class BuiltinFunctions {
             }
             
             // 使用IOManager的控制台输出流
-            PrintStream outputStream = edu.carole.runtime.io.IOManager.getInstance().getConsoleOutputStream();
-            outputStream.println(output.toString());
+            PrintStream outputStream = io.getConsoleOutputStream();
+            outputStream.println(output);
             return PyNone.INSTANCE;
         }));
         
@@ -183,7 +179,8 @@ public class BuiltinFunctions {
                 throw new RuntimeException("list() takes at most 1 argument (" + args.size() + " given)");
             }
         }));
-          // dict函数
+
+        // dict函数
         globals.define("dict", new PyBuiltinFunction("dict", (args, kwargs, inter) -> {
             if (args.size() == 0) {
                 return new PyDict(new HashMap<>());
@@ -198,24 +195,21 @@ public class BuiltinFunctions {
                 // Handle dict from iterable of key-value pairs
                 Map<PyObject, PyObject> entries = new HashMap<>();
                 Iterator<PyObject> iterator = arg.iterator(inter);
-                try {
-                    while (iterator.hasNext()) {
-                        PyObject pair = iterator.next();
-                        if (pair instanceof PyTuple) {
-                            List<PyObject> elements = ((PyTuple) pair).getElements();
-                            if (elements.size() == 2) {
-                                entries.put(elements.get(0), elements.get(1));
-                            } else {
-                                throw new RuntimeException("ValueError: dictionary update sequence element has length " + elements.size() + "; 2 is required");
-                            }
+                while (iterator.hasNext()) {
+                    PyObject pair = iterator.next();
+                    if (pair instanceof PyTuple) {
+                        List<PyObject> elements = ((PyTuple) pair).getElements();
+                        if (elements.size() == 2) {
+                            entries.put(elements.get(0), elements.get(1));
                         } else {
-                            throw new RuntimeException("TypeError: cannot convert dictionary update sequence element to a sequence");
+                            throw new RuntimeException("ValueError: dictionary update sequence element has length " +
+                                    elements.size() + "; 2 is required");
                         }
+                    } else {
+                        throw new RuntimeException("TypeError: cannot convert dictionary update sequence element to a sequence");
                     }
-                    return new PyDict(entries);
-                } catch (Exception e) {
-                    throw e;
                 }
+                return new PyDict(entries);
             } else {
                 throw new RuntimeException("dict() takes at most 1 argument (" + args.size() + " given)");
             }
@@ -250,7 +244,9 @@ public class BuiltinFunctions {
             } else {
                 throw new RuntimeException("range expected at most 3 arguments, got " + args.size());
             }
-        }));          // input函数
+        }));
+
+        // input函数
         globals.define("input", new PyBuiltinFunction("input", (args, kwargs, inter) -> {
             if (args.size() > 1) {
                 throw new RuntimeException("input expected at most 1 arguments, got " + args.size());
@@ -258,14 +254,14 @@ public class BuiltinFunctions {
             
             if (args.size() == 1) {
                 // 使用IOManager的控制台输出流打印提示
-                PrintStream outputStream = edu.carole.runtime.io.IOManager.getInstance().getConsoleOutputStream();
+                PrintStream outputStream = io.getConsoleOutputStream();
                 outputStream.print(args.get(0).toString());
                 outputStream.flush(); // 确保提示立即显示
             }
             
             try {
                 // 使用IOManager的专用方法读取控制台输入
-                String line = edu.carole.runtime.io.IOManager.getInstance().readConsoleLine();
+                String line = io.readConsoleLine();
                 return new PyString(line != null ? line : "");
             } catch (IOException e) {
                 throw new RuntimeException("Error reading input: " + e.getMessage());
@@ -331,8 +327,7 @@ public class BuiltinFunctions {
             PyObject iterator = args.get(0);
             
             // Special handling for generators
-            if (iterator instanceof PyGenerator) {
-                PyGenerator generator = (PyGenerator) iterator;
+            if (iterator instanceof PyGenerator generator) {
                 if (generator.isExhausted()) {
                     if (args.size() == 2) {
                         return args.get(1); // Return default value
@@ -394,7 +389,8 @@ public class BuiltinFunctions {
                 throw new RuntimeException("'" + obj.getTypeName() + "' object is not iterable");
             }
         }));
-          // open函数 - 创建真正的文件对象用于文件I/O操作
+
+        // open函数 - 创建真正的文件对象用于文件I/O操作
         globals.define("open", new PyBuiltinFunction("open", (args, kwargs, inter) -> {
             if (args.size() < 1 || args.size() > 2) {
                 throw new RuntimeException("open() takes from 1 to 2 positional arguments but " + args.size() + " were given");
@@ -430,12 +426,12 @@ public class BuiltinFunctions {
                 if (hasKwArgs && kwargs.containsKey("charset")) {
                     charset = kwargs.get("charset").toString();
                 }
-                PyFileContext context = new PyTextFileContext(((PyString) filename).getValue(), mode, charset);
+                PyFileContext context = new PyTextFileContext(io, ((PyString) filename).getValue(), mode, charset);
                 context.setBufferSize(buffer);
                 return context;
             } else {
                 // binary file mode
-                PyFileContext context = new PyBinaryFileContext(((PyString) filename).getValue(), mode);
+                PyFileContext context = new PyBinaryFileContext(io, ((PyString) filename).getValue(), mode);
                 context.setBufferSize(buffer);
                 return context;
             }
@@ -443,7 +439,7 @@ public class BuiltinFunctions {
         
         // sorted函数 - 返回排序后的新列表
         globals.define("sorted", new PyBuiltinFunction("sorted", (args, kwargs, inter) -> {
-            if (args.size() < 1 || args.size() > 1) {
+            if (args.size() != 1) {
                 // 目前仅实现基本版本，不支持key参数和reverse参数
                 throw new RuntimeException("sorted() takes 1 positional argument but " + args.size() + " were given");
             }
@@ -462,7 +458,7 @@ public class BuiltinFunctions {
             }
             
             // 对元素进行排序
-            elements.sort((o1, o2) -> compareObjects(o1, o2));
+            elements.sort(BuiltinFunctions::compareObjects);
             
             // 返回新的排序列表
             return new PyList(elements);
@@ -524,15 +520,14 @@ public class BuiltinFunctions {
                     PyObject element = iterator.next();
                     List<PyObject> functionArgs = new ArrayList<>();
                     functionArgs.add(element);
-                    
-                    PyObject predicate = function;
-                    if (predicate == PyNone.INSTANCE) {
+
+                    if (function == PyNone.INSTANCE) {
                         // None作为函数时，相当于identity函数，保留真值的元素
                         if (element.isTruthy()) {
                             result.add(element);
                         }
                     } else {
-                        PyObject callResult = predicate.call(functionArgs, inter);
+                        PyObject callResult = function.call(functionArgs, inter);
                         if (callResult.isTruthy()) {
                             result.add(element);
                         }
@@ -632,7 +627,8 @@ public class BuiltinFunctions {
             
             return PyBool.TRUE;
         }));
-          // sum函数 - 对可迭代对象的元素求和
+
+        // sum函数 - 对可迭代对象的元素求和
         globals.define("sum", new PyBuiltinFunction("sum", (args, kwargs, inter) -> {
             if (args.size() < 1 || args.size() > 2) {
                 throw new RuntimeException("sum() takes at most 2 arguments (" + args.size() + " given)");
@@ -712,7 +708,8 @@ public class BuiltinFunctions {
                 throw new RuntimeException("type '" + number.getTypeName() + "' doesn't define __round__ method");
             }
         }));
-          // pow函数 - 返回x的y次幂
+
+        // pow函数 - 返回x的y次幂
         globals.define("pow", new PyBuiltinFunction("pow", (args, kwargs, inter) -> {
             if (args.size() < 2 || args.size() > 3) {
                 throw new RuntimeException("pow() takes 2 or 3 arguments (" + args.size() + " given)");
@@ -787,25 +784,26 @@ public class BuiltinFunctions {
                     return new PyInt((long) result);
                 }
             }
-          // 否则返回浮点数
+            // 否则返回浮点数
             return new PyFloat(result);
         }));
-          // dir函数 - 返回对象的属性列表
+
+        // dir函数 - 返回对象的属性列表
         globals.define("dir", new PyBuiltinFunction("dir", (args, kwargs, inter) -> {
             if (args.size() > 1) {
                 throw new RuntimeException("dir() takes at most 1 argument (" + args.size() + " given)");
             }
             
             List<PyObject> attributes = new ArrayList<>();
-              if (args.size() == 0) {
+            if (args.size() == 0) {
                 // 没有参数时，返回当前作用域的名字
                 // 通过闭包访问当前环境
                 Set<String> allNames = new HashSet<>();
                 
                 // 遍历当前环境链获取所有可见的变量名
-                Environment currentEnv = globals; // 在实际使用时需要获取当前环境
-                while (currentEnv != null) {
-                    allNames.addAll(currentEnv.getValues().keySet());
+                // fixme: check and fix this
+                while (globals != null) {
+                    allNames.addAll(globals.getValues().keySet());
                     // 获取父环境需要反射或增加方法
                     break; // 暂时只获取当前层
                 }
@@ -848,7 +846,8 @@ public class BuiltinFunctions {
             
             return new PyList(attributes);
         }));
-          // isinstance函数 - 检查对象是否是指定类型的实例
+
+        // isinstance函数 - 检查对象是否是指定类型的实例
         globals.define("isinstance", new PyBuiltinFunction("isinstance", (args, kwargs, inter) -> {
             if (args.size() != 2) {
                 throw new RuntimeException("isinstance() takes exactly 2 arguments (" + args.size() + " given)");
@@ -925,7 +924,8 @@ public class BuiltinFunctions {
                 return PyBool.FALSE;
             }
         }));
-          // complex函数 - 创建复数
+
+        // complex函数 - 创建复数
         globals.define("complex", new PyBuiltinFunction("complex", (args, kwargs, inter) -> {
             if (args.size() > 2) {
                 throw new RuntimeException("complex() takes at most 2 arguments (" + args.size() + " given)");
@@ -939,7 +939,8 @@ public class BuiltinFunctions {
                 if (realArg instanceof PyInt) {
                     real = ((PyInt) realArg).getValue();
                 } else if (realArg instanceof PyFloat) {
-                    real = ((PyFloat) realArg).getValue();                } else if (realArg instanceof PyString) {
+                    real = ((PyFloat) realArg).getValue();
+                } else if (realArg instanceof PyString) {
                     // 解析字符串形式的复数，如 "3+4j"、"5j"、"2.5"
                     String complexStr = ((PyString) realArg).getValue().trim();
                     try {
@@ -953,9 +954,8 @@ public class BuiltinFunctions {
                         e.printStackTrace();
                         throw new RuntimeException("complex() arg is a malformed string");
                     }
-                } else if (realArg instanceof PyComplex) {
+                } else if (realArg instanceof PyComplex complex) {
                     // 如果第一个参数已经是复数
-                    PyComplex complex = (PyComplex) realArg;
                     real = complex.getReal();
                     imag = complex.getImag();
                 } else {
@@ -971,12 +971,14 @@ public class BuiltinFunctions {
                     imag += ((PyFloat) imagArg).getValue();
                 } else {
                     throw new RuntimeException("complex() argument must be a string or a number, not '" + imagArg.getTypeName() + "'");
-                }            }
+                }
+            }
             
             // 返回真正的复数对象
             return new PyComplex(real, imag);
         }));
-          // set函数 - 创建集合
+
+        // set函数 - 创建集合
         globals.define("set", new PyBuiltinFunction("set", (args, kwargs, inter) -> {
             if (args.size() > 1) {
                 throw new RuntimeException("set() takes at most 1 argument (" + args.size() + " given)");
@@ -997,7 +999,9 @@ public class BuiltinFunctions {
             }
               // 返回真正的集合对象
             return new PySet(elements);
-        }));        // bytes函数 - 创建字节对象
+        }));
+
+        // bytes函数 - 创建字节对象
         globals.define("bytes", new PyBuiltinFunction("bytes", (args, kwargs, inter) -> {
             if (args.size() == 0) {
                 return new PyBytes(new byte[0]);
@@ -1109,20 +1113,22 @@ public class BuiltinFunctions {
             } else {
                 throw new RuntimeException("bytearray() takes at most 1 argument (" + args.size() + " given)");
             }
-        }));        // vars函数 - 返回对象的__dict__属性或当前作用域的局部变量
+        }));
+
+        // vars函数 - 返回对象的__dict__属性或当前作用域的局部变量
         globals.define("vars", new PyBuiltinFunction("vars", (args, kwargs, inter) -> {
             if (args.size() > 1) {
                 throw new RuntimeException("vars() takes at most 1 argument (" + args.size() + " given)");
             }
-              if (args.size() == 0) {
+            if (args.size() == 0) {
                 // 返回当前作用域的局部变量
                 Map<PyObject, PyObject> localVars = new HashMap<>();
                 
                 // 获取当前环境的所有变量
                 // 注意：在实际使用时需要传递当前环境
-                Environment currentEnv = globals; // 这里应该是当前环境，而非全局环境
-                if (currentEnv != null) {
-                    for (Map.Entry<String, PyObject> entry : currentEnv.getValues().entrySet()) {
+                // fixme: check and fix this
+                if (globals != null) {
+                    for (Map.Entry<String, PyObject> entry : globals.getValues().entrySet()) {
                         localVars.put(new PyString(entry.getKey()), entry.getValue());
                     }
                 }
@@ -1173,7 +1179,9 @@ public class BuiltinFunctions {
             } else {
                 throw new RuntimeException("tuple() takes at most 1 argument (" + args.size() + " given)");
             }
-        }));        // frozenset函数 - 创建不可变集合
+        }));
+
+        // frozenset函数 - 创建不可变集合
         globals.define("frozenset", new PyBuiltinFunction("frozenset", (args, kwargs, inter) -> {
             if (args.size() > 1) {
                 throw new RuntimeException("frozenset() takes at most 1 argument (" + args.size() + " given)");
@@ -1377,8 +1385,7 @@ public class BuiltinFunctions {
         }
         
         // 处理内置类型函数（如int, str, list等）
-        if (classinfo instanceof PyBuiltinFunction) {
-            PyBuiltinFunction typeFunc = (PyBuiltinFunction) classinfo;
+        if (classinfo instanceof PyBuiltinFunction typeFunc) {
             String typeName = typeFunc.toString();
             
             // 从函数字符串中提取类型名，例如 "<built-in function int>" -> "int"
@@ -1420,10 +1427,8 @@ public class BuiltinFunctions {
                 if (targetClasspath != null) {
                     String targetModulePath = targetClasspath.getModulePath();
                     String targetFullName = targetModulePath + "." + targetClassName;
-                    
-                    if (objClass.isSubclassOfByPath(targetFullName)) {
-                        return true;
-                    }
+
+                    return objClass.isSubclassOfByPath(targetFullName);
                 }
                 
                 return false;
@@ -1495,9 +1500,7 @@ public class BuiltinFunctions {
         }
         
         if (obj instanceof edu.carole.runtime.collections.PyMutableMapping) {
-            if ("MutableMapping".equals(className) || "collections.abc.MutableMapping".equals(className)) {
-                return true;
-            }
+            return "MutableMapping".equals(className) || "collections.abc.MutableMapping".equals(className);
         }
           return false;
     }
@@ -1510,9 +1513,8 @@ public class BuiltinFunctions {
         if (classinfo instanceof PyString) {
             String className = ((PyString) classinfo).getValue();
             
-            if (cls instanceof PyClass) {
-                PyClass pyClass = (PyClass) cls;
-                
+            if (cls instanceof PyClass pyClass) {
+
                 // 检查直接类名匹配
                 if (pyClass.getName().equals(className)) {
                     return true;
@@ -1527,31 +1529,22 @@ public class BuiltinFunctions {
                 }
                 
                 // 检查PyClasspath继承关系
-                if (pyClass.isSubclassOfByPath(className)) {
-                    return true;
-                }
-                
-                return false;
+                return pyClass.isSubclassOfByPath(className);
             }
             
             // 对于内置类型，检查类型名匹配
-            if (cls instanceof PyString && "str".equals(className)) {
-                return true;
-            }
-            return false;
+            return cls instanceof PyString && "str".equals(className);
         }
         
         // 处理内置类型函数
-        if (classinfo instanceof PyBuiltinFunction) {
-            PyBuiltinFunction typeFunc = (PyBuiltinFunction) classinfo;
+        if (classinfo instanceof PyBuiltinFunction typeFunc) {
             String typeName = typeFunc.toString();
             
             if (typeName.startsWith("<built-in function ") && typeName.endsWith(">")) {
                 String className = typeName.substring(19, typeName.length() - 1);
                 
-                if (cls instanceof PyClass) {
-                    PyClass pyClass = (PyClass) cls;
-                    
+                if (cls instanceof PyClass pyClass) {
+
                     // 检查类名匹配
                     if (pyClass.getName().equals(className)) {
                         return true;
@@ -1571,10 +1564,9 @@ public class BuiltinFunctions {
         }
         
         // 处理类对象的直接比较
-        if (classinfo instanceof PyClass && cls instanceof PyClass) {
+        if (classinfo instanceof PyClass targetClass && cls instanceof PyClass) {
             PyClass pyClass = (PyClass) cls;
-            PyClass targetClass = (PyClass) classinfo;
-            
+
             // 检查直接匹配
             if (pyClass.equals(targetClass)) {
                 return true;
@@ -1594,10 +1586,8 @@ public class BuiltinFunctions {
             if (targetClasspath != null) {
                 String targetModulePath = targetClasspath.getModulePath();
                 String targetFullName = targetModulePath + "." + targetClassName;
-                
-                if (pyClass.isSubclassOfByPath(targetFullName)) {
-                    return true;
-                }
+
+                return pyClass.isSubclassOfByPath(targetFullName);
             }
             
             return false;
@@ -1681,7 +1671,8 @@ public class BuiltinFunctions {
             double real = Double.parseDouble(complexStr);
             return new PyComplex(real, 0.0);
         } catch (NumberFormatException e) {
-            throw new NumberFormatException("Invalid real number: " + complexStr);        }
+            throw new NumberFormatException("Invalid real number: " + complexStr);
+        }
     }
 }
 
@@ -1743,31 +1734,28 @@ class PyRange extends PyObject implements Iterable<PyObject> {
     
     @Override
     public PyObject getAttribute(String name) {
-        switch (name) {
-            case "__iter__":
-                return new PyBuiltinFunction("__iter__", (args, kwargs, inter) -> this);
-            case "__next__":
-                return new PyBuiltinFunction("__next__", (args, kwargs, inter) -> {
-                    if (!args.isEmpty()) {
-                        throw new RuntimeException("__next__() takes no arguments (" + args.size() + " given)");
-                    }
-                    if (step > 0 && start >= stop) {
-                        throw new RuntimeException("StopIteration");
-                    } else if (step < 0 && start <= stop) {
-                        throw new RuntimeException("StopIteration");
-                    }
-                    long current = getCurrent();
-                    setCurrent(current + step);
-                    if (step > 0 && getCurrent() > stop) {
-                        throw new RuntimeException("StopIteration");
-                    } else if (step < 0 && getCurrent() < stop) {
-                        throw new RuntimeException("StopIteration");
-                    }
-                    return new PyInt(current);
-                });
-            default:
-                return super.getAttribute(name);
-        }
+        return switch (name) {
+            case "__iter__" -> new PyBuiltinFunction("__iter__", (args, kwargs, inter) -> this);
+            case "__next__" -> new PyBuiltinFunction("__next__", (args, kwargs, inter) -> {
+                if (!args.isEmpty()) {
+                    throw new RuntimeException("__next__() takes no arguments (" + args.size() + " given)");
+                }
+                if (step > 0 && start >= stop) {
+                    throw new RuntimeException("StopIteration");
+                } else if (step < 0 && start <= stop) {
+                    throw new RuntimeException("StopIteration");
+                }
+                long current = getCurrent();
+                setCurrent(current + step);
+                if (step > 0 && getCurrent() > stop) {
+                    throw new RuntimeException("StopIteration");
+                } else if (step < 0 && getCurrent() < stop) {
+                    throw new RuntimeException("StopIteration");
+                }
+                return new PyInt(current);
+            });
+            default -> super.getAttribute(name);
+        };
     }
 
     public void setCurrent(long current) {
