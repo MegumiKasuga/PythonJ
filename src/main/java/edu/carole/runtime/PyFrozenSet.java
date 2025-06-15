@@ -1,5 +1,6 @@
 package edu.carole.runtime;
 
+import edu.carole.interpreter.Interpreter;
 import edu.carole.runtime.base.PyObjectWithMethods;
 import edu.carole.runtime.registry.MethodBuilder;
 import edu.carole.runtime.registry.MethodRegistry;
@@ -118,20 +119,20 @@ public class PyFrozenSet extends PyObjectWithMethods {
         return PyBool.valueOf(this.elements.contains(item));
     }
     
-    private PyObject __or__(PyObject other) {
-        return union(List.of(other));
+    private PyObject __or__(PyObject other, Interpreter interpreter) {
+        return union(List.of(other), interpreter);
     }
     
-    private PyObject __and__(PyObject other) {
-        return intersection(List.of(other));
+    private PyObject __and__(PyObject other, Interpreter interpreter) {
+        return intersection(List.of(other), interpreter);
     }
     
-    private PyObject __sub__(PyObject other) {
-        return difference(List.of(other));
+    private PyObject __sub__(PyObject other, Interpreter interpreter) {
+        return difference(List.of(other), interpreter);
     }
     
-    private PyObject __xor__(PyObject other) {
-        return symmetric_difference(other);
+    private PyObject __xor__(PyObject other, Interpreter interpreter) {
+        return symmetric_difference(other, interpreter);
     }
 
     private PyObject __repr__() {
@@ -151,10 +152,10 @@ public class PyFrozenSet extends PyObjectWithMethods {
         return this; // Since it's immutable, return self
     }
     
-    private PyObject union(List<PyObject> args) {
+    private PyObject union(List<PyObject> args, Interpreter interpreter) {
         Set<PyObject> result = new HashSet<>(elements);
         for (PyObject arg : args) {
-            Iterator<PyObject> iterator = arg.iterator();
+            Iterator<PyObject> iterator = arg.iterator(interpreter);
             while (iterator.hasNext()) {
                 result.add(iterator.next());
             }
@@ -162,7 +163,7 @@ public class PyFrozenSet extends PyObjectWithMethods {
         return new PyFrozenSet(result);
     }
     
-    private PyObject intersection(List<PyObject> args) {
+    private PyObject intersection(List<PyObject> args, Interpreter interpreter) {
         if (args.isEmpty()) {
             return new PyFrozenSet(new HashSet<>(elements));
         }
@@ -170,7 +171,7 @@ public class PyFrozenSet extends PyObjectWithMethods {
         Set<PyObject> result = new HashSet<>(elements);
         for (PyObject arg : args) {
             Set<PyObject> argSet = new HashSet<>();
-            Iterator<PyObject> iterator = arg.iterator();
+            Iterator<PyObject> iterator = arg.iterator(interpreter);
             while (iterator.hasNext()) {
                 argSet.add(iterator.next());
             }
@@ -181,10 +182,10 @@ public class PyFrozenSet extends PyObjectWithMethods {
         return new PyFrozenSet(result);
     }
     
-    private PyObject difference(List<PyObject> args) {
+    private PyObject difference(List<PyObject> args, Interpreter interpreter) {
         Set<PyObject> result = new HashSet<>(elements);
         for (PyObject arg : args) {
-            Iterator<PyObject> iterator = arg.iterator();
+            Iterator<PyObject> iterator = arg.iterator(interpreter);
             while (iterator.hasNext()) {
                 result.remove(iterator.next());
             }
@@ -192,11 +193,11 @@ public class PyFrozenSet extends PyObjectWithMethods {
         return new PyFrozenSet(result);
     }
     
-    private PyObject symmetric_difference(PyObject other) {
+    private PyObject symmetric_difference(PyObject other, Interpreter interpreter) {
         Set<PyObject> result = new HashSet<>(elements);
         Set<PyObject> otherSet = new HashSet<>();
         
-        Iterator<PyObject> iterator = other.iterator();
+        Iterator<PyObject> iterator = other.iterator(interpreter);
         while (iterator.hasNext()) {
             otherSet.add(iterator.next());
         }
@@ -243,8 +244,8 @@ public class PyFrozenSet extends PyObjectWithMethods {
         return PyBool.valueOf(elements.containsAll(otherSet));
     }
     
-    private PyObject isdisjoint(PyObject other) {
-        Iterator<PyObject> iterator = other.iterator();
+    private PyObject isdisjoint(PyObject other, Interpreter interpreter) {
+        Iterator<PyObject> iterator = other.iterator(interpreter);
         while (iterator.hasNext()) {
             if (elements.contains(iterator.next())) {
                 return PyBool.FALSE;

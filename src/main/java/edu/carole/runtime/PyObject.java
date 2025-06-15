@@ -1,11 +1,14 @@
 package edu.carole.runtime;
 
+import edu.carole.interpreter.Interpreter;
+
 import java.util.*;
 
 /**
  * Python对象的基类
  */
 public abstract class PyObject {
+
     public abstract String getTypeName();
     public abstract String toString();
     public abstract boolean isTruthy();
@@ -15,9 +18,9 @@ public abstract class PyObject {
     public PyObject getAttribute(String name) {
         // 提供一些默认的魔术方法
         return switch (name) {
-            case "__str__" -> new PyBuiltinFunction("__str__", (args, kwargs) -> new PyString(this.toString()));
-            case "__repr__" -> new PyBuiltinFunction("__repr__", (args, kwargs) -> new PyString(this.toString()));
-            case "__bool__" -> new PyBuiltinFunction("__bool__", (args, kwargs) -> PyBool.valueOf(this.isTruthy()));
+            case "__str__" -> new PyBuiltinFunction("__str__", (args, kwargs, interpreter) -> new PyString(this.toString()));
+            case "__repr__" -> new PyBuiltinFunction("__repr__", (args, kwargs, interpreter) -> new PyString(this.toString()));
+            case "__bool__" -> new PyBuiltinFunction("__bool__", (args, kwargs, interpreter) -> PyBool.valueOf(this.isTruthy()));
             default -> throw new RuntimeException("'" + getTypeName() + "' object has no attribute '" + name + "'");
         };
     }
@@ -28,19 +31,13 @@ public abstract class PyObject {
     public void setAttribute(String name, PyObject value) {
         throw new RuntimeException("'" + getTypeName() + "' object has no attribute '" + name + "'");
     }
-      /**
-     * 调用对象
-     */
-    public PyObject call(List<PyObject> arguments) {
-        throw new RuntimeException("'" + getTypeName() + "' object is not callable");
-    }
     
     /**
      * 调用对象（带解释器上下文）
      */
     public PyObject call(List<PyObject> arguments, edu.carole.interpreter.Interpreter interpreter) {
         // Default implementation falls back to regular call
-        return call(arguments);
+        return call(arguments, null, interpreter);
     }
     
     /**
@@ -87,7 +84,7 @@ public abstract class PyObject {
     /**
      * 迭代器
      */
-    public Iterator<PyObject> iterator() {
+    public Iterator<PyObject> iterator(Interpreter interpreter) {
         try {
             getAttribute("__iter__");
             getAttribute("__next__");
@@ -95,7 +92,7 @@ public abstract class PyObject {
             // 如果没有__iter__或__next__方法，抛出异常
             throw new RuntimeException("'" + getTypeName() + "' object is not iterable");
         }
-        return new PyIterator(this, getTypeName());
+        return new PyIterator(interpreter, this, getTypeName());
     }
       /**
      * 相等性比较

@@ -99,10 +99,6 @@ public abstract class AbstractProperty extends PyObject {
         return cache.isTruthy();
     }
 
-    public PyObject call(List<PyObject> arguments) {
-        return call(arguments, null);
-    }
-
     public abstract PyObject call(List<PyObject> arguments, Interpreter interpreter);
 
     public PyObject call(List<PyObject> arguments, Map<String, PyObject> keywordArguments, Interpreter interpreter) {

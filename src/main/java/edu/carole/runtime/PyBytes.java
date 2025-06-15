@@ -1,5 +1,6 @@
 package edu.carole.runtime;
 
+import edu.carole.interpreter.Interpreter;
 import edu.carole.runtime.base.PyObjectWithMethods;
 import edu.carole.runtime.registry.MethodBuilder;
 import java.util.*;
@@ -77,7 +78,7 @@ public class PyBytes extends PyObjectWithMethods {
     }
     
     @Override
-    public Iterator<PyObject> iterator() {
+    public Iterator<PyObject> iterator(Interpreter interpreter) {
         return new Iterator<PyObject>() {
             private int index = 0;
             
@@ -99,8 +100,8 @@ public class PyBytes extends PyObjectWithMethods {
     @Override
     protected void registerMethods() {
         // 注册迭代器方法
-        methodRegistry.registerMethod("__iter__", MethodBuilder.noArgs(() ->
-            new PyIterator(iterator(), "bytes_iterator")));
+        methodRegistry.registerMethod("__iter__", MethodBuilder.noArgs(inter ->
+            new PyIterator(iterator(inter), "bytes_iterator")));
           // 注册解码方法
         methodRegistry.registerMethod("decode", MethodBuilder.varArgs(args -> {
             String encoding = "utf-8";  // 默认编码
@@ -143,8 +144,8 @@ public class PyBytes extends PyObjectWithMethods {
             return PyBool.valueOf(Arrays.equals(value, ((PyBytes)other).getValue()));
         }));
           // 注册不相等比较方法
-        methodRegistry.registerMethod("__ne__", MethodBuilder.oneArg(other -> {
-            PyObject eqResult = methodRegistry.getMethod("__eq__").call(List.of(other));
+        methodRegistry.registerMethod("__ne__", MethodBuilder.oneArg((other, inter) -> {
+            PyObject eqResult = methodRegistry.getMethod("__eq__").call(List.of(other), inter);
             return PyBool.valueOf(!((PyBool) eqResult).getValue());
         }));
         
@@ -307,9 +308,9 @@ public class PyBytes extends PyObjectWithMethods {
         methodRegistry.registerMethod("copy", MethodBuilder.noArgs(() -> this));
         
         // 注册右乘法方法
-        methodRegistry.registerMethod("__rmul__", MethodBuilder.oneArg(other -> {
+        methodRegistry.registerMethod("__rmul__", MethodBuilder.oneArg((other, inter) -> {
             // 右乘法与左乘法相同
-            return methodRegistry.getMethod("__mul__").call(List.of(other));
+            return methodRegistry.getMethod("__mul__").call(List.of(other), inter);
         }));
         
         // 注册替换方法
@@ -650,12 +651,12 @@ public class PyBytes extends PyObjectWithMethods {
         return new PyBytes(result);
     }
     
-    private PyObject index(List<PyObject> args) {
+    private PyObject index(List<PyObject> args, Interpreter inter) {
         // 类似于find，但没找到时抛出异常
         if (args.isEmpty()) {
             throw new RuntimeException("index() takes at least 1 argument (0 given)");
         }
-          PyObject findResult = methodRegistry.getMethod("find").call(args);
+          PyObject findResult = methodRegistry.getMethod("find").call(args, inter);
         if (findResult instanceof PyInt && ((PyInt)findResult).getValue() == -1) {
             throw new RuntimeException("substring not found");
         }

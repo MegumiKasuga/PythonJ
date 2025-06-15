@@ -236,14 +236,9 @@ public class PyClass extends PyObject {
         }
         return null;
     }
-    
-    @Override
-    public PyObject call(List<PyObject> arguments) {
-        return call(arguments, null);
-    }
 
     @Override
-    public PyObject call(List<PyObject> arguments, edu.carole.interpreter.Interpreter interpreter) {
+    public PyObject call(List<PyObject> arguments, Map<String, PyObject> keywordArguments, Interpreter interpreter) {
         // 创建实例
         PyInstance instance = new PyInstance(this);
         properties.forEach(
@@ -251,22 +246,30 @@ public class PyClass extends PyObject {
                     instance.setAttribute(name, prop.boundToInstance(instance));
                 }
         );
-        
+
         // 调用__init__方法（如果存在）
         PyObject initMethod = findMethod("__init__");
         if (initMethod != null) {
             // Create a bound method to ensure proper context setting
             PyBoundMethod boundInit = new PyBoundMethod(instance, initMethod);
-            
+
             // Use interpreter-aware call if available
+            if (keywordArguments != null && !keywordArguments.isEmpty()) {
+                boundInit.call(arguments, keywordArguments, interpreter);
+            }
             if (interpreter != null) {
                 boundInit.call(arguments, interpreter);
             } else {
-                boundInit.call(arguments);
+                boundInit.call(arguments, interpreter);
             }
         }
-        
+
         return instance;
+    }
+
+    @Override
+    public PyObject call(List<PyObject> arguments, edu.carole.interpreter.Interpreter interpreter) {
+        return call(arguments, null, interpreter);
     }
     
     public String getName() { return name; }

@@ -1,11 +1,13 @@
 package edu.carole.runtime.registry;
 
+import edu.carole.interpreter.Interpreter;
 import edu.carole.runtime.PyBuiltinFunction;
 import edu.carole.runtime.PyObject;
 import edu.carole.runtime.PyStaticMethod;
 import edu.carole.runtime.PyAbstractMethod;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.List;
 
@@ -29,7 +31,13 @@ public class MethodRegistry {
      * @param implementation 方法实现
      */
     public void registerMethod(String methodName, Function<List<PyObject>, PyObject> implementation) {
-        methods.put(methodName, new PyBuiltinFunction(methodName, (args, kwargs) -> implementation.apply(args)));
+        methods.put(methodName, new PyBuiltinFunction(methodName, (args, kwargs, inter) -> implementation.apply(args)));
+    }
+
+    public void registerMethod(String methodName, FunctionSupplier implementation) {
+        methods.put(methodName, new PyBuiltinFunction(methodName, (args, kwargs, inter) ->
+                implementation.apply(new FunctionParams(args, kwargs, inter))
+        ));
     }
     
     /**
@@ -46,7 +54,7 @@ public class MethodRegistry {
      * @param implementation 方法实现
      */
     public void registerStaticMethod(String methodName, Function<List<PyObject>, PyObject> implementation) {
-        staticMethods.put(methodName, new PyBuiltinFunction(methodName, (args, kwargs) -> implementation.apply(args)));
+        staticMethods.put(methodName, new PyBuiltinFunction(methodName, (args, kwargs, inter) -> implementation.apply(args)));
     }
     
     /**
@@ -57,6 +65,12 @@ public class MethodRegistry {
     public void registerStaticMethod(String methodName, PyBuiltinFunction function) {
         staticMethods.put(methodName, function);
     }
+
+    public void registerStaticMethod(String methodName, FunctionSupplier supplier) {
+        staticMethods.put(methodName, new PyBuiltinFunction(methodName, (args, kwargs, inter) -> {
+            return supplier.apply(new FunctionParams(args, kwargs, inter));
+        }));
+    }
     
     /**
      * 注册一个抽象方法
@@ -65,10 +79,10 @@ public class MethodRegistry {
      */
     public void registerAbstractMethod(String methodName, Function<List<PyObject>, PyObject> implementation) {
         if (implementation != null) {
-            abstractMethods.put(methodName, new PyBuiltinFunction(methodName, (args, kwargs) -> implementation.apply(args)));
+            abstractMethods.put(methodName, new PyBuiltinFunction(methodName, (args, kwargs, inter) -> implementation.apply(args)));
         } else {
             // 抽象方法的默认实现，抛出NotImplementedError
-            abstractMethods.put(methodName, new PyBuiltinFunction(methodName, (args, kwargs) -> {
+            abstractMethods.put(methodName, new PyBuiltinFunction(methodName, (args, kwargs, inter) -> {
                 throw new RuntimeException("NotImplementedError: Abstract method '" + methodName + "' must be implemented by subclass");
             }));
         }
@@ -92,14 +106,14 @@ public class MethodRegistry {
         staticMethods.put(methodName, staticMethod.getFunction());
     }
     
-    /**
-     * 注册一个@abstractmethod装饰的方法
-     * @param methodName 方法名
-     * @param abstractMethod PyAbstractMethod对象
-     */
-    public void registerAbstractMethodDecorator(String methodName, PyAbstractMethod abstractMethod) {
-        abstractMethods.put(methodName, abstractMethod.getFunction());
-    }
+//    /**
+//     * 注册一个@abstractmethod装饰的方法
+//     * @param methodName 方法名
+//     * @param abstractMethod PyAbstractMethod对象
+//     */
+//    public void registerAbstractMethodDecorator(String methodName, PyAbstractMethod abstractMethod) {
+//        abstractMethods.put(methodName, abstractMethod.getFunction());
+//    }
     
     /**
      * 获取静态方法
@@ -201,5 +215,14 @@ public class MethodRegistry {
                 this.methods.put(entry.getKey(), entry.getValue());
             }
         }
+    }
+
+    public record FunctionParams(List<PyObject> positionArgs,
+                                 Map<String, PyObject> keywordArgs,
+                                 Interpreter interpreter) {}
+
+    @FunctionalInterface
+    public interface FunctionSupplier {
+        PyObject apply(FunctionParams params);
     }
 }

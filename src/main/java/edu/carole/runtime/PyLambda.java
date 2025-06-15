@@ -45,24 +45,23 @@ public class PyLambda extends PyObject {
     public boolean isTruthy() {
         return true;
     }
-    
+
     @Override
-    public PyObject call(List<PyObject> arguments) {
+    public PyObject call(List<PyObject> arguments, Interpreter interpreter) {
         if (arguments.size() != parameters.size()) {
-            throw new RuntimeException("lambda takes " + parameters.size() + 
-                " positional arguments but " + arguments.size() + " were given");
+            throw new RuntimeException("lambda takes " + parameters.size() +
+                    " positional arguments but " + arguments.size() + " were given");
         }
-        
+
         // 创建新的lambda作用域
-        Environment environment = new Environment(closure);
-        
+        Environment environment = new Environment(interpreter, closure);
+
         // 绑定参数
         for (int i = 0; i < parameters.size(); i++) {
             environment.define(parameters.get(i), arguments.get(i));
         }
-        
+
         // 执行lambda体 (单个表达式)
-        Interpreter interpreter = new Interpreter();
         return interpreter.execute(body, environment);
     }
 }

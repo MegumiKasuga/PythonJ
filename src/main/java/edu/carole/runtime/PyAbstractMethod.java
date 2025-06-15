@@ -1,5 +1,7 @@
 package edu.carole.runtime;
 
+import edu.carole.interpreter.Interpreter;
+
 import java.util.function.Function;
 import java.util.List;
 
@@ -25,7 +27,7 @@ public class PyAbstractMethod extends PyObject {
      * @param methodName 方法名
      */
     public PyAbstractMethod(String methodName) {
-        this.function = new PyBuiltinFunction(methodName, (args, kwargs) -> {
+        this.function = new PyBuiltinFunction(methodName, (args, kwargs, inter) -> {
             throw new RuntimeException("NotImplementedError: Abstract method '" + methodName + "' must be implemented by subclass");
         });
         this.isAbstract = true;
@@ -38,9 +40,9 @@ public class PyAbstractMethod extends PyObject {
      */
     public PyAbstractMethod(String methodName, Function<List<PyObject>, PyObject> implementation) {
         if (implementation != null) {
-            this.function = new PyBuiltinFunction(methodName, (args, kwargs) -> implementation.apply(args));
+            this.function = new PyBuiltinFunction(methodName, (args, kwargs, inter) -> implementation.apply(args));
         } else {
-            this.function = new PyBuiltinFunction(methodName, (args, kwargs) -> {
+            this.function = new PyBuiltinFunction(methodName, (args, kwargs, inter) -> {
                 throw new RuntimeException("NotImplementedError: Abstract method '" + methodName + "' must be implemented by subclass");
             });
         }
@@ -62,16 +64,12 @@ public class PyAbstractMethod extends PyObject {
     public boolean isAbstract() {
         return isAbstract;
     }
-    
-    /**
-     * 调用抽象方法
-     * @param args 参数列表
-     * @return 方法返回值
-     */
-    public PyObject call(List<PyObject> args) {
-        return function.call(args);
+
+    @Override
+    public PyObject call(List<PyObject> arguments, Interpreter interpreter) {
+        return function.call(arguments, interpreter);
     }
-    
+
     /**
      * 获取描述器，用于类属性访问
      * @param obj 实例对象

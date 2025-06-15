@@ -233,16 +233,11 @@ public class PyFunction extends PyObject {
     public void setAttribute(String attributeName, PyObject value) {
         attributes.put(attributeName, value);
     }
-
-    @Override
-    public PyObject call(List<PyObject> arguments) {
-        return call(arguments, null);
-    }
     
     @Override
     public PyObject call(List<PyObject> positionalArguments, Map<String, PyObject> keywordArguments, Interpreter interpreter) {
         // Create new function scope
-        Environment environment = new Environment(closure);
+        Environment environment = new Environment(interpreter, closure);
         
         int regularParamCount = parameters.size();
         int posArgCount = positionalArguments.size();
@@ -378,7 +373,7 @@ public class PyFunction extends PyObject {
     @Override
     public PyObject call(List<PyObject> arguments, Interpreter interpreter) {
         // Create new function scope
-        Environment environment = new Environment(closure);
+        Environment environment = new Environment(interpreter, closure);
         
         List<PyObject> actualArguments = new ArrayList<>(arguments);
         
@@ -510,7 +505,7 @@ public class PyFunction extends PyObject {
         if (this.closure != null && functionEnvironment != this.closure) {
             // For nested functions, we need to make sure the closure environment is in the chain
             // Create a synthetic environment that links both the call environment and the closure
-            executionEnvironment = new Environment(functionEnvironment);
+            executionEnvironment = new Environment(interpreter, functionEnvironment);
             
             // Add closure's variables directly to the execution environment
             for (Map.Entry<String, PyObject> entry : closure.getValues().entrySet()) {

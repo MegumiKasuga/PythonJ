@@ -1,5 +1,6 @@
 package edu.carole.runtime;
 
+import edu.carole.interpreter.Interpreter;
 import edu.carole.runtime.base.PyObjectWithMethods;
 import edu.carole.runtime.registry.MethodBuilder;
 import java.util.*;
@@ -66,7 +67,7 @@ public class PyString extends PyObjectWithMethods {
     }
     
     @Override
-    public Iterator<PyObject> iterator() {
+    public Iterator<PyObject> iterator(Interpreter interpreter) {
         return new Iterator<PyObject>() {
             private int index = 0;
             
@@ -94,7 +95,7 @@ public class PyString extends PyObjectWithMethods {
         methodRegistry.registerMethod("__getitem__", MethodBuilder.oneArg(this::getItem));
         methodRegistry.registerMethod("__getslice__", MethodBuilder.varArgs(args ->
                 this.__getslice__(args.get(0), args.size() > 1 ? args.get(1) : PyNone.INSTANCE, args.size() > 2 ? args.get(2) : new PyInt(1))));
-        methodRegistry.registerMethod("__iter__", MethodBuilder.noArgs(() -> new PyIterator(iterator(), "str")));
+        methodRegistry.registerMethod("__iter__", MethodBuilder.noArgs(inter -> new PyIterator(iterator(inter), "str")));
         
         // 比较方法
         methodRegistry.registerMethod("__eq__", MethodBuilder.oneArg(this::__eq__));
@@ -214,11 +215,11 @@ public class PyString extends PyObjectWithMethods {
         throw new RuntimeException("can only concatenate str (not \"" + other.getTypeName() + "\") to str");
     }
 
-    private PyObject __mod__(PyObject other) {
+    private PyObject __mod__(PyObject other, Interpreter interpreter) {
         try {
             PyObject iterator = other.getAttribute("__iter__");
-            PyObject iterResult = iterator.call(List.of());
-            Iterator<PyObject> iter = iterResult.iterator();
+            PyObject iterResult = iterator.call(List.of(), interpreter);
+            Iterator<PyObject> iter = iterResult.iterator(interpreter);
             List<Object> strList = new ArrayList<>();
             PyObject obj;
             while (iter.hasNext()) {
@@ -816,9 +817,9 @@ public class PyString extends PyObjectWithMethods {
         return new PyList(result);
     }
     
-    private PyObject join(PyObject iterable) {
+    private PyObject join(PyObject iterable, Interpreter interpreter) {
         StringBuilder sb = new StringBuilder();
-        Iterator<PyObject> iterator = iterable.iterator();
+        Iterator<PyObject> iterator = iterable.iterator(interpreter);
         
         boolean first = true;
         while (iterator.hasNext()) {

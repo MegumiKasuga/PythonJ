@@ -47,13 +47,14 @@ public abstract class PyFileContext extends PyObject {
 
     public void initAttributes(Map<String, PyObject> attributes) {
         attributes.put("is_open", new BuiltinProperty("is_open",
-                (args, kwargs) -> PyBool.fromValue(isOpen)
+                (args, kwargs, inter) -> PyBool.fromValue(isOpen)
         ));
         attributes.put("mode", new BuiltinProperty("mode",
-                (args, kwargs) -> new PyString(mode)));
+                (args, kwargs, inter) -> new PyString(mode)));
         attributes.put("filename", new BuiltinProperty("filename",
-                (args, kwargs) -> new PyString(path)));
-        attributes.put("close", new PyBuiltinFunction("close", (args, kwargs) ->
+                (args, kwargs, inter) -> new PyString(path)));
+        attributes.put("close", new PyBuiltinFunction("close",
+                (args, kwargs, inter) ->
                 this.contextExit(null, null, null)));
     }
 

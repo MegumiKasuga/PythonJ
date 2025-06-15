@@ -1,7 +1,9 @@
 package edu.carole.runtime.registry;
 
+import edu.carole.interpreter.Interpreter;
 import edu.carole.runtime.*;
 import java.util.List;
+import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.Arrays;
 import java.util.function.Supplier;
@@ -22,6 +24,15 @@ public class MethodBuilder {
             return impl.get();
         };
     }
+
+    public static MethodRegistry.FunctionSupplier noArgs(Function<Interpreter, PyObject> impl) {
+        return params -> {
+            if (!params.positionArgs().isEmpty()) {
+                throw new RuntimeException("method takes no arguments (" + params.positionArgs().size() + " given)");
+            }
+            return impl.apply(params.interpreter());
+        };
+    }
     
     /**
      * 创建一个接受一个参数的方法
@@ -32,6 +43,16 @@ public class MethodBuilder {
                 throw new RuntimeException("method takes exactly 1 argument (" + args.size() + " given)");
             }
             return impl.apply(args.get(0));
+        };
+    }
+
+    public static MethodRegistry.FunctionSupplier oneArg(BiFunction<PyObject, Interpreter, PyObject> impl) {
+        return params -> {
+            List<PyObject> args = params.positionArgs();
+            if (args.size() != 1) {
+                throw new RuntimeException("method takes exactly 1 argument (" + args.size() + " given)");
+            }
+            return impl.apply(args.get(0), params.interpreter());
         };
     }
     
@@ -67,6 +88,16 @@ public class MethodBuilder {
     public static Function<List<PyObject>, PyObject> varArgs(Function<List<PyObject>, PyObject> impl) {
         return impl;
     }
+
+    public static MethodRegistry.FunctionSupplier varArgs(BiFunction<List<PyObject>, Interpreter, PyObject> impl) {
+        return params -> {
+            return impl.apply(params.positionArgs(), params.interpreter());
+        };
+    }
+
+//    public static MethodRegistry.FunctionSupplier varArgs(MethodRegistry.FunctionSupplier sup) {
+//        return sup;
+//    }
     
     /**
      * 创建一个接受指定数量参数的方法

@@ -31,8 +31,8 @@ public class Interpreter implements ASTVisitor<PyObject> {
     
     public Interpreter(IOManager io) {
         this.io = io;
-        this.moduleLoader = new ModuleLoader(io);
-        this.globals = BuiltinFunctions.createGlobalEnvironment(io, moduleLoader);
+        this.moduleLoader = new ModuleLoader(this, io);
+        this.globals = BuiltinFunctions.createGlobalEnvironment(this, io, moduleLoader);
         this.environment = globals;
     }
     
@@ -227,7 +227,7 @@ public class Interpreter implements ASTVisitor<PyObject> {
         } else {
             // Try to iterate through the value
             try {
-                Iterator<PyObject> iterator = value.iterator();
+                Iterator<PyObject> iterator = value.iterator(this);
                 while (iterator.hasNext()) {
                     elements.add(iterator.next());
                 }
@@ -359,7 +359,7 @@ public class Interpreter implements ASTVisitor<PyObject> {
     }
 
     public PyObject visitForStatement(ForStatement statement, PyObject iterable) {
-        Iterator<PyObject> iterator = iterable.iterator();
+        Iterator<PyObject> iterator = iterable.iterator(this);
         boolean brokeOut = false;
         Circle: try {
             while (iterator.hasNext()) {
@@ -451,7 +451,7 @@ public class Interpreter implements ASTVisitor<PyObject> {
         }
         
         // 创建类环境
-        Environment classEnvironment = new Environment(environment);
+        Environment classEnvironment = new Environment(this, environment);
         Environment previous = this.environment;
         Map<String, PyObject> classAttributes = new HashMap<>();
         Map<String, PyProperty> properties = new HashMap<>();
@@ -991,20 +991,20 @@ public class Interpreter implements ASTVisitor<PyObject> {
         return environment.get(name, true);
     }
 
-    public static PyObject dealWithPropertyGet(PyObject input) {
+    public PyObject dealWithPropertyGet(PyObject input) {
         if (!(input instanceof PyProperty property)) {
             return input;
         }
-        return property.call(new ArrayList<>());
+        return property.call(new ArrayList<>(), this);
     }
 
-    public static PyObject dealWithPropertySet(PyObject key, PyObject value) {
+    public PyObject dealWithPropertySet(PyObject key, PyObject value) {
         if (!(key instanceof PyProperty property)) {
             return value;
         }
         ArrayList<PyObject> args = new ArrayList<>();
         args.add(value);
-        property.call(args);
+        property.call(args, this);
         return value;
     }
 
@@ -1386,7 +1386,7 @@ public class Interpreter implements ASTVisitor<PyObject> {
         PyObject iterable = clause.getIterable().accept(this);
         
         // Create new environment for this iteration
-        Environment iterationEnv = new Environment(this.environment);
+        Environment iterationEnv = new Environment(this, this.environment);
         Environment previous = this.environment;
         this.environment = iterationEnv;
         try {
@@ -1401,7 +1401,7 @@ public class Interpreter implements ASTVisitor<PyObject> {
             } else {
                 PyObject iterMethod = iterable.getAttribute("__iter__");
                 PyObject iterResult = iterMethod.call(Collections.emptyList(), this);
-                iterator = iterResult.iterator();
+                iterator = iterResult.iterator(this);
             }
             while (iterator.hasNext()) {
                 PyObject iterElement = iterator.next();
@@ -1545,7 +1545,7 @@ public class Interpreter implements ASTVisitor<PyObject> {
         // Try each case clause until one matches
         for (MatchStatement.CaseClause caseClause : statement.getCases()) {
             // Create a new environment for pattern variable bindings
-            Environment caseEnvironment = new Environment(this.environment);
+            Environment caseEnvironment = new Environment(this, this.environment);
             Environment previous = this.environment;
             
             try {
@@ -1589,7 +1589,7 @@ public class Interpreter implements ASTVisitor<PyObject> {
             }
         }
         if (statement.hasDefaultCase()) {
-            Environment caseEnvironment = new Environment(this.environment);
+            Environment caseEnvironment = new Environment(this, this.environment);
             Environment previous = this.environment;
             try {
                 this.environment = caseEnvironment;
@@ -1714,7 +1714,7 @@ public class Interpreter implements ASTVisitor<PyObject> {
     
     private boolean matchOrPattern(OrPattern pattern, PyObject subject) {
         // Try left pattern first
-        Environment leftEnv = new Environment(this.environment);
+        Environment leftEnv = new Environment(this, this.environment);
         Environment previous = this.environment;
         
         try {
@@ -1729,7 +1729,7 @@ public class Interpreter implements ASTVisitor<PyObject> {
         }
         
         // Try right pattern
-        Environment rightEnv = new Environment(this.environment);
+        Environment rightEnv = new Environment(this, this.environment);
         try {
             this.environment = rightEnv;
             if (matchPattern(pattern.getRight(), subject)) {

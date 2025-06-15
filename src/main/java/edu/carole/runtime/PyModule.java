@@ -7,6 +7,7 @@ import edu.carole.runtime.registry.MethodRegistry;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 
 /**
  * Python模块类型 - 表示一个Python模块
@@ -64,8 +65,8 @@ public class PyModule extends PyObjectWithMethods {
         MethodRegistry methodRegistry = getMethodRegistry();
         
         // 添加标准模块方法
-        methodRegistry.registerMethod("__repr__", args -> new PyString("<module '" + name + "'>"));
-        methodRegistry.registerMethod("__str__", args -> new PyString("<module '" + name + "'>"));
+        methodRegistry.registerMethod("__repr__", (Function<List<PyObject>, PyObject>) args -> new PyString("<module '" + name + "'>"));
+        methodRegistry.registerMethod("__str__", (Function<List<PyObject>, PyObject>) args -> new PyString("<module '" + name + "'>"));
     }
     
     @Override

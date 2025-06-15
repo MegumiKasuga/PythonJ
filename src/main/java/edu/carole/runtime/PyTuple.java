@@ -1,5 +1,6 @@
 package edu.carole.runtime;
 
+import edu.carole.interpreter.Interpreter;
 import edu.carole.runtime.base.PyObjectWithMethods;
 import edu.carole.runtime.registry.MethodBuilder;
 import java.util.*;
@@ -72,7 +73,7 @@ public class PyTuple extends PyObjectWithMethods {
     }
 
     @Override
-    public Iterator<PyObject> iterator() {
+    public Iterator<PyObject> iterator(Interpreter interpreter) {
         return elements.iterator();
     }
 
@@ -134,39 +135,41 @@ public class PyTuple extends PyObjectWithMethods {
         return PyBool.valueOf(!this.equals(other));
     }
     
-    private PyObject __lt__(PyObject other) {
+    private PyObject __lt__(PyObject other, Interpreter interpreter) {
         if (other instanceof PyTuple) {
-            return PyBool.valueOf(compareTo(other) < 0);
+            return PyBool.valueOf(compareTo(other, interpreter) < 0);
         }
         throw new RuntimeException("'<' not supported between instances of 'tuple' and '" + other.getTypeName() + "'");
     }
     
-    private PyObject __le__(PyObject other) {
+    private PyObject __le__(PyObject other, Interpreter interpreter) {
         if (other instanceof PyTuple) {
-            return PyBool.valueOf(compareTo(other) <= 0);
+            return PyBool.valueOf(compareTo(other, interpreter) <= 0);
         }
         throw new RuntimeException("'<=' not supported between instances of 'tuple' and '" + other.getTypeName() + "'");
     }
     
-    private PyObject __gt__(PyObject other) {
+    private PyObject __gt__(PyObject other, Interpreter interpreter) {
         if (other instanceof PyTuple) {
-            return PyBool.valueOf(compareTo(other) > 0);
+            return PyBool.valueOf(compareTo(other, interpreter) > 0);
         }
         throw new RuntimeException("'>' not supported between instances of 'tuple' and '" + other.getTypeName() + "'");
     }
     
-    private PyObject __ge__(PyObject other) {
+    private PyObject __ge__(PyObject other, Interpreter interpreter) {
         if (other instanceof PyTuple) {
-            return PyBool.valueOf(compareTo(other) >= 0);
+            return PyBool.valueOf(compareTo(other, interpreter) >= 0);
         }
         throw new RuntimeException("'>=' not supported between instances of 'tuple' and '" + other.getTypeName() + "'");
     }
     
-    private PyObject __hash__() {        int hash = 1;
+    private PyObject __hash__(Interpreter interpreter) {
+        int hash = 1;
         for (PyObject element : elements) {
             // Call the __hash__ method on each element
             PyObject hashMethod = element.getAttribute("__hash__");
-            PyObject elementHash = hashMethod.call(java.util.List.of());            if (elementHash instanceof PyInt) {
+            PyObject elementHash = hashMethod.call(java.util.List.of(), interpreter);
+            if (elementHash instanceof PyInt) {
                 hash = 31 * hash + (int)((PyInt) elementHash).getValue();
             } else {
                 throw new RuntimeException("unhashable type: '" + element.getTypeName() + "'");
@@ -303,7 +306,7 @@ public class PyTuple extends PyObjectWithMethods {
     /**
      * Helper method to compare tuples lexicographically (element by element)
      */
-    private int compareTo(PyObject other) {
+    private int compareTo(PyObject other, Interpreter interpreter) {
         List<PyObject> otherElements;
         if (other instanceof PyTuple) {
             otherElements = ((PyTuple) other).elements;
@@ -321,7 +324,7 @@ public class PyTuple extends PyObjectWithMethods {
             try {
                 // Check if elements are equal
                 PyObject eqMethod = elem1.getAttribute("__eq__");
-                PyObject eqResult = eqMethod.call(java.util.List.of(elem2));
+                PyObject eqResult = eqMethod.call(java.util.List.of(elem2), interpreter);
                 if (eqResult instanceof PyBool && ((PyBool) eqResult).getValue()) {
                     continue; // Elements are equal, continue with next elements
                 }
@@ -329,7 +332,7 @@ public class PyTuple extends PyObjectWithMethods {
                 // Try to use less than comparison
                 try {
                     PyObject ltMethod = elem1.getAttribute("__lt__");
-                    PyObject ltResult = ltMethod.call(java.util.List.of(elem2));
+                    PyObject ltResult = ltMethod.call(java.util.List.of(elem2), interpreter);
                     if (ltResult instanceof PyBool) {
                         boolean isLess = ((PyBool) ltResult).getValue();
                         if (isLess) return -1; // elem1 < elem2

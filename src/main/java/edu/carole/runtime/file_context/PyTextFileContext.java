@@ -72,8 +72,8 @@ public class PyTextFileContext extends PyFileContext {
     @Override
     public void initAttributes(Map<String, PyObject> attributes) {
         super.initAttributes(attributes);
-        attributes.put("charset", new BuiltinProperty("charset", (args, kwargs) -> new PyString(charSet)));
-        attributes.put("read", new PyBuiltinFunction("read", (args, kwargs) -> {
+        attributes.put("charset", new BuiltinProperty("charset", (args, kwargs, inter) -> new PyString(charSet)));
+        attributes.put("read", new PyBuiltinFunction("read", (args, kwargs, inter) -> {
             if (args.size() == 0) {
                 return read();
             } else if (args.size() == 1) {
@@ -82,31 +82,31 @@ public class PyTextFileContext extends PyFileContext {
                 throw new RuntimeException("read() takes at most 1 argument (" + args.size() + " given)");
             }
         }));
-        attributes.put("readline", new PyBuiltinFunction("readline", (args, kwargs) -> {
+        attributes.put("readline", new PyBuiltinFunction("readline", (args, kwargs, inter) -> {
             if (args.size() != 0) {
                 throw new RuntimeException("readline() takes no arguments (" + args.size() + " given)");
             }
             return readline();
         }));
-        attributes.put("readlines", new PyBuiltinFunction("readlines", (args, kwargs) -> {
+        attributes.put("readlines", new PyBuiltinFunction("readlines", (args, kwargs, inter) -> {
             if (args.size() != 0) {
                 throw new RuntimeException("readlines() takes no arguments (" + args.size() + " given)");
             }
             return readlines();
         }));
-        attributes.put("write", new PyBuiltinFunction("write", (args, kwargs) -> {
+        attributes.put("write", new PyBuiltinFunction("write", (args, kwargs, inter) -> {
             if (args.size() != 1) {
                 throw new RuntimeException("write() takes exactly one argument (" + args.size() + " given)");
             }
             return write(args.get(0));
         }));
-        attributes.put("writelines", new PyBuiltinFunction("writelines", (args, kwargs) -> {
+        attributes.put("writelines", new PyBuiltinFunction("writelines", (args, kwargs, inter) -> {
             if (args.size() != 1) {
                 throw new RuntimeException("writelines() takes exactly one argument (" + args.size() + " given)");
             }
             return writelines(args.get(0));
         }));
-        attributes.put("flush", new PyBuiltinFunction("flush", (args, kwargs) -> {
+        attributes.put("flush", new PyBuiltinFunction("flush", (args, kwargs, inter) -> {
             if (args.size() != 0) {
                 throw new RuntimeException("flush() takes no arguments (" + args.size() + " given)");
             }

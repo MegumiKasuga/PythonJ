@@ -1,5 +1,6 @@
 package edu.carole.runtime;
 
+import edu.carole.interpreter.Interpreter;
 import edu.carole.runtime.base.PyObjectWithMethods;
 import edu.carole.runtime.registry.MethodBuilder;
 
@@ -92,7 +93,7 @@ public class PyByteArray extends PyObjectWithMethods {
     }
     
     @Override
-    public Iterator<PyObject> iterator() {
+    public Iterator<PyObject> iterator(Interpreter interpreter) {
         return new Iterator<PyObject>() {
             private int index = 0;
             
@@ -114,8 +115,8 @@ public class PyByteArray extends PyObjectWithMethods {
     @Override
     protected void registerMethods() {
         // Iterator method
-        methodRegistry.registerMethod("__iter__", MethodBuilder.noArgs(() ->
-            new PyIterator(iterator(), "bytearray_iterator")
+        methodRegistry.registerMethod("__iter__", MethodBuilder.noArgs(inter ->
+            new PyIterator(iterator(inter), "bytearray_iterator")
         ));
         
         // Append method
@@ -130,7 +131,8 @@ public class PyByteArray extends PyObjectWithMethods {
         methodRegistry.registerMethod("__add__", MethodBuilder.oneArg(this::add));
         methodRegistry.registerMethod("__eq__", MethodBuilder.oneArg(this::eq));
         methodRegistry.registerMethod("__ne__", MethodBuilder.oneArg(this::ne));
-        methodRegistry.registerMethod("__len__", MethodBuilder.noArgs(() ->new PyInt(this.value.length)));        methodRegistry.registerMethod("__getitem__", MethodBuilder.oneArg(this::getItem));
+        methodRegistry.registerMethod("__len__", MethodBuilder.noArgs(() ->new PyInt(this.value.length)));
+        methodRegistry.registerMethod("__getitem__", MethodBuilder.oneArg(this::getItem));
         methodRegistry.registerMethod("__getslice__", MethodBuilder.varArgs(args ->
                 this.__getslice__(args.get(0), args.size() > 1 ? args.get(1) : PyNone.INSTANCE, args.size() > 2 ? args.get(2) : new PyInt(1))));
         methodRegistry.registerMethod("__setitem__", MethodBuilder.twoArgs(args -> {
@@ -139,7 +141,7 @@ public class PyByteArray extends PyObjectWithMethods {
         }));
         methodRegistry.registerMethod("__setslice__", MethodBuilder.varArgs(args ->
                 this.__setslice__(args.get(0), args.size() > 1 ? args.get(1) : PyNone.INSTANCE, args.size() > 2 ? args.get(2) : new PyInt(1), args.get(args.size() - 1))));
-        methodRegistry.registerMethod("__contains__", MethodBuilder.oneArg(this::contains));
+        methodRegistry.registerMethod("__contains__", MethodBuilder.oneArg(obj -> this.contains(obj)));
         
         // Mutating methods
         methodRegistry.registerMethod("clear", MethodBuilder.noArgs(this::clear));
@@ -202,11 +204,11 @@ public class PyByteArray extends PyObjectWithMethods {
         return PyNone.INSTANCE;
     }
     
-    private PyObject extend(PyObject iterable) {
+    private PyObject extend(PyObject iterable, Interpreter interpreter) {
         List<Byte> bytesToAdd = new ArrayList<>();
         
         try {
-            Iterator<PyObject> iterator = iterable.iterator();
+            Iterator<PyObject> iterator = iterable.iterator(interpreter);
             while (iterator.hasNext()) {
                 PyObject item = iterator.next();                if (!(item instanceof PyInt)) {
                     throw new RuntimeException("an integer is required");
@@ -710,11 +712,11 @@ public class PyByteArray extends PyObjectWithMethods {
         return indexOf(needle, 0, haystack.length);
     }
     
-    private PyObject join(PyObject iterable) {
+    private PyObject join(PyObject iterable, Interpreter interpreter) {
         List<byte[]> parts = new ArrayList<>();
         int totalLength = 0;
         
-        Iterator<PyObject> iterator = iterable.iterator();
+        Iterator<PyObject> iterator = iterable.iterator(interpreter);
         while (iterator.hasNext()) {
             PyObject item = iterator.next();
             byte[] bytes = getBytes(item);

@@ -63,7 +63,7 @@ public class BuiltinProperty extends AbstractProperty {
         if (args.size() == 1) {
             PyObject oldValue = getCache();
             runListener(this, true, true, oldValue, oldValue);
-            PyObject neoValue = getGetter().call(args);
+            PyObject neoValue = getGetter().call(args, interpreter);
             setCache(neoValue);
             runListener(this, true, false, oldValue, neoValue);
             return neoValue;
@@ -73,7 +73,7 @@ public class BuiltinProperty extends AbstractProperty {
             }
             PyObject oldValue = getCache();
             runListener(this, false, true, oldValue, oldValue);
-            PyObject result = getSetter().call(args);
+            PyObject result = getSetter().call(args, interpreter);
             runListener(this, false, false, oldValue, getCache());
             return result;
         } else {

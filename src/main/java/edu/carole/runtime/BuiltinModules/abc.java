@@ -16,7 +16,7 @@ public class abc {
 
         // Add abstractmethod decorator
         module.setAttribute("abstractmethod", new PyBuiltinFunction("abstractmethod",
-                (args, kwargs) -> {
+                (args, kwargs, interpreter) -> {
                     if (args.size() != 1) {
                         throw new RuntimeException("@abstractmethod takes exactly 1 argument");
                     }
@@ -33,7 +33,7 @@ public class abc {
 
         // Add abstractproperty decorator
         module.setAttribute("abstractproperty", new PyBuiltinFunction("abstractproperty",
-                (args, kwargs) -> {
+                (args, kwargs, interpreter) -> {
                     if (args.size() != 1) {
                         throw new RuntimeException("@abstractproperty takes exactly 1 argument");
                     }

@@ -23,39 +23,39 @@ public class PyBinaryFileContext extends PyFileContext {
     @Override
     public void initAttributes(Map<String, PyObject> attributes) {
         super.initAttributes(attributes);
-        attributes.put("read", new PyBuiltinFunction("read", (args, kwargs) -> {
+        attributes.put("read", new PyBuiltinFunction("read", (args, kwargs, inter) -> {
             if (args.size() > 1) {
                 throw new RuntimeException("read() takes at most 1 argument (" + args.size() + " given)");
             }
             return read(args.isEmpty() ? null : args.get(0));
         }));
-        attributes.put("write", new PyBuiltinFunction("write", (args, kwargs) -> {
+        attributes.put("write", new PyBuiltinFunction("write", (args, kwargs, inter) -> {
             if (args.size() != 1) {
                 throw new RuntimeException("write() takes exactly one argument (" + args.size() + " given)");
             }
             return write(args.get(0));
         }));
-        attributes.put("flush", new PyBuiltinFunction("flush", (args, kwargs) -> {
+        attributes.put("flush", new PyBuiltinFunction("flush", (args, kwargs, inter) -> {
             if (args.size() != 0) {
                 throw new RuntimeException("flush() takes no arguments (" + args.size() + " given)");
             }
             return flush();
         }));
-        attributes.put("skip", new PyBuiltinFunction("skip", (args, kwargs) -> {
+        attributes.put("skip", new PyBuiltinFunction("skip", (args, kwargs, inter) -> {
             if (args.size() != 1) {
                 throw new RuntimeException("write() takes exactly one argument (" + args.size() + " given)");
             }
             return skip(args.get(0));
         }));
-        attributes.put("available", new BuiltinProperty("available", (args, kwargs) -> {
+        attributes.put("available", new BuiltinProperty("available", (args, kwargs, inter) -> {
             if (!isOpen() || !readingMode()) return new PyInt(0);
             if (inStream == null) return new PyInt(0);
             return new PyInt(inStream.available());
         }));
-        attributes.put("__iter__", new PyBuiltinFunction("__iter__", (args, kwargs) -> {
+        attributes.put("__iter__", new PyBuiltinFunction("__iter__", (args, kwargs, inter) -> {
             return PyNone.INSTANCE;
         }));
-        attributes.put("__next__", new PyBuiltinFunction("__next__", (args, kwargs) -> {
+        attributes.put("__next__", new PyBuiltinFunction("__next__", (args, kwargs, inter) -> {
             try {
                 return readOneByte();
             } catch (RuntimeException e) {

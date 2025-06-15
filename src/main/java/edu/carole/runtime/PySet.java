@@ -1,5 +1,6 @@
 package edu.carole.runtime;
 
+import edu.carole.interpreter.Interpreter;
 import edu.carole.runtime.base.PyObjectWithMethods;
 import edu.carole.runtime.registry.MethodBuilder;
 
@@ -53,7 +54,7 @@ public class PySet extends PyObjectWithMethods {
     }
     
     @Override
-    public Iterator<PyObject> iterator() {
+    public Iterator<PyObject> iterator(Interpreter interpreter) {
         return elements.iterator();
     }
 
@@ -163,10 +164,10 @@ public class PySet extends PyObjectWithMethods {
         return PyBool.valueOf(elements.containsAll(otherSet));
     }
 
-    private PyObject union(List<PyObject> args) {
+    private PyObject union(List<PyObject> args, Interpreter interpreter) {
         Set<PyObject> result = new HashSet<>(elements);
         for (PyObject arg : args) {
-            Iterator<PyObject> iterator = arg.iterator();
+            Iterator<PyObject> iterator = arg.iterator(interpreter);
             while (iterator.hasNext()) {
                 result.add(iterator.next());
             }
@@ -174,11 +175,11 @@ public class PySet extends PyObjectWithMethods {
         return new PySet(result);
     }
 
-    private PyObject intersection(List<PyObject> args) {
+    private PyObject intersection(List<PyObject> args, Interpreter interpreter) {
         Set<PyObject> result = new HashSet<>(elements);
         for (PyObject arg : args) {
             Set<PyObject> argSet = new HashSet<>();
-            Iterator<PyObject> iterator = arg.iterator();
+            Iterator<PyObject> iterator = arg.iterator(interpreter);
             while (iterator.hasNext()) {
                 argSet.add(iterator.next());
             }
@@ -189,10 +190,10 @@ public class PySet extends PyObjectWithMethods {
         return new PySet(result);
     }
 
-    private PyObject difference(List<PyObject> args) {
+    private PyObject difference(List<PyObject> args, Interpreter interpreter) {
         Set<PyObject> result = new HashSet<>(elements);
         for (PyObject arg : args) {
-            Iterator<PyObject> iterator = arg.iterator();
+            Iterator<PyObject> iterator = arg.iterator(interpreter);
             while (iterator.hasNext()) {
                 result.remove(iterator.next());
             }
@@ -218,27 +219,27 @@ public class PySet extends PyObjectWithMethods {
         return PyBool.valueOf(this.elements.contains(arg));
     }
 
-    private PyObject or(PyObject arg) {
-        return union(List.of(arg));
+    private PyObject or(PyObject arg, Interpreter interpreter) {
+        return union(List.of(arg), interpreter);
     }
 
-    private PyObject and(PyObject arg) {
-        return intersection(List.of(arg));
+    private PyObject and(PyObject arg, Interpreter interpreter) {
+        return intersection(List.of(arg), interpreter);
     }
 
-    private PyObject sub(PyObject arg) {
-        return difference(List.of(arg));
+    private PyObject sub(PyObject arg, Interpreter interpreter) {
+        return difference(List.of(arg), interpreter);
     }
 
-    private PyObject xor(PyObject other) {
-        return symmetricDifference(other);
+    private PyObject xor(PyObject other, Interpreter interpreter) {
+        return symmetricDifference(other, interpreter);
     }
 
-    private PyObject symmetricDifference(PyObject other) {
+    private PyObject symmetricDifference(PyObject other, Interpreter interpreter) {
         Set<PyObject> result = new HashSet<>(elements);
         Set<PyObject> otherSet = new HashSet<>();
 
-        Iterator<PyObject> iterator = other.iterator();
+        Iterator<PyObject> iterator = other.iterator(interpreter);
         while (iterator.hasNext()) {
             otherSet.add(iterator.next());
         }
@@ -255,8 +256,8 @@ public class PySet extends PyObjectWithMethods {
         return new PySet(result);
     }
 
-    private PyObject isdisjoint(PyObject other) {
-        Iterator<PyObject> iterator = other.iterator();
+    private PyObject isdisjoint(PyObject other, Interpreter interpreter) {
+        Iterator<PyObject> iterator = other.iterator(interpreter);
         while (iterator.hasNext()) {
             if (elements.contains(iterator.next())) {
                 return PyBool.FALSE;
@@ -265,9 +266,9 @@ public class PySet extends PyObjectWithMethods {
         return PyBool.TRUE;
     }
 
-    private PyObject update(List<PyObject> args) {
+    private PyObject update(List<PyObject> args, Interpreter interpreter) {
         for (PyObject arg : args) {
-            Iterator<PyObject> iterator = arg.iterator();
+            Iterator<PyObject> iterator = arg.iterator(interpreter);
             while (iterator.hasNext()) {
                 elements.add(iterator.next());
             }
@@ -275,10 +276,10 @@ public class PySet extends PyObjectWithMethods {
         return PyNone.INSTANCE;
     }
 
-    private PyObject intersectionUpdate(List<PyObject> args) {
+    private PyObject intersectionUpdate(List<PyObject> args, Interpreter interpreter) {
         for (PyObject arg : args) {
             Set<PyObject> argSet = new HashSet<>();
-            Iterator<PyObject> iterator = arg.iterator();
+            Iterator<PyObject> iterator = arg.iterator(interpreter);
             while (iterator.hasNext()) {
                 argSet.add(iterator.next());
             }
@@ -287,9 +288,9 @@ public class PySet extends PyObjectWithMethods {
         return PyNone.INSTANCE;
     }
 
-    private PyObject differenceUpdate(List<PyObject> args) {
+    private PyObject differenceUpdate(List<PyObject> args, Interpreter interpreter) {
         for (PyObject arg : args) {
-            Iterator<PyObject> iterator = arg.iterator();
+            Iterator<PyObject> iterator = arg.iterator(interpreter);
             while (iterator.hasNext()) {
                 elements.remove(iterator.next());
             }
@@ -297,10 +298,10 @@ public class PySet extends PyObjectWithMethods {
         return PyNone.INSTANCE;
     }
 
-    private PyObject symmetricDifferenceUpdate(PyObject other) {
+    private PyObject symmetricDifferenceUpdate(PyObject other, Interpreter interpreter) {
         Set<PyObject> otherSet = new HashSet<>();
 
-        Iterator<PyObject> iterator = other.iterator();
+        Iterator<PyObject> iterator = other.iterator(interpreter);
         while (iterator.hasNext()) {
             otherSet.add(iterator.next());
         }

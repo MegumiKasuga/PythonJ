@@ -86,32 +86,27 @@ public class PyGenerator extends PyObject implements Iterable<PyObject> {
     
     @Override
     public PyObject getAttribute(String name) {
-        switch (name) {
-            case "__iter__":
-                return new PyBuiltinFunction("__iter__", (args, kwargs) -> {
-                    if (args.size() != 0) {
-                        throw new RuntimeException("__iter__() takes no arguments (" + args.size() + " given)");
-                    }
-                    return this; // Generators return themselves for __iter__
-                });
-                
-            case "__next__":
-                return new PyBuiltinFunction("__next__", (args, kwargs) -> {
-                    if (args.size() != 0) {
-                        throw new RuntimeException("__next__() takes no arguments (" + args.size() + " given)");
-                    }
-                    Iterator<PyObject> iter = getCurrentIterator();
-                    if (iter.hasNext()) {
-                        return iter.next();
-                    } else {
-                        exhausted = true;
-                        throw new RuntimeException("StopIteration");
-                    }
-                });
-                
-            default:
-                return super.getAttribute(name);
-        }
+        return switch (name) {
+            case "__iter__" -> new PyBuiltinFunction("__iter__", (args, kwargs, inter) -> {
+                if (args.size() != 0) {
+                    throw new RuntimeException("__iter__() takes no arguments (" + args.size() + " given)");
+                }
+                return this; // Generators return themselves for __iter__
+            });
+            case "__next__" -> new PyBuiltinFunction("__next__", (args, kwargs, inter) -> {
+                if (args.size() != 0) {
+                    throw new RuntimeException("__next__() takes no arguments (" + args.size() + " given)");
+                }
+                Iterator<PyObject> iter = getCurrentIterator();
+                if (iter.hasNext()) {
+                    return iter.next();
+                } else {
+                    exhausted = true;
+                    throw new RuntimeException("StopIteration");
+                }
+            });
+            default -> super.getAttribute(name);
+        };
     }
     
     class GeneratorIterator implements Iterator<PyObject> {
@@ -140,7 +135,7 @@ public class PyGenerator extends PyObject implements Iterable<PyObject> {
         
         void generateValues() {
             values = new ArrayList<>();
-            generateRecursive(0, new Environment(closure));
+            generateRecursive(0, new Environment(interpreter, closure));
         }
 
         private void generateRecursive(int clauseIndex, Environment env) {
@@ -166,14 +161,14 @@ public class PyGenerator extends PyObject implements Iterable<PyObject> {
                 // Support all iterable objects
                 Iterator<PyObject> iterator;
                 try {
-                    iterator = iterable.iterator();
+                    iterator = iterable.iterator(interpreter);
                 } catch (Exception e) {
                     throw new RuntimeException("'" + iterable.getTypeName() + "' object is not iterable");
                 }
                 
                 while (iterator.hasNext()) {
                     PyObject item = iterator.next();
-                    Environment newEnv = new Environment(env);
+                    Environment newEnv = new Environment(interpreter, env);
                     newEnv.define(clause.getVariable(), item);
                     
                     // 检查条件

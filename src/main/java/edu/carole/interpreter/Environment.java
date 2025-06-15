@@ -15,12 +15,15 @@ public class Environment {
     private final Map<String, PyObject> values = new HashMap<>();
     private PyClass currentClass; // 当前类上下文（用于super()）
     private PyInstance currentInstance; // 当前实例上下文（用于super()）
+    private final Interpreter interpreter;
     
-    public Environment() {
+    public Environment(Interpreter interpreter) {
+        this.interpreter = interpreter;
         this.enclosing = null;
     }
     
-    public Environment(Environment enclosing) {
+    public Environment(Interpreter interpreter, Environment enclosing) {
+        this.interpreter = interpreter;
         this.enclosing = enclosing;
     }
     
@@ -39,12 +42,12 @@ public class Environment {
         dealWithPropertySet(name, value, values);
     }
 
-    public static void dealWithPropertySet(String name, PyObject value, Map<String, PyObject> values) {
+    public void dealWithPropertySet(String name, PyObject value, Map<String, PyObject> values) {
         if (values.containsKey(name) &&
                 values.get(name) instanceof PyProperty prop) {
             ArrayList<PyObject> args = new ArrayList<>();
             args.add(value);
-            PyObject result = prop.call(args);
+            PyObject result = prop.call(args, interpreter);
             if (result == prop) {
                 values.put(name, prop);
             }

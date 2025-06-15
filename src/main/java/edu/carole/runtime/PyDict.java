@@ -1,5 +1,6 @@
 package edu.carole.runtime;
 
+import edu.carole.interpreter.Interpreter;
 import edu.carole.runtime.base.PyObjectWithMethods;
 import edu.carole.runtime.registry.MethodRegistry;
 import edu.carole.runtime.registry.MethodBuilder;
@@ -43,12 +44,12 @@ public class PyDict extends PyObjectWithMethods {
         methodRegistry.registerMethod("keys", MethodBuilder.noArgs(this::keys));
         methodRegistry.registerMethod("values", MethodBuilder.noArgs(this::values));
         methodRegistry.registerMethod("items", MethodBuilder.noArgs(this::items));
-        methodRegistry.registerMethod("get", MethodBuilder.varArgs(this::get));
-        methodRegistry.registerMethod("pop", MethodBuilder.varArgs(this::pop));
+        methodRegistry.registerMethod("get", MethodBuilder.varArgs(args -> this.get(args)));
+        methodRegistry.registerMethod("pop", MethodBuilder.varArgs(args -> this.pop(args)));
         methodRegistry.registerMethod("popitem", MethodBuilder.noArgs(this::popitem));
         methodRegistry.registerMethod("clear", MethodBuilder.noArgs(this::clear));
         methodRegistry.registerMethod("update", MethodBuilder.oneArg(this::update));
-        methodRegistry.registerMethod("setdefault", MethodBuilder.varArgs(this::setdefault));
+        methodRegistry.registerMethod("setdefault", MethodBuilder.varArgs(args -> this.setdefault(args)));
         methodRegistry.registerMethod("copy", MethodBuilder.noArgs(this::copy));
         
         // Static methods
@@ -56,7 +57,7 @@ public class PyDict extends PyObjectWithMethods {
     }
     
     // Static method implementation
-    private static PyObject fromkeys(List<PyObject> args) {
+    private static PyObject fromkeys(List<PyObject> args, Interpreter interpreter) {
         if (args.size() < 1 || args.size() > 2) {
             throw new RuntimeException("fromkeys() takes 1 or 2 positional arguments but " + args.size() + " were given");
         }
@@ -65,7 +66,7 @@ public class PyDict extends PyObjectWithMethods {
         PyObject defaultValue = args.size() > 1 ? args.get(1) : PyNone.INSTANCE;
         
         PyDict result = new PyDict();
-        Iterator<PyObject> iterator = iterable.iterator();
+        Iterator<PyObject> iterator = iterable.iterator(interpreter);
         while (iterator.hasNext()) {
             PyObject key = iterator.next();
             result.entries.put(key, defaultValue);
@@ -302,13 +303,13 @@ public class PyDict extends PyObjectWithMethods {
         return PyNone.INSTANCE;
     }
     
-    private PyObject update(PyObject other) {
+    private PyObject update(PyObject other, Interpreter interpreter) {
         if (other instanceof PyDict) {
             PyDict otherDict = (PyDict) other;
             entries.putAll(otherDict.getEntries());
         } else {
             // Handle iterable of key-value pairs
-            Iterator<PyObject> iterator = other.iterator();
+            Iterator<PyObject> iterator = other.iterator(interpreter);
             while (iterator.hasNext()) {
                 PyObject item = iterator.next();
                 if (item instanceof PyTuple) {

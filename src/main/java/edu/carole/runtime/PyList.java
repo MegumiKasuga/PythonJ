@@ -1,5 +1,6 @@
 package edu.carole.runtime;
 
+import edu.carole.interpreter.Interpreter;
 import edu.carole.runtime.base.PyObjectWithMethods;
 import edu.carole.runtime.registry.MethodRegistry;
 import edu.carole.runtime.registry.MethodBuilder;
@@ -332,14 +333,14 @@ public class PyList extends PyObjectWithMethods {
         return new PyIterator(reversedElements.iterator(), "list_reverseiterator");
     }
     
-    private PyObject __iadd__(PyObject other) {
+    private PyObject __iadd__(PyObject other, Interpreter interpreter) {
         if (other instanceof PyList) {
             this.elements.addAll(((PyList) other).getElements());
             return this;
         } else {
             // Try to iterate over the object
             try {
-                Iterator<PyObject> iterator = other.iterator();
+                Iterator<PyObject> iterator = other.iterator(interpreter);
                 while (iterator.hasNext()) {
                     this.elements.add(iterator.next());
                 }
@@ -373,8 +374,8 @@ public class PyList extends PyObjectWithMethods {
         return PyNone.INSTANCE;
     }
     
-    private PyObject extend(PyObject iterable) {
-        Iterator<PyObject> iterator = iterable.iterator();
+    private PyObject extend(PyObject iterable, Interpreter interpreter) {
+        Iterator<PyObject> iterator = iterable.iterator(interpreter);
         while (iterator.hasNext()) {
             elements.add(iterator.next());
         }

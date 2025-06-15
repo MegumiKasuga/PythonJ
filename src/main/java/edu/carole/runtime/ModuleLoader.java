@@ -7,6 +7,8 @@ import edu.carole.lexer.Lexer;
 import edu.carole.parser.Parser;
 import edu.carole.ast.statements.Program;
 import edu.carole.runtime.io.IOManager;
+import lombok.NonNull;
+import lombok.Setter;
 
 import java.io.*;
 import java.nio.charset.Charset;
@@ -22,9 +24,12 @@ public class ModuleLoader {
     private final List<String> modulePaths;
     private final Map<String, PyModule> builtinModules;
     private final IOManager io;
+
+    private final Interpreter interpreter;
     
-    public ModuleLoader(IOManager io) {
+    public ModuleLoader(Interpreter interpreter, IOManager io) {
         this.io = io;
+        this.interpreter = interpreter;
         this.loadedModules = new HashMap<>();
         this.modulePaths = new ArrayList<>();
         this.builtinModules = new HashMap<>();
@@ -170,14 +175,13 @@ public class ModuleLoader {
         Program program = parser.parse();
         
         // Create module environment
-        Environment moduleEnv = new Environment();
+        Environment moduleEnv = new Environment(interpreter);
         
         // Set module attributes
         moduleEnv.define("__name__", new PyString(moduleName));
         moduleEnv.define("__file__", new PyString(filePath));
         
         // Execute module code
-        Interpreter interpreter = new Interpreter();
         interpreter.setEnvironment(moduleEnv);
         interpreter.visitProgram(program);
         
@@ -209,10 +213,10 @@ public class ModuleLoader {
      * Create the functools builtin module
      */
     private Environment createFunctoolsModule() {
-        Environment env = new Environment();
+        Environment env = new Environment(interpreter);
         
         // Add functools.reduce - simplified implementation
-        env.define("reduce", new PyBuiltinFunction("reduce", (args, kwargs) -> {
+        env.define("reduce", new PyBuiltinFunction("reduce", (args, kwargs, inter) -> {
             if (args.size() < 2 || args.size() > 3) {
                 throw new RuntimeException("reduce expected 2 or 3 arguments, got " + args.size());
             }
@@ -226,7 +230,7 @@ public class ModuleLoader {
             boolean first = true;
             
             try {
-                java.util.Iterator<PyObject> iterator = iterable.iterator();
+                java.util.Iterator<PyObject> iterator = iterable.iterator(inter);
                 while (iterator.hasNext()) {
                     PyObject element = iterator.next();
                     if (first && result == null) {
@@ -236,7 +240,7 @@ public class ModuleLoader {
                         java.util.List<PyObject> funcArgs = new java.util.ArrayList<>();
                         funcArgs.add(result);
                         funcArgs.add(element);
-                        result = function.call(funcArgs);
+                        result = function.call(funcArgs, inter);
                     }
                 }
             } catch (Exception e) {
@@ -247,7 +251,7 @@ public class ModuleLoader {
         }));
         
         // Add functools.partial (placeholder implementation)
-        env.define("partial", new PyBuiltinFunction("partial", (args, kwargs) -> {
+        env.define("partial", new PyBuiltinFunction("partial", (args, kwargs, inter) -> {
             if (args.size() < 1) {
                 throw new RuntimeException("partial expected at least 1 argument, got " + args.size());
             }
@@ -262,7 +266,7 @@ public class ModuleLoader {
      * Create the sys builtin module
      */
     private Environment createSysModule() {
-        Environment env = new Environment();
+        Environment env = new Environment(interpreter);
         
         // Add sys.version
         env.define("version", new PyString("3.8.0 (JythonKernel)"));
@@ -281,9 +285,9 @@ public class ModuleLoader {
      * Create the os builtin module
      */
     private Environment createOsModule() {
-        Environment env = new Environment();
+        Environment env = new Environment(interpreter);
           // Add os.getcwd
-        env.define("getcwd", new PyBuiltinFunction("getcwd", (args, kwargs) -> {
+        env.define("getcwd", new PyBuiltinFunction("getcwd", (args, kwargs, inter) -> {
             if (args.size() != 0) {
                 throw new RuntimeException("getcwd() takes no arguments");
             }

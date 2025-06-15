@@ -1,5 +1,7 @@
 package edu.carole.runtime;
 
+import edu.carole.interpreter.Interpreter;
+
 import java.util.*;
 
 /**
@@ -24,27 +26,29 @@ public class PyBoundMethod extends PyObject {
     
     @Override
     public boolean isTruthy() { return true; }
-      @Override
-    public PyObject call(List<PyObject> arguments) {
-        List<PyObject> boundArgs = new ArrayList<>();
-        boundArgs.add(instance);
-        boundArgs.addAll(arguments);
-        return method.call(boundArgs);
-    }
     
     @Override
     public PyObject call(List<PyObject> arguments, edu.carole.interpreter.Interpreter interpreter) {
+        return call(arguments, null, interpreter);
+    }
+
+    @Override
+    public PyObject call(List<PyObject> arguments, Map<String, PyObject> keywordArguments, Interpreter interpreter) {
         List<PyObject> boundArgs = new ArrayList<>();
         boundArgs.add(instance);
         boundArgs.addAll(arguments);
-        
+
         // 设置方法调用上下文（用于super()）
         if (interpreter != null) {
             edu.carole.interpreter.Environment env = interpreter.getEnvironment();
             env.setCurrentClass(instance.getPyClass());
             env.setCurrentInstance(instance);
         }
-        
-        return method.call(boundArgs, interpreter);
+
+        if (keywordArguments != null && !keywordArguments.isEmpty()) {
+            return method.call(boundArgs, keywordArguments, interpreter);
+        } else {
+            return method.call(boundArgs, interpreter);
+        }
     }
 }

@@ -60,7 +60,7 @@ public abstract class PyMutableMapping extends PyMapping {
     public PyObject getAttribute(String name) {
         switch (name) {
             case "__setitem__":
-                return new PyBuiltinFunction("__setitem__", (args, kwargs) -> {
+                return new PyBuiltinFunction("__setitem__", (args, kwargs, inter) -> {
                     if (args.size() != 2) {
                         throw new RuntimeException("__setitem__() takes exactly 2 arguments (" + args.size() + " given)");
                     }
@@ -69,7 +69,7 @@ public abstract class PyMutableMapping extends PyMapping {
                 });
                 
             case "__delitem__":
-                return new PyBuiltinFunction("__delitem__", (args, kwargs) -> {
+                return new PyBuiltinFunction("__delitem__", (args, kwargs, inter) -> {
                     if (args.size() != 1) {
                         throw new RuntimeException("__delitem__() takes exactly 1 argument (" + args.size() + " given)");
                     }
@@ -78,7 +78,7 @@ public abstract class PyMutableMapping extends PyMapping {
                 });
                 
             case "clear":
-                return new PyBuiltinFunction("clear", (args, kwargs) -> {
+                return new PyBuiltinFunction("clear", (args, kwargs, inter) -> {
                     if (args.size() != 0) {
                         throw new RuntimeException("clear() takes no arguments (" + args.size() + " given)");
                     }
@@ -87,7 +87,7 @@ public abstract class PyMutableMapping extends PyMapping {
                 });
                 
             case "pop":
-                return new PyBuiltinFunction("pop", (args, kwargs) -> {
+                return new PyBuiltinFunction("pop", (args, kwargs, inter) -> {
                     if (args.size() < 1 || args.size() > 2) {
                         throw new RuntimeException("pop() takes from 1 to 2 arguments but " + args.size() + " were given");
                     }
@@ -96,7 +96,7 @@ public abstract class PyMutableMapping extends PyMapping {
                 });
                 
             case "popitem":
-                return new PyBuiltinFunction("popitem", (args, kwargs) -> {
+                return new PyBuiltinFunction("popitem", (args, kwargs, inter) -> {
                     if (args.size() != 0) {
                         throw new RuntimeException("popitem() takes no arguments (" + args.size() + " given)");
                     }
@@ -104,7 +104,7 @@ public abstract class PyMutableMapping extends PyMapping {
                 });
                 
             case "update":
-                return new PyBuiltinFunction("update", (args, kwargs) -> {
+                return new PyBuiltinFunction("update", (args, kwargs, inter) -> {
                     if (args.size() != 1) {
                         throw new RuntimeException("update() takes exactly one argument (" + args.size() + " given)");
                     }
@@ -113,7 +113,7 @@ public abstract class PyMutableMapping extends PyMapping {
                 });
                 
             case "setdefault":
-                return new PyBuiltinFunction("setdefault", (args, kwargs) -> {
+                return new PyBuiltinFunction("setdefault", (args, kwargs, inter) -> {
                     if (args.size() < 1 || args.size() > 2) {
                         throw new RuntimeException("setdefault() takes from 1 to 2 arguments but " + args.size() + " were given");
                     }

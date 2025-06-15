@@ -1,5 +1,7 @@
 package edu.carole.runtime;
 
+import edu.carole.interpreter.Interpreter;
+
 import java.util.Iterator;
 import java.util.List;
 import java.util.NoSuchElementException;
@@ -12,28 +14,31 @@ public class PyIterator extends PyObject implements Iterator<PyObject> {
     private PyObject pyObject;
     private final String sourceTypeName;
     private boolean finished = false;
+    private final Interpreter interpreter;
     
     public PyIterator(Iterator<PyObject> iterator, String sourceTypeName) {
         this.iterator = iterator;
         this.pyObject = null; // PyObject is not used in this context
         this.sourceTypeName = sourceTypeName;
+        this.interpreter = null;
     }
 
-    public PyIterator(PyObject pyObject, String sourceTypeName) {
+    public PyIterator(Interpreter interpreter, PyObject pyObject, String sourceTypeName) {
         this.iterator = null;
-        runIterMethod(pyObject);
+        runIterMethod(pyObject, interpreter);
         this.pyObject = pyObject;
         this.sourceTypeName = sourceTypeName;
+        this.interpreter = interpreter;
     }
 
-    private PyObject runIterMethod(PyObject obj) {
+    private PyObject runIterMethod(PyObject obj, Interpreter interpreter) {
         PyObject iterMethod;
         try {
             iterMethod = obj.getAttribute("__iter__");
         } catch (RuntimeException e) {
             throw new RuntimeException("Object does not have an __iter__ method");
         }
-        return iterMethod.call(List.of()); // Call the __iter__ method to initialize the iterator
+        return iterMethod.call(List.of(), interpreter); // Call the __iter__ method to initialize the iterator
     }
     
     @Override
@@ -54,13 +59,13 @@ public class PyIterator extends PyObject implements Iterator<PyObject> {
     @Override
     public PyObject getAttribute(String name) {
         return switch (name) {
-            case "__iter__" -> new PyBuiltinFunction("__iter__", (args, kwargs) -> {
+            case "__iter__" -> new PyBuiltinFunction("__iter__", (args, kwargs, interpreter) -> {
                 if (!args.isEmpty()) {
                     throw new RuntimeException("__iter__() takes no arguments (" + args.size() + " given)");
                 }
                 return this; // Iterators return themselves
             });
-            case "__next__" -> new PyBuiltinFunction("__next__", (args, kwargs) -> {
+            case "__next__" -> new PyBuiltinFunction("__next__", (args, kwargs, interpreter) -> {
                 if (!args.isEmpty()) {
                     throw new RuntimeException("__next__() takes no arguments (" + args.size() + " given)");
                 }
@@ -72,7 +77,7 @@ public class PyIterator extends PyObject implements Iterator<PyObject> {
                         throw new RuntimeException("Iterator object does not have a __next__ method");
                     }
                     try {
-                        return nextMethod.call(List.of()); // Call the __next__ method on the PyObject
+                        return nextMethod.call(List.of(), interpreter); // Call the __next__ method on the PyObject
                     } catch (RuntimeException e) {
                         throw new RuntimeException("StopIteration");
                     }
@@ -96,7 +101,7 @@ public class PyIterator extends PyObject implements Iterator<PyObject> {
      * Java iterator interface for compatibility
      */
     @Override
-    public Iterator<PyObject> iterator() {
+    public Iterator<PyObject> iterator(Interpreter interpreter) {
         if (iterator == null) {
             return this;
         }
@@ -127,7 +132,7 @@ public class PyIterator extends PyObject implements Iterator<PyObject> {
             } else {
                 PyObject nextMethod = pyObject.getAttribute("__next__");
                 try {
-                    return nextMethod.call(List.of()); // Call the __next__ method on the PyObject
+                    return nextMethod.call(List.of(), interpreter); // Call the __next__ method on the PyObject
                 } catch (RuntimeException e) {
                     if (e.getMessage().equals("StopIteration")) {
                         finished = true; // Mark as finished if StopIteration is raised
