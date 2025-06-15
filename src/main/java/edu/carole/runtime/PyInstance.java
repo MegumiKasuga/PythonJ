@@ -45,8 +45,8 @@ public class PyInstance extends PyObject {
         PyObject method = pyClass.findMethod(name);
         if (method != null) {
             // If it's a function, bind it to this instance
-            if (method instanceof PyFunction) {
-                return ((PyFunction) method).bindToInstance(this);
+            if (method instanceof InstanceBindable pf) {
+                return pf.bindToInstance(this);
             }
             // For other method types (including decorated methods)
             return new PyBoundMethod(this, method);

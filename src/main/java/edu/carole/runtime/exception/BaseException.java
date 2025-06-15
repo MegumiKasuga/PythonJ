@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Consumer;
 
 public class BaseException extends PyClass {
 
@@ -21,9 +22,21 @@ public class BaseException extends PyClass {
     private boolean suppressContext = false;
     private PyObject cause = PyNone.INSTANCE;
     private PyObject context = PyNone.INSTANCE;
+
+    private final Consumer<PyInstance> instanceConsumer;
+
     private BaseException(String name) {
         super(name, new HashMap<>());
         initProperties(getClassAttributes());
+        instanceConsumer = null;
+    }
+
+    private BaseException(String name, Consumer<PyInstance> instanceCustomizer, PyClass... baseClasses) {
+        super(name, new HashMap<>());
+        this.instanceConsumer = instanceCustomizer;
+        for (PyClass clazz : baseClasses) {
+            this.getBaseClasses().add(clazz);
+        }
     }
 
     public void initProperties(Map<String, PyObject> map) {
@@ -52,6 +65,9 @@ public class BaseException extends PyClass {
             instance.setAttribute("__traceback__", tb);
             return instance;
         }));
+        if (instanceConsumer != null) {
+            instanceConsumer.accept(instance);
+        }
         return instance;
     }
 

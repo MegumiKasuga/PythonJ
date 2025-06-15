@@ -2,17 +2,15 @@ package edu.carole.runtime;
 
 import edu.carole.interpreter.Interpreter;
 
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
  * Python内置函数
  */
-public class PyBuiltinFunction extends PyObject {
+public class PyBuiltinFunction extends PyObject implements InstanceBindable {
     private final String name;
     private final BuiltinFunction function;
+    private PyObject boundInstance = null;
     
     @FunctionalInterface
     public interface BuiltinFunction {
@@ -39,6 +37,18 @@ public class PyBuiltinFunction extends PyObject {
     }
 
     public PyObject call(List<PyObject> posArgs, Map<String, PyObject> kwargs, Interpreter interpreter) {
-        return function.call(posArgs, kwargs, interpreter);
+        ArrayList<PyObject> args = new ArrayList<>();
+        // add 'self' to this func
+        if (boundInstance != null) {
+            args.add(0, boundInstance);
+        }
+        return function.call(args, kwargs, interpreter);
+    }
+
+    @Override
+    public PyBuiltinFunction bindToInstance(PyObject instance) {
+        PyBuiltinFunction func = new PyBuiltinFunction(name, function);
+        func.boundInstance = instance;
+        return func;
     }
 }

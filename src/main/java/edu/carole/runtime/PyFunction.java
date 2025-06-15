@@ -12,7 +12,7 @@ import java.util.stream.Collectors;
 /**
  * Python函数对象
  */
-public class PyFunction extends PyObject {
+public class PyFunction extends PyObject implements InstanceBindable {
     private final String name;
     private final List<String> parameters;  // 保留用于向后兼容
     private final List<FunctionParameter> functionParameters;  // 新的参数结构
@@ -565,6 +565,7 @@ public class PyFunction extends PyObject {
      * @param instance The object instance to bind this function to
      * @return A new PyFunction that is bound to the specified instance
      */
+    @Override
     public PyFunction bindToInstance(PyObject instance) {
         PyFunction boundFunction = new PyFunction(
                 name,

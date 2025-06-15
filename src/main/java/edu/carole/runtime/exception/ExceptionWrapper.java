@@ -20,6 +20,7 @@ public class ExceptionWrapper extends RuntimeException {
         if (!attr.containsKey("__notes__"))
             return super.getMessage();
         PyList notes = (PyList) attr.get("__notes__");
+        if (notes.getElements().isEmpty()) return super.getMessage();
         return notes.getElements().get(notes.size() - 1).toString();
     }
 

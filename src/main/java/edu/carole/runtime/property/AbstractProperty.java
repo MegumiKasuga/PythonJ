@@ -1,9 +1,7 @@
 package edu.carole.runtime.property;
 
 import edu.carole.interpreter.Interpreter;
-import edu.carole.runtime.PyFunction;
-import edu.carole.runtime.PyNone;
-import edu.carole.runtime.PyObject;
+import edu.carole.runtime.*;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -35,12 +33,12 @@ public abstract class AbstractProperty extends PyObject {
 
     public AbstractProperty boundToInstance(PyObject instance) {
         PyObject neoGetter, neoSetter;
-        if (getter instanceof PyFunction pyFunc) {
+        if (getter instanceof InstanceBindable pyFunc) {
             neoGetter = pyFunc.bindToInstance(instance);
         } else {
             neoGetter = getter;
         }
-        if (setter instanceof PyFunction pyFunc) {
+        if (setter instanceof InstanceBindable pyFunc) {
             neoSetter = pyFunc.bindToInstance(instance);
         } else {
             neoSetter = setter;

@@ -154,16 +154,21 @@ public class Environment {
                         if (i + 1 >= path.length - 1) {
                             Map<String, PyObject> cache = (clazz.findMethodEnv(path[i + 1]));
                             if (cache != null) {
-                                PyFunction func = ((PyFunction) cache.get(path[i + 1]));
-                                if (func.isAbstractMethod()) {
-                                    throw new Interpreter.PyExceptionWrapper(
-                                        PyException.attributeError(
-                                            "method '" + path[i + 1] + "' in class '" + clazz.getName() + "' is abstract, cannot be called directly."
-                                        )
-                                    );
+                                PyObject funcObj = cache.get(path[i + 1]);
+                                if (funcObj instanceof InstanceBindable ib) {
+                                    if (ib instanceof PyFunction func) {
+                                        if (func.isAbstractMethod()) {
+                                            throw new Interpreter.PyExceptionWrapper(
+                                                    PyException.attributeError(
+                                                            "method '" + path[i + 1] + "' in class '" + clazz.getName() +
+                                                                    "' is abstract, cannot be called directly."
+                                                    )
+                                            );
+                                        }
+                                    }
+                                    PyObject rst = ib.bindToInstance(instance);
+                                    return Map.of(path[i + 1], rst);
                                 }
-                                func = func.bindToInstance(instance);
-                                return Map.of(path[i + 1], func);
                             }
                             cache = clazz.getAttributeEnv(path[i + 1]);
                             return cache;
