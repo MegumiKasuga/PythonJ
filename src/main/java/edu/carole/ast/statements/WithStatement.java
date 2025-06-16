@@ -2,6 +2,8 @@ package edu.carole.ast.statements;
 
 import edu.carole.ast.ASTNode;
 import edu.carole.ast.ast.ASTVisitor;
+import lombok.Getter;
+
 import java.util.List;
 
 /**
@@ -12,13 +14,17 @@ public class WithStatement extends ASTNode {
     private final String targetVariable; // 可选的 as 变量
     private final List<ASTNode> body;
     private final int line, column;
+
+    @Getter
+    private final String file;
     
-    public WithStatement(ASTNode contextExpression, String targetVariable, List<ASTNode> body, int line, int column) {
+    public WithStatement(String file, ASTNode contextExpression, String targetVariable, List<ASTNode> body, int line, int column) {
         this.contextExpression = contextExpression;
         this.targetVariable = targetVariable;
         this.body = body;
         this.line = line;
         this.column = column;
+        this.file = file;
     }
 
     @Override

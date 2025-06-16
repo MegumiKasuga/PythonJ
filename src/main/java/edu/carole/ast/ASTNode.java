@@ -15,5 +15,7 @@ public abstract class ASTNode {
     public int getColumn() {
         return -1; // 默认返回-1，子类可以覆盖此方法提供具体列号
     }
+
+    public abstract String getFile();
 }
 

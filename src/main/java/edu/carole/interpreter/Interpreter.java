@@ -5,8 +5,10 @@ import edu.carole.ast.ast.ASTVisitor;
 import edu.carole.ast.statements.*;
 import edu.carole.ast.expressions.*;
 import edu.carole.runtime.*;
+import edu.carole.runtime.exception.BuiltinExceptions;
 import edu.carole.runtime.io.IOManager;
 import edu.carole.runtime.property.PyProperty;
+import lombok.Getter;
 
 import java.util.*;
 import java.util.Set;
@@ -25,15 +27,15 @@ public class Interpreter implements ASTVisitor<PyObject> {
     private final ModuleLoader moduleLoader; // Module loading system
     private final IOManager io;
 
-    public Interpreter() {
-        this(IOManager.getInstance());
-    }
+    @Getter
+    private final BuiltinExceptions exceptions;
     
     public Interpreter(IOManager io) {
         this.io = io;
         this.moduleLoader = new ModuleLoader(this, io);
         this.globals = BuiltinFunctions.createGlobalEnvironment(this, io, moduleLoader);
         this.environment = globals;
+        this.exceptions = new BuiltinExceptions(this);
     }
     
     // Getter and setter for environment access
@@ -1030,10 +1032,9 @@ public class Interpreter implements ASTVisitor<PyObject> {
     @Override
     public PyObject visitFStringLiteral(FStringLiteral fStringLiteral) {
         String rawValue = fStringLiteral.getValue();
-        
         // Process the F-string by evaluating embedded expressions
-        String processedValue = FStringProcessor.processFString(rawValue, this, this.environment);
-        
+        String processedValue = FStringProcessor.processFString(fStringLiteral.getFile(), rawValue,
+                this, this.environment);
         return new PyString(processedValue);
     }
     
@@ -1445,7 +1446,7 @@ public class Interpreter implements ASTVisitor<PyObject> {
             String name = identifier.getName().substring(0,
                     identifier.getName().length() - 7);
             setterName = new PyString(name);
-            Identifier identifier1 = new Identifier("setter",
+            Identifier identifier1 = new Identifier(identifier.getFile(), "setter",
                     identifier.getLine(), identifier.getColumn());
             decoratorFunc = identifier1.accept(this);
             args.add(setterName);

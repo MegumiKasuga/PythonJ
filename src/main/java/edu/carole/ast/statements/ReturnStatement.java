@@ -2,6 +2,7 @@ package edu.carole.ast.statements;
 
 import edu.carole.ast.ASTNode;
 import edu.carole.ast.ast.ASTVisitor;
+import lombok.Getter;
 
 /**
  * return语句
@@ -9,11 +10,15 @@ import edu.carole.ast.ast.ASTVisitor;
 public class ReturnStatement extends ASTNode {
     private final ASTNode value;
     private final int line, column;
+
+    @Getter
+    private final String file;
     
-    public ReturnStatement(ASTNode value, int line, int column) {
+    public ReturnStatement(String file, ASTNode value, int line, int column) {
         this.value = value;
         this.line = line;
         this.column = column;
+        this.file = file;
     }
 
     @Override

@@ -2,6 +2,7 @@ package edu.carole.ast.statements;
 
 import edu.carole.ast.ASTNode;
 import edu.carole.ast.ast.ASTVisitor;
+import lombok.Getter;
 
 import java.util.List;
 
@@ -11,11 +12,15 @@ import java.util.List;
 public class ImportStatement extends ASTNode {
     private final List<ImportClause> imports;
     private final int line, column;
+
+    @Getter
+    private final String file;
     
-    public ImportStatement(List<ImportClause> imports, int line, int column) {
+    public ImportStatement(String file, List<ImportClause> imports, int line, int column) {
         this.imports = imports;
         this.line = line;
         this.column = column;
+        this.file = file;
     }
 
     @Override

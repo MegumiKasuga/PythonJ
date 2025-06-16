@@ -18,9 +18,11 @@ public class Parser {
 
     private final List<Token> tokens;
     private int current = 0;
+    private final String fileName;
     
-    public Parser(List<Token> tokens) {
+    public Parser(String fileName, List<Token> tokens) {
         this.tokens = tokens;
+        this.fileName = fileName;
     }
     
     public Program parse() {
@@ -40,7 +42,7 @@ public class Parser {
             }
         }
         
-        return new Program(statements);
+        return new Program(fileName, statements);
     }
 
     private void scanAndRemoveUselessDedents() {
@@ -88,9 +90,9 @@ public class Parser {
             if (match(Token.Type.CLASS)) return classDef();
             if (match(Token.Type.RETURN)) return returnStatement(previous());
             if (match(Token.Type.YIELD)) return yieldStatement(previous());
-            if (match(Token.Type.BREAK)) return new BreakStatement(previous().getLine(), previous().getColumn());
-            if (match(Token.Type.CONTINUE)) return new ContinueStatement(previous().getLine(), previous().getColumn());
-            if (match(Token.Type.PASS)) return new PassStatement(previous().getLine(), previous().getColumn());
+            if (match(Token.Type.BREAK)) return new BreakStatement(fileName, previous().getLine(), previous().getColumn());
+            if (match(Token.Type.CONTINUE)) return new ContinueStatement(fileName, previous().getLine(), previous().getColumn());
+            if (match(Token.Type.PASS)) return new PassStatement(fileName, previous().getLine(), previous().getColumn());
             if (match(Token.Type.TRY)) return tryExceptStatement(previous());
             if (match(Token.Type.WITH)) return withStatement(previous());
             if (match(Token.Type.GLOBAL)) return globalStatement(previous());
@@ -140,7 +142,7 @@ public class Parser {
             elseBranch = block(singleLine);
         }
         
-        return new IfStatement(conditionBranches, elseBranch, token.getLine(), token.getColumn());
+        return new IfStatement(fileName, conditionBranches, elseBranch, token.getLine(), token.getColumn());
     }
 
     private ASTNode whileStatement(Token token) {
@@ -160,7 +162,7 @@ public class Parser {
             elseBody = block(singleLine);
         }
         
-        return new WhileStatement(condition, body, elseBody, token.getLine(), token.getColumn());
+        return new WhileStatement(fileName, condition, body, elseBody, token.getLine(), token.getColumn());
     }
 
     private ASTNode forStatement(Token token) {
@@ -180,7 +182,7 @@ public class Parser {
             );
             elseBody = block(singleLine);
         }
-        return new ForStatement(variable.getValue(), iterable, body, elseBody, token.getLine(), token.getColumn());
+        return new ForStatement(fileName, variable.getValue(), iterable, body, elseBody, token.getLine(), token.getColumn());
     }
 
     private ASTNode functionDef(Token token) {
@@ -208,7 +210,7 @@ public class Parser {
         );
 
         List<ASTNode> body = block(singleLine);
-        return new FunctionDef(name.getValue(), parameters, body, returnTypeHint, token.getLine(), token.getColumn());
+        return new FunctionDef(fileName, name.getValue(), parameters, body, returnTypeHint, token.getLine(), token.getColumn());
     }
 
     private FunctionParameter parseParameter() {
@@ -248,7 +250,7 @@ public class Parser {
             defaultValue = expression(false);
         }
 
-        return new FunctionParameter(paramName, paramType, defaultValue, typeHint, paramToken.getLine(), paramToken.getColumn());
+        return new FunctionParameter(fileName, paramName, paramType, defaultValue, typeHint, paramToken.getLine(), paramToken.getColumn());
     }
 
     private ASTNode classDef() {
@@ -275,7 +277,7 @@ public class Parser {
         consume(Token.Type.INDENT, "Expected indentation after class definition");
         
         List<ASTNode> body = block(false);
-        return new ClassDef(name.getValue(), baseClasses, body, name.getLine(), name.getColumn());
+        return new ClassDef(fileName, name.getValue(), baseClasses, body, name.getLine(), name.getColumn());
     }
 
 
@@ -284,7 +286,7 @@ public class Parser {
         if (!check(Token.Type.NEWLINE) && !isAtEnd()) {
             value = tupleExpression(true); // Use tupleExpression to support comma-separated returns
         }
-        return new ReturnStatement(value, t.getLine(), t.getColumn());
+        return new ReturnStatement(fileName, value, t.getLine(), t.getColumn());
     }
 
     private ASTNode yieldStatement(Token token) {
@@ -292,7 +294,7 @@ public class Parser {
         if (!check(Token.Type.NEWLINE) && !isAtEnd()) {
             value = tupleExpression(true); // Use tupleExpression to support comma-separated yields
         }
-        return new YieldStatement(value, token.getLine(), token.getColumn());
+        return new YieldStatement(fileName, value, token.getLine(), token.getColumn());
     }
 
     private List<ASTNode> block(boolean singleLine) {
@@ -330,7 +332,7 @@ public class Parser {
             return expr;
         }
         
-        return new ExpressionStatement(expr, token.getLine(), token.getColumn());
+        return new ExpressionStatement(fileName, expr, token.getLine(), token.getColumn());
     }
 
     private ASTNode assignment(boolean greedy) {
@@ -340,14 +342,14 @@ public class Parser {
             Token assign = previous();
             ASTNode value = assignment(greedy);
               if (expr instanceof Identifier) {
-                return new AssignmentStatement(((Identifier) expr).getName(), value,
-                        assign.getLine(), assign.getColumn());
+                return new AssignmentStatement(fileName, ((Identifier) expr).getName(),
+                        value, assign.getLine(), assign.getColumn());
             } else if (expr instanceof AttributeExpression attrExpr) {
-                  return new AttributeAssignmentStatement(attrExpr.getObject(), attrExpr.getAttribute(), value,
-                          assign.getLine(), assign.getColumn());
+                  return new AttributeAssignmentStatement(fileName, attrExpr.getObject(),
+                          attrExpr.getAttribute(), value, assign.getLine(), assign.getColumn());
             } else if (expr instanceof IndexExpression indexExpr) {
-                  return new IndexAssignmentStatement(indexExpr.getObject(), indexExpr.getIndex(), value,
-                          assign.getLine(), assign.getColumn());
+                  return new IndexAssignmentStatement(fileName, indexExpr.getObject(),
+                          indexExpr.getIndex(), value, assign.getLine(), assign.getColumn());
             } else if (expr instanceof TupleLiteral tuple) {
                 // Handle tuple unpacking assignment: a, b, c = expression
                   List<String> targets = new ArrayList<>();
@@ -357,7 +359,7 @@ public class Parser {
                     }
                     targets.add(((Identifier) element).getName());
                 }
-                return new TupleUnpackingAssignment(targets, value, previous().getLine(), previous().getColumn());
+                return new TupleUnpackingAssignment(fileName, targets, value, previous().getLine(), previous().getColumn());
             }
             throw new RuntimeException("Invalid assignment target");
         } else if (match(Token.Type.PLUS_ASSIGN, Token.Type.MINUS_ASSIGN,
@@ -390,10 +392,12 @@ public class Parser {
                     default -> throw new RuntimeException("Unknown compound assignment operator: " + operatorType);
                 };
                 if (expr instanceof AttributeExpression) {
-                    return new CompoundAssignmentStatement(expr.toString(), operator, value,
+                    return new CompoundAssignmentStatement(fileName,
+                            expr.toString(), operator, value,
                             token.getLine(), token.getColumn());
                 }
-                return new CompoundAssignmentStatement(((Identifier) expr).getName(), operator,
+                return new CompoundAssignmentStatement(fileName,
+                        ((Identifier) expr).getName(), operator,
                         value, token.getLine(), token.getColumn());
             } else {
                 throw new RuntimeException("Invalid compound assignment target - must be identifier");
@@ -424,8 +428,8 @@ public class Parser {
             
             // Create a tuple if we have more than one element OR if there's a trailing comma
             // The trailing comma case is important for single-element tuple unpacking: "a, = ..."
-            return greedy ? new TupleLiteral(elements, previous().getLine(), previous().getColumn()) :
-                    elements.get(0);
+            return greedy ? new TupleLiteral(fileName, elements, previous().getLine(),
+                    previous().getColumn()) : elements.get(0);
         }
         
         return expr;
@@ -436,7 +440,7 @@ public class Parser {
             while (match(Token.Type.OR)) {
                 Token token = tokens.get(current - 1);
                 ASTNode right = conditionalExpression();
-                expr = new BinaryExpression(expr, BinaryExpression.Operator.OR,
+                expr = new BinaryExpression(fileName, expr, BinaryExpression.Operator.OR,
                         right, token.getLine(), token.getColumn());
             }
         return expr;
@@ -458,7 +462,7 @@ public class Parser {
                 consume(Token.Type.ELSE, "Expected 'else' in conditional expression");
                 falseExpression = conditionalExpression(); // Right-associative
             }
-            return new ConditionalExpression(expr, condition, falseExpression,
+            return new ConditionalExpression(fileName, expr, condition, falseExpression,
                     ifToken.getLine(), ifToken.getColumn());
         }
         return expr;
@@ -471,7 +475,7 @@ public class Parser {
         while (match(Token.Type.AND)) {
             Token token = tokens.get(current - 1);
             ASTNode right = bitwiseOr();
-            expr = new BinaryExpression(expr, BinaryExpression.Operator.AND, right,
+            expr = new BinaryExpression(fileName, expr, BinaryExpression.Operator.AND, right,
                     token.getLine(), token.getColumn());
         }
         
@@ -484,7 +488,7 @@ public class Parser {
         while (match(Token.Type.BITWISE_OR)) {
             Token token = tokens.get(current - 1);
             ASTNode right = bitwiseXor();
-            expr = new BinaryExpression(expr, BinaryExpression.Operator.BITWISE_OR, right,
+            expr = new BinaryExpression(fileName, expr, BinaryExpression.Operator.BITWISE_OR, right,
                     token.getLine(), token.getColumn());
         }
         
@@ -497,7 +501,7 @@ public class Parser {
         while (match(Token.Type.BITWISE_XOR)) {
             Token token = tokens.get(current - 1);
             ASTNode right = bitwiseAnd();
-            expr = new BinaryExpression(expr, BinaryExpression.Operator.BITWISE_XOR, right,
+            expr = new BinaryExpression(fileName, expr, BinaryExpression.Operator.BITWISE_XOR, right,
                     token.getLine(), token.getColumn());
         }
         
@@ -510,7 +514,7 @@ public class Parser {
         while (match(Token.Type.BITWISE_AND)) {
             Token token = tokens.get(current - 1);
             ASTNode right = shift();
-            expr = new BinaryExpression(expr, BinaryExpression.Operator.BITWISE_AND, right,
+            expr = new BinaryExpression(fileName, expr, BinaryExpression.Operator.BITWISE_AND, right,
                     token.getLine(), token.getColumn());
         }
         
@@ -525,7 +529,7 @@ public class Parser {
             ASTNode right = equality();
             BinaryExpression.Operator op = operator.getType() == Token.Type.LEFT_SHIFT ? 
                 BinaryExpression.Operator.LEFT_SHIFT : BinaryExpression.Operator.RIGHT_SHIFT;
-            expr = new BinaryExpression(expr, op, right, operator.getLine(), operator.getColumn());
+            expr = new BinaryExpression(fileName, expr, op, right, operator.getLine(), operator.getColumn());
         }
         
         return expr;
@@ -540,7 +544,7 @@ public class Parser {
             ASTNode right = comparison();
             BinaryExpression.Operator op = operator.getType() == Token.Type.EQUAL ? 
                 BinaryExpression.Operator.EQUAL : BinaryExpression.Operator.NOT_EQUAL;
-            expr = new BinaryExpression(expr, op, right,
+            expr = new BinaryExpression(fileName, expr, op, right,
                     operator.getLine(), operator.getColumn());
         }
         
@@ -562,7 +566,7 @@ public class Parser {
                 case IS -> BinaryExpression.Operator.IS;
                 default -> throw new RuntimeException("Unknown comparison operator");
             };
-            expr = new BinaryExpression(expr, op, right,
+            expr = new BinaryExpression(fileName, expr, op, right,
                     operator.getLine(), operator.getColumn());
         }
         
@@ -577,7 +581,7 @@ public class Parser {
             ASTNode right = factor();
             BinaryExpression.Operator op = operator.getType() == Token.Type.MINUS ? 
                 BinaryExpression.Operator.MINUS : BinaryExpression.Operator.PLUS;
-            expr = new BinaryExpression(expr, op, right,
+            expr = new BinaryExpression(fileName, expr, op, right,
                     operator.getLine(), operator.getColumn());
         }
         
@@ -598,7 +602,7 @@ public class Parser {
                 case FLOOR_DIVIDE -> BinaryExpression.Operator.FLOOR_DIVIDE;
                 default -> throw new RuntimeException("Unknown factor operator");
             };
-            expr = new BinaryExpression(expr, op, right,
+            expr = new BinaryExpression(fileName, expr, op, right,
                     operator.getLine(), operator.getColumn());
         }
         
@@ -611,7 +615,7 @@ public class Parser {
         if (match(Token.Type.POWER)) {
             Token token = tokens.get(current - 1);
             ASTNode right = power(); // 右结合
-            expr = new BinaryExpression(expr, BinaryExpression.Operator.POWER, right,
+            expr = new BinaryExpression(fileName, expr, BinaryExpression.Operator.POWER, right,
                     token.getLine(), token.getColumn());
         }
         
@@ -622,13 +626,15 @@ public class Parser {
         if (match(Token.Type.NOT)) {
             Token token = previous();
             ASTNode expr = unary();
-            return new UnaryExpression(UnaryExpression.Operator.NOT, expr, token.getLine(), token.getColumn());
+            return new UnaryExpression(fileName, UnaryExpression.Operator.NOT, expr,
+                    token.getLine(), token.getColumn());
         }
         
         if (match(Token.Type.MINUS)) {
             Token token = previous();
             ASTNode expr = unary();
-            return new UnaryExpression(UnaryExpression.Operator.MINUS, expr, token.getLine(), token.getColumn());
+            return new UnaryExpression(fileName, UnaryExpression.Operator.MINUS, expr,
+                    token.getLine(), token.getColumn());
         }
         
         return call();
@@ -643,11 +649,11 @@ public class Parser {
                 expr = finishCall(expr, token.getLine(), token.getColumn());
             } else if (match(Token.Type.DOT)) {
                 Token name = consume(Token.Type.IDENTIFIER, "Expected property name after '.'");
-                expr = new AttributeExpression(expr, name.getValue(), name.getLine(), name.getColumn());
+                expr = new AttributeExpression(fileName, expr, name.getValue(), name.getLine(), name.getColumn());
             } else if (match(Token.Type.LEFT_BRACKET)) {
                 ASTNode indexOrSlice = parseIndexOrSlice(token);
                 consume(Token.Type.RIGHT_BRACKET, "Expected ']' after index");
-                expr = new IndexExpression(expr, indexOrSlice, token.getLine(), token.getColumn());
+                expr = new IndexExpression(fileName, expr, indexOrSlice, token.getLine(), token.getColumn());
             } else {
                 break;
             }
@@ -672,7 +678,7 @@ public class Parser {
                         throw error("Expected identifier after '*'");
                     }
                     // Create a special StarredExpression to mark this as *args
-                    positionalArguments.add(new StarredExpression(args, token.getLine(), token.getColumn()));
+                    positionalArguments.add(new StarredExpression(fileName, args, token.getLine(), token.getColumn()));
                     continue;
                 }
 
@@ -714,7 +720,7 @@ public class Parser {
         }
         
         consume(Token.Type.RIGHT_PAREN, "Expected ')' after arguments");
-        return new CallExpression(callee, positionalArguments, keywordArguments, line, column);
+        return new CallExpression(fileName, callee, positionalArguments, keywordArguments, line, column);
     }
 
     private ASTNode primary() {
@@ -722,9 +728,9 @@ public class Parser {
 //            advance();
 //            return primary();
 //        }
-        if (match(Token.Type.TRUE)) return new Literal(true, previous().getLine(), previous().getColumn());
-        if (match(Token.Type.FALSE)) return new Literal(false, previous().getLine(), previous().getColumn());
-        if (match(Token.Type.NONE)) return new Literal(null, previous().getLine(), previous().getColumn());
+        if (match(Token.Type.TRUE)) return new Literal(fileName, true, previous().getLine(), previous().getColumn());
+        if (match(Token.Type.FALSE)) return new Literal(fileName, false, previous().getLine(), previous().getColumn());
+        if (match(Token.Type.NONE)) return new Literal(fileName, null, previous().getLine(), previous().getColumn());
           // Lambda expression
         if (match(Token.Type.LAMBDA)) {
             return lambdaExpression(previous());
@@ -739,32 +745,32 @@ public class Parser {
             Token token = previous();
             Long specialNum = dealWithSpecialNumbers();
             if (specialNum != null) {
-                return new Literal(specialNum, token.getLine(), token.getColumn());
+                return new Literal(fileName, specialNum, token.getLine(), token.getColumn());
             }
             String value = previous().getValue();
             if (value.contains(".")) {
-                return new Literal(Double.parseDouble(value), token.getLine(), token.getColumn());
+                return new Literal(fileName, Double.parseDouble(value), token.getLine(), token.getColumn());
             } else {
-                return new Literal(Long.parseLong(value), token.getLine(), token.getColumn());
+                return new Literal(fileName, Long.parseLong(value), token.getLine(), token.getColumn());
             }
         }
         if (match(Token.Type.STRING, Token.Type.TRIPLE_STRING)) {
             Token token = previous();
-            return new Literal(decodeUnicode(previous().getValue()), previous().getLine(), previous().getColumn());
+            return new Literal(fileName, decodeUnicode(previous().getValue()), previous().getLine(), previous().getColumn());
         }
         if (match(Token.Type.RAW_STRING, Token.Type.TRIPLE_RAW_STRING)) {
             Token token = previous();
-            return new Literal(previous().getValue(), token.getLine(), token.getColumn());
+            return new Literal(fileName, previous().getValue(), token.getLine(), token.getColumn());
         }
         
         if (match(Token.Type.F_STRING, Token.Type.TRIPLE_F_STRING)) {
             Token token = previous();
             boolean isTriple = token.getType() == Token.Type.TRIPLE_F_STRING;
-            return new FStringLiteral(token.getValue(), false, isTriple, token.getLine(), token.getColumn());
+            return new FStringLiteral(this.fileName, token.getValue(), false, isTriple, token.getLine(), token.getColumn());
         }
         
         if (match(Token.Type.IDENTIFIER)) {
-            return new Identifier(previous().getValue(),
+            return new Identifier(fileName, previous().getValue(),
                     previous().getLine(), previous().getColumn());
         }
 
@@ -774,7 +780,8 @@ public class Parser {
             if (check(Token.Type.RIGHT_PAREN)) {
                 // Empty tuple: ()
                 consume(Token.Type.RIGHT_PAREN, "Expected ')' after '('");
-                return new TupleLiteral(new ArrayList<>(), head.getLine(), head.getColumn());
+                return new TupleLiteral(fileName, new ArrayList<>(),
+                        head.getLine(), head.getColumn());
             }
             
             // Use or() instead of expression() to avoid tuple parsing interference
@@ -800,7 +807,8 @@ public class Parser {
                 }
                 
                 consume(Token.Type.RIGHT_PAREN, "Expected ')' after tuple elements");
-                return new TupleLiteral(elements, head.getLine(), head.getColumn());
+                return new TupleLiteral(fileName, elements,
+                        head.getLine(), head.getColumn());
             } else {
                 // This is a grouped expression: (a)
                 consume(Token.Type.RIGHT_PAREN, "Expected ')' after expression");
@@ -812,7 +820,7 @@ public class Parser {
             if (check(Token.Type.RIGHT_BRACKET)) {
             // Empty list
                 consume(Token.Type.RIGHT_BRACKET, "Expected ']' after '['");
-                return new ListLiteral(new ArrayList<>(), head.getLine(), head.getColumn());
+                return new ListLiteral(fileName, new ArrayList<>(), head.getLine(), head.getColumn());
             }
             
             ASTNode result = parseListOrComprehension(head);
@@ -824,7 +832,7 @@ public class Parser {
             // Handle empty braces as empty dictionary
             if (check(Token.Type.RIGHT_BRACE)) {
                 consume(Token.Type.RIGHT_BRACE, "Expected '}' after empty braces");
-                return new DictLiteral(new HashMap<>(), token.getLine(), token.getColumn());
+                return new DictLiteral(fileName, new HashMap<>(), token.getLine(), token.getColumn());
             }
             
             // Parse first element to determine if it's a set or dict
@@ -847,7 +855,7 @@ public class Parser {
                 }
                 
                 consume(Token.Type.RIGHT_BRACE, "Expected '}' after dictionary entries");
-                return new DictLiteral(entries, token.getLine(), token.getColumn());
+                return new DictLiteral(fileName, entries, token.getLine(), token.getColumn());
             } else {
                 // It's a set
                 List<ASTNode> elements = new ArrayList<>();
@@ -860,7 +868,7 @@ public class Parser {
                 }
                 
                 consume(Token.Type.RIGHT_BRACE, "Expected '}' after set elements");
-                return new SetLiteral(elements, token.getLine(), token.getColumn());
+                return new SetLiteral(fileName, elements, token.getLine(), token.getColumn());
             }
         }
         
@@ -988,7 +996,7 @@ public class Parser {
         if (exceptClauses.isEmpty() && finallyBody.isEmpty()) {
             throw new RuntimeException("Expected at least one except or finally clause");
         }
-        return new TryExceptStatement(tryBody, exceptClauses, finallyBody);
+        return new TryExceptStatement(fileName, tryBody, exceptClauses, finallyBody, token.getLine(), token.getColumn());
     }
     
     private ASTNode withStatement(Token token) {
@@ -1007,7 +1015,7 @@ public class Parser {
         );
 
         List<ASTNode> body = block(singleLine);
-        return new WithStatement(contextExpression, targetVariable, body, token.getLine(), token.getColumn());
+        return new WithStatement(fileName, contextExpression, targetVariable, body, token.getLine(), token.getColumn());
     }
     
     private ASTNode globalStatement(Token token) {
@@ -1019,7 +1027,7 @@ public class Parser {
             variables.add(variable.getValue());
         } while (match(Token.Type.COMMA));
         
-        return new GlobalStatement(variables, token.getLine(), token.getColumn());
+        return new GlobalStatement(fileName, variables, token.getLine(), token.getColumn());
     }
     
     private ASTNode nonlocalStatement(Token token) {
@@ -1031,7 +1039,7 @@ public class Parser {
             variables.add(variable.getValue());
         } while (match(Token.Type.COMMA));
         
-        return new NonlocalStatement(variables, token.getLine(), token.getColumn());
+        return new NonlocalStatement(fileName, variables, token.getLine(), token.getColumn());
     }
     
     private ASTNode importStatement(Token token) {
@@ -1051,7 +1059,7 @@ public class Parser {
             imports.add(new ImportStatement.ImportClause(moduleName.getValue(), alias));
         } while (match(Token.Type.COMMA));
         
-        return new ImportStatement(imports, token.getLine(), token.getColumn());
+        return new ImportStatement(fileName, imports, token.getLine(), token.getColumn());
     }
     
     private ASTNode fromImportStatement(Token token) {
@@ -1063,7 +1071,7 @@ public class Parser {
         
         // Check for 'import *'
         if (match(Token.Type.MULTIPLY)) {
-            return new FromImportStatement(moduleName, true, token.getLine(), token.getColumn());
+            return new FromImportStatement(fileName, moduleName, true, token.getLine(), token.getColumn());
         }
         
         // Parse import items: import item1, item2 as alias
@@ -1080,7 +1088,7 @@ public class Parser {
             
             imports.add(new FromImportStatement.ImportClause(itemName.getValue(), alias));
         } while (match(Token.Type.COMMA));
-          return new FromImportStatement(moduleName, imports, token.getLine(), token.getColumn());
+          return new FromImportStatement(fileName, moduleName, imports, token.getLine(), token.getColumn());
     }
     
     private ASTNode matchStatement(Token token) {
@@ -1126,7 +1134,7 @@ public class Parser {
             throw new RuntimeException("Match statement must have at least one case");
         }
         
-        return new MatchStatement(subject, cases, defaultBody, token.getLine(), token.getColumn());
+        return new MatchStatement(fileName, subject, cases, defaultBody, token.getLine(), token.getColumn());
     }
     
     private ASTNode parsePattern() {
@@ -1139,7 +1147,7 @@ public class Parser {
         while (match(Token.Type.BITWISE_OR)) {
             Token token = previous();
             ASTNode right = parseSequencePattern();
-            pattern = new OrPattern(pattern, right, token.getLine(), token.getColumn());
+            pattern = new OrPattern(fileName, pattern, right, token.getLine(), token.getColumn());
         }
         
         return pattern;
@@ -1152,7 +1160,7 @@ public class Parser {
             if (check(Token.Type.RIGHT_PAREN)) {
                 // Empty tuple pattern: ()
                 consume(Token.Type.RIGHT_PAREN, "Expected ')' after '('");
-                return new SequencePattern(new ArrayList<>(), true, previous().getLine(), previous().getColumn());
+                return new SequencePattern(fileName, new ArrayList<>(), true, previous().getLine(), previous().getColumn());
             }
             
             List<ASTNode> patterns = new ArrayList<>();
@@ -1166,7 +1174,7 @@ public class Parser {
                     if (!match(Token.Type.COMMA)) break;
                 }
                 consume(Token.Type.RIGHT_PAREN, "Expected ')' after tuple pattern");
-                return new SequencePattern(patterns, true, head.getLine(), head.getColumn());
+                return new SequencePattern(fileName, patterns, true, head.getLine(), head.getColumn());
             } else {
                 // This is just a grouped pattern
                 consume(Token.Type.RIGHT_PAREN, "Expected ')' after pattern");
@@ -1186,7 +1194,7 @@ public class Parser {
             }
             
             consume(Token.Type.RIGHT_BRACKET, "Expected ']' after list pattern");
-            return new SequencePattern(patterns, false, head.getLine(), head.getColumn());
+            return new SequencePattern(fileName, patterns, false, head.getLine(), head.getColumn());
         }
         
         return parseAtomicPattern();
@@ -1200,13 +1208,13 @@ public class Parser {
             // Wildcard pattern: _
             if (identifier.getValue().equals("_")) {
                 advance(); // consume the token
-                return new WildcardPattern(identifier.getLine(), identifier.getColumn());
+                return new WildcardPattern(fileName, identifier.getLine(), identifier.getColumn());
             }
             
             // Capture pattern: variable name
             Token token = tokens.get(current);
             advance(); // consume the token
-            return new CapturePattern(identifier.getValue(),
+            return new CapturePattern(fileName, identifier.getValue(),
                     token.getLine(), token.getColumn());
         }
         
@@ -1221,24 +1229,24 @@ public class Parser {
                 case NUMBER -> {
                     String val = literal.getValue();
                     if (val.contains(".")) {
-                        value = new Literal(Double.parseDouble(val), literal.getLine(), literal.getColumn());
+                        value = new Literal(fileName, Double.parseDouble(val), literal.getLine(), literal.getColumn());
                     } else {
-                        value = new Literal(Long.parseLong(val), literal.getLine(), literal.getColumn());
+                        value = new Literal(fileName, Long.parseLong(val), literal.getLine(), literal.getColumn());
                     }
                 }
                 case STRING, TRIPLE_STRING -> {
                     String v = decodeUnicode(literal.getValue());
-                    value = new Literal(v, literal.getLine(), literal.getColumn());
+                    value = new Literal(fileName, v, literal.getLine(), literal.getColumn());
                 }
                 case RAW_STRING, TRIPLE_RAW_STRING ->
-                    value = new Literal(literal.getValue(), literal.getLine(), literal.getColumn());
-                case TRUE -> value = new Literal(true, literal.getLine(), literal.getColumn());
-                case FALSE -> value = new Literal(false, literal.getLine(), literal.getColumn());
-                case NONE -> value = new Literal(null, literal.getLine(), literal.getColumn());
+                    value = new Literal(fileName, literal.getValue(), literal.getLine(), literal.getColumn());
+                case TRUE -> value = new Literal(fileName, true, literal.getLine(), literal.getColumn());
+                case FALSE -> value = new Literal(fileName, false, literal.getLine(), literal.getColumn());
+                case NONE -> value = new Literal(fileName, null, literal.getLine(), literal.getColumn());
                 default -> throw new RuntimeException("Unexpected literal type in pattern");
             }
             
-            return new LiteralPattern(value, literal.getLine(), literal.getColumn());
+            return new LiteralPattern(fileName, value, literal.getLine(), literal.getColumn());
         }
         
         throw new RuntimeException("Expected pattern at line " + peek().getLine());
@@ -1259,7 +1267,7 @@ public class Parser {
           consume(Token.Type.COLON, "Expected ':' after lambda parameters");
         ASTNode body = or(); // Use or() to avoid tuple parsing issues
         
-        return new LambdaExpression(parameters, body, token.getLine(), token.getColumn());
+        return new LambdaExpression(fileName, parameters, body, token.getLine(), token.getColumn());
     }
     
     private ASTNode superExpression(Token head) {
@@ -1269,7 +1277,7 @@ public class Parser {
         if (check(Token.Type.RIGHT_PAREN)) {
             // super() - automatic parent class resolution
             consume(Token.Type.RIGHT_PAREN, "Expected ')' after super");
-            return new SuperExpression(head.getLine(), head.getColumn());
+            return new SuperExpression(fileName, head.getLine(), head.getColumn());
         } else {
             // super(ClassName) - specific parent class
             Token className = consume(Token.Type.IDENTIFIER, "Expected class name in super()");
@@ -1296,7 +1304,7 @@ public class Parser {
             elements.add(or());
         }
         
-        return new ListLiteral(elements, head.getLine(), head.getColumn());
+        return new ListLiteral(fileName, elements, head.getLine(), head.getColumn());
     }
     
     private ASTNode parseListComprehension(ASTNode element, Token head) {
@@ -1328,7 +1336,7 @@ public class Parser {
             clauses.add(new ListComprehension.ComprehensionClause(variable.getValue(), iterable, condition));
         }
         
-        return new ListComprehension(element, clauses, head.getLine(), head.getColumn());
+        return new ListComprehension(fileName, element, clauses, head.getLine(), head.getColumn());
     }
     
     private ASTNode parseGeneratorExpression(ASTNode element, Token head) {
@@ -1360,7 +1368,7 @@ public class Parser {
             clauses.add(new ListComprehension.ComprehensionClause(variable.getValue(), iterable, condition));
         }
         
-        return new GeneratorExpression(element, clauses, head.getLine(), head.getColumn());
+        return new GeneratorExpression(fileName, element, clauses, head.getLine(), head.getColumn());
     }
 
     private ASTNode decoratorStatement(Token token) {
@@ -1388,7 +1396,7 @@ public class Parser {
         }
         
         // Create a decorator node
-        return new Decorator(expression, decorated, token.getLine(), token.getColumn());
+        return new Decorator(fileName, expression, decorated, token.getLine(), token.getColumn());
     }
 
     /**
@@ -1422,7 +1430,7 @@ public class Parser {
                 }
             }
             
-            return new SliceExpression(start, stop, step, head.getLine(), head.getColumn());
+            return new SliceExpression(fileName, start, stop, step, head.getLine(), head.getColumn());
         }
         
         // Parse first expression
@@ -1444,7 +1452,7 @@ public class Parser {
                 }
             }
             
-            return new SliceExpression(start, stop, step, head.getLine(), head.getColumn());
+            return new SliceExpression(fileName, start, stop, step, head.getLine(), head.getColumn());
         }
         
         // This is a simple index

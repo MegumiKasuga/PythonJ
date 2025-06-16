@@ -2,6 +2,7 @@ package edu.carole.ast.expressions;
 
 import edu.carole.ast.ASTNode;
 import edu.carole.ast.ast.ASTVisitor;
+import lombok.Getter;
 
 /**
  * 条件表达式 (三元运算符)
@@ -12,14 +13,18 @@ public class ConditionalExpression extends ASTNode {
     private final ASTNode trueExpression;
     private final ASTNode falseExpression;
     private final int line, column;
+
+    @Getter
+    private final String file;
     
-    public ConditionalExpression(ASTNode trueExpression, ASTNode condition, ASTNode falseExpression,
+    public ConditionalExpression(String file, ASTNode trueExpression, ASTNode condition, ASTNode falseExpression,
                                  int line, int column) {
         this.trueExpression = trueExpression;
         this.condition = condition;
         this.falseExpression = falseExpression;
         this.line = line;
         this.column = column;
+        this.file = file;
     }
 
     @Override

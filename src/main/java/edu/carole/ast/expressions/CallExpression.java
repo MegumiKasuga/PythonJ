@@ -2,6 +2,8 @@ package edu.carole.ast.expressions;
 
 import edu.carole.ast.ASTNode;
 import edu.carole.ast.ast.ASTVisitor;
+import lombok.Getter;
+
 import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
@@ -15,24 +17,29 @@ public class CallExpression extends ASTNode {
     private final List<ASTNode> positionalArguments; // 位置参数
     private final Map<String, ASTNode> keywordArguments; // 关键字参数 name -> value expression
     private final int line, column;
+
+    @Getter
+    private final String file;
     
     // 原始构造器，保持向后兼容
-    public CallExpression(ASTNode function, List<ASTNode> arguments, int line, int column) {
+    public CallExpression(String file, ASTNode function, List<ASTNode> arguments, int line, int column) {
         this.function = function;
         this.positionalArguments = arguments;
         this.keywordArguments = new HashMap<>();
         this.line = line;
         this.column = column;
+        this.file = file;
     }
     
     // 新构造器，支持关键字参数
-    public CallExpression(ASTNode function, List<ASTNode> positionalArguments, Map<String, ASTNode> keywordArguments,
+    public CallExpression(String file, ASTNode function, List<ASTNode> positionalArguments, Map<String, ASTNode> keywordArguments,
                           int line, int column) {
         this.function = function;
         this.positionalArguments = positionalArguments;
         this.keywordArguments = keywordArguments;
         this.line = line;
         this.column = column;
+        this.file = file;
     }
 
     @Override

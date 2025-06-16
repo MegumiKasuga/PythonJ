@@ -28,9 +28,9 @@ public class PyFunction extends PyObject implements InstanceBindable {
     private final int line, column;
     
     // 静态工厂方法用于向后兼容
-    public static PyFunction fromParameterNames(String name, List<String> parameters, List<ASTNode> body, Environment closure, int line, int column) {
+    public static PyFunction fromParameterNames(String file, String name, List<String> parameters, List<ASTNode> body, Environment closure, int line, int column) {
         List<FunctionParameter> functionParameters = parameters.stream()
-                .map(paramName -> new FunctionParameter(paramName, line, column))
+                .map(paramName -> new FunctionParameter(file, paramName, line, column))
                 .collect(java.util.stream.Collectors.toList());
         return new PyFunction(name, functionParameters, body, closure, line, column);
     }
@@ -55,10 +55,10 @@ public class PyFunction extends PyObject implements InstanceBindable {
 //        System.out.println("  Default values: " + defaultValues.keySet());
     }
 
-    public PyFunction(String name, List<String> parameters, List<ASTNode> body, Environment closure, String varargsParam, int line, int column) {
+    public PyFunction(String file, String name, List<String> parameters, List<ASTNode> body, Environment closure, String varargsParam, int line, int column) {
         this.name = name;
         this.parameters = parameters;
-        this.functionParameters = convertToFunctionParameters(parameters, varargsParam, null);
+        this.functionParameters = convertToFunctionParameters(file, parameters, varargsParam, null);
         this.body = body;
         this.closure = closure;
         this.varargsParam = varargsParam;
@@ -68,12 +68,12 @@ public class PyFunction extends PyObject implements InstanceBindable {
         this.column = column;
     }
     
-    public PyFunction(String name, List<String> parameters, List<ASTNode> body, Environment closure, 
+    public PyFunction(String file, String name, List<String> parameters, List<ASTNode> body, Environment closure,
                       String varargsParam, String kwargsParam, Map<String, ASTNode> defaultValues,
                       int line, int column) {
         this.name = name;
         this.parameters = parameters;
-        this.functionParameters = convertToFunctionParameters(parameters, varargsParam, kwargsParam, defaultValues);
+        this.functionParameters = convertToFunctionParameters(file, parameters, varargsParam, kwargsParam, defaultValues);
         this.body = body;
         this.closure = closure;
         this.varargsParam = varargsParam;
@@ -103,17 +103,17 @@ public class PyFunction extends PyObject implements InstanceBindable {
     }
 
     // 转换工具方法
-    private List<FunctionParameter> convertToFunctionParameters(List<String> parameterNames) {
+    private List<FunctionParameter> convertToFunctionParameters(String file, List<String> parameterNames) {
         return parameterNames.stream()
-                .map(paramName -> new FunctionParameter(paramName, line, column))
+                .map(paramName -> new FunctionParameter(file, paramName, line, column))
                 .collect(Collectors.toList());
     }
     
-    private List<FunctionParameter> convertToFunctionParameters(List<String> parameterNames, String varargsParam, String kwargsParam) {
-        return convertToFunctionParameters(parameterNames, varargsParam, kwargsParam, null);
+    private List<FunctionParameter> convertToFunctionParameters(String file, List<String> parameterNames, String varargsParam, String kwargsParam) {
+        return convertToFunctionParameters(file, parameterNames, varargsParam, kwargsParam, null);
     }
     
-    private List<FunctionParameter> convertToFunctionParameters(List<String> parameterNames, 
+    private List<FunctionParameter> convertToFunctionParameters(String file, List<String> parameterNames,
                                                                String varargsParam, String kwargsParam, 
                                                                Map<String, ASTNode> defaultValues) {
         List<FunctionParameter> result = new ArrayList<>();
@@ -121,17 +121,17 @@ public class PyFunction extends PyObject implements InstanceBindable {
         // 添加普通参数
         for (String paramName : parameterNames) {
             ASTNode defaultValue = (defaultValues != null) ? defaultValues.get(paramName) : null;
-            result.add(new FunctionParameter(paramName, defaultValue, line, column));
+            result.add(new FunctionParameter(file, paramName, defaultValue, line, column));
         }
         
         // 添加 *args 参数
         if (varargsParam != null) {
-            result.add(new FunctionParameter(varargsParam, FunctionParameter.ParameterType.VARARGS, line, column));
+            result.add(new FunctionParameter(file, varargsParam, FunctionParameter.ParameterType.VARARGS, line, column));
         }
         
         // 添加 **kwargs 参数
         if (kwargsParam != null) {
-            result.add(new FunctionParameter(kwargsParam, FunctionParameter.ParameterType.KWARGS, line, column));
+            result.add(new FunctionParameter(file, kwargsParam, FunctionParameter.ParameterType.KWARGS, line, column));
         }
         
         return result;
@@ -471,9 +471,6 @@ public class PyFunction extends PyObject implements InstanceBindable {
     }
 
     private PyObject evaluateDefaultValue(ASTNode defaultExpr, Interpreter interpreter) {
-        if (interpreter == null) {
-            interpreter = new Interpreter();
-        }
         
         // Evaluate default value in the closure environment
         Environment previousEnv = interpreter.getEnvironment();
@@ -495,9 +492,6 @@ public class PyFunction extends PyObject implements InstanceBindable {
      * Enhanced to better handle closures and nested functions
      */
     public PyObject callWithInterpreter(Environment functionEnvironment, Interpreter interpreter) {
-        if (interpreter == null) {
-            interpreter = new Interpreter();
-        }
         
         // For closures, ensure the function's original closure is part of the environment chain
         Environment executionEnvironment;

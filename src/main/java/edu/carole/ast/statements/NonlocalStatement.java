@@ -2,6 +2,8 @@ package edu.carole.ast.statements;
 
 import edu.carole.ast.ASTNode;
 import edu.carole.ast.ast.ASTVisitor;
+import lombok.Getter;
+
 import java.util.List;
 
 /**
@@ -12,11 +14,15 @@ import java.util.List;
 public class NonlocalStatement extends ASTNode {
     private final List<String> variables;
     private final int line, column;
+
+    @Getter
+    private final String file;
     
-    public NonlocalStatement(List<String> variables, int line, int column) {
+    public NonlocalStatement(String file, List<String> variables, int line, int column) {
         this.variables = variables;
         this.line = line;
         this.column = column;
+        this.file = file;
     }
 
     @Override

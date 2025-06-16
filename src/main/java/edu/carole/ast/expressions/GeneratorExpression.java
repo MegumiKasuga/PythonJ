@@ -2,6 +2,8 @@ package edu.carole.ast.expressions;
 
 import edu.carole.ast.ASTNode;
 import edu.carole.ast.ast.ASTVisitor;
+import lombok.Getter;
+
 import java.util.List;
 
 /**
@@ -11,13 +13,17 @@ public class GeneratorExpression extends ASTNode {
     private final ASTNode element;
     private final List<ListComprehension.ComprehensionClause> clauses;
     private final int line, column;
+
+    @Getter
+    private final String file;
     
-    public GeneratorExpression(ASTNode element, List<ListComprehension.ComprehensionClause> clauses,
+    public GeneratorExpression(String file, ASTNode element, List<ListComprehension.ComprehensionClause> clauses,
                                int line, int column) {
         this.element = element;
         this.clauses = clauses;
         this.line = line;
         this.column = column;
+        this.file = file;
     }
 
     @Override

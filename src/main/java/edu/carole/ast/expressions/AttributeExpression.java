@@ -2,6 +2,7 @@ package edu.carole.ast.expressions;
 
 import edu.carole.ast.ASTNode;
 import edu.carole.ast.ast.ASTVisitor;
+import lombok.Getter;
 
 /**
  * 属性访问表达式
@@ -10,12 +11,16 @@ public class AttributeExpression extends ASTNode {
     private final ASTNode object;
     private final String attribute;
     private final int line, column;
+
+    @Getter
+    private final String file;
     
-    public AttributeExpression(ASTNode object, String attribute, int line, int column) {
+    public AttributeExpression(String file, ASTNode object, String attribute, int line, int column) {
         this.object = object;
         this.attribute = attribute;
         this.line = line;
         this.column = column;
+        this.file = file;
     }
 
     @Override

@@ -2,6 +2,7 @@ package edu.carole.ast.expressions;
 
 import edu.carole.ast.ASTNode;
 import edu.carole.ast.ast.ASTVisitor;
+import lombok.Getter;
 
 /**
  * 切片表达式 (e.g., list[start:stop:step])
@@ -11,13 +12,17 @@ public class SliceExpression extends ASTNode {
     private final ASTNode stop;    // 可以为 null  
     private final ASTNode step;    // 可以为 null
     private final int line, column;
-    
-    public SliceExpression(ASTNode start, ASTNode stop, ASTNode step, int line, int column) {
+
+    @Getter
+    private final String file;
+
+    public SliceExpression(String file, ASTNode start, ASTNode stop, ASTNode step, int line, int column) {
         this.start = start;
         this.stop = stop;
         this.step = step;
         this.line = line;
         this.column = column;
+        this.file = file;
     }
 
     @Override

@@ -2,6 +2,8 @@ package edu.carole.ast.expressions;
 
 import edu.carole.ast.ASTNode;
 import edu.carole.ast.ast.ASTVisitor;
+import lombok.Getter;
+
 import java.util.List;
 
 /**
@@ -11,12 +13,16 @@ public class LambdaExpression extends ASTNode {
     private final List<String> parameters;
     private final ASTNode body;
     private final int line, column;
-    
-    public LambdaExpression(List<String> parameters, ASTNode body, int line, int column) {
+
+    @Getter
+    private final String file;
+
+    public LambdaExpression(String file, List<String> parameters, ASTNode body, int line, int column) {
         this.parameters = parameters;
         this.body = body;
         this.line = line;
         this.column = column;
+        this.file = file;
     }
 
     @Override

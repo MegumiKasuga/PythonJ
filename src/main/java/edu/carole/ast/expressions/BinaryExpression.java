@@ -2,6 +2,7 @@ package edu.carole.ast.expressions;
 
 import edu.carole.ast.ASTNode;
 import edu.carole.ast.ast.ASTVisitor;
+import lombok.Getter;
 
 /**
  * 二元表达式
@@ -17,13 +18,17 @@ public class BinaryExpression extends ASTNode {    public enum Operator {
     private final Operator operator;
     private final ASTNode right;
     private final int line, column;
+
+    @Getter
+    private final String file;
     
-    public BinaryExpression(ASTNode left, Operator operator, ASTNode right, int line, int column) {
+    public BinaryExpression(String file, ASTNode left, Operator operator, ASTNode right, int line, int column) {
         this.left = left;
         this.operator = operator;
         this.right = right;
         this.line = line;
         this.column = column;
+        this.file = file;
     }
 
     @Override

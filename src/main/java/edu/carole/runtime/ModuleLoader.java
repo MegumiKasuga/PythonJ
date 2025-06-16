@@ -171,7 +171,7 @@ public class ModuleLoader {
         String source = readFile(stream, StandardCharsets.UTF_8);
 
         Lexer lexer = new Lexer(source);
-        Parser parser = new Parser(lexer.tokenize());
+        Parser parser = new Parser(filePath, lexer.tokenize());
         Program program = parser.parse();
         
         // Create module environment

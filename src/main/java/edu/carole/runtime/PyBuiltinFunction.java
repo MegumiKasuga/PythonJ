@@ -42,6 +42,7 @@ public class PyBuiltinFunction extends PyObject implements InstanceBindable {
         if (boundInstance != null) {
             args.add(0, boundInstance);
         }
+        args.addAll(posArgs);
         return function.call(args, kwargs, interpreter);
     }
 

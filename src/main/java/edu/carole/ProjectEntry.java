@@ -5,6 +5,7 @@ import edu.carole.interpreter.Interpreter;
 import edu.carole.lexer.Lexer;
 import edu.carole.lexer.Token;
 import edu.carole.parser.Parser;
+import edu.carole.runtime.io.IOManager;
 
 import java.io.*;
 import java.nio.file.Files;
@@ -35,7 +36,7 @@ public class ProjectEntry {
      */
     private static void runRepl() {
         Scanner scanner = new Scanner(System.in);
-        Interpreter interpreter = new Interpreter();
+        Interpreter interpreter = new Interpreter(IOManager.getInstance());
         
         System.out.println("Python 3.x Interpreter (Custom Implementation)");
         System.out.println("Type 'exit()' to quit");
@@ -53,7 +54,7 @@ public class ProjectEntry {
             }
             
             try {
-                run(line, interpreter);
+                run("console", line, interpreter);
             } catch (Exception e) {
                 System.err.println("Error: " + e.getMessage());
             }
@@ -68,8 +69,8 @@ public class ProjectEntry {
     private static void runFile(String path) {
         try {
             String source = Files.readString(Paths.get(path));
-            Interpreter interpreter = new Interpreter();
-            run(source, interpreter);
+            Interpreter interpreter = new Interpreter(IOManager.getInstance());
+            run(path, source, interpreter);
         } catch (IOException e) {
             System.err.println("Error reading file: " + e.getMessage());
             System.exit(74);
@@ -84,14 +85,14 @@ public class ProjectEntry {
       /**
      * 执行Python代码
      */
-    private static void run(String source, Interpreter interpreter) {
+    private static void run(String fileName, String source, Interpreter interpreter) {
         try {
             // 词法分析
             Lexer lexer = new Lexer(source);
             List<Token> tokens = lexer.tokenize();
             
             // 语法分析
-            Parser parser = new Parser(tokens);
+            Parser parser = new Parser(fileName, tokens);
             Program program = parser.parse();
             
             // 执行

@@ -21,7 +21,7 @@ public class FStringProcessor {
     private static final Pattern F_STRING_PATTERN = Pattern.compile("\\{([^}]+)\\}");    /**
      * Process an f-string by evaluating embedded expressions
      */
-    public static String processFString(String fString, Interpreter interpreter, Environment environment) {
+    public static String processFString(String filePath, String fString, Interpreter interpreter, Environment environment) {
         StringBuilder result = new StringBuilder();
         Matcher matcher = F_STRING_PATTERN.matcher(fString);
         int lastEnd = 0;
@@ -33,7 +33,7 @@ public class FStringProcessor {
             // Extract and evaluate the expression
             String expression = matcher.group(1).trim();
             try {
-                Object value = evaluateExpression(expression, interpreter, environment);
+                Object value = evaluateExpression(filePath, expression, interpreter, environment);
                 result.append(formatValue(value));
             } catch (Exception e) {
                 // If evaluation fails, keep the original expression
@@ -50,7 +50,7 @@ public class FStringProcessor {
     }    /**
      * Evaluate an expression string within an f-string
      */
-    private static Object evaluateExpression(String expression, Interpreter interpreter, Environment environment) {
+    private static Object evaluateExpression(String filePath, String expression, Interpreter interpreter, Environment environment) {
         try {
             // Parse the expression
             Lexer lexer = new Lexer(expression);
@@ -61,7 +61,7 @@ public class FStringProcessor {
             }
             
             // Use the full parser for all expressions (keep EOF token for proper parsing)
-            Parser parser = new Parser(tokens);
+            Parser parser = new Parser(filePath, tokens);
             ASTNode expressionNode = parser.parseExpression();
             
             // Evaluate the expression in the current environment

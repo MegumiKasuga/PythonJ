@@ -2,6 +2,8 @@ package edu.carole.ast.statements;
 
 import edu.carole.ast.ASTNode;
 import edu.carole.ast.ast.ASTVisitor;
+import lombok.Getter;
+
 import java.util.List;
 import java.util.ArrayList;
 
@@ -14,21 +16,26 @@ public class ClassDef extends ASTNode {
     private final List<String> baseClasses; // 父类名列表
 
     private final int line, column;
+
+    @Getter
+    private final String file;
     
-    public ClassDef(String name, List<ASTNode> body, int line, int column) {
+    public ClassDef(String file, String name, List<ASTNode> body, int line, int column) {
         this.name = name;
         this.body = body;
         this.baseClasses = new ArrayList<>(); // 无父类
         this.line = line;
         this.column = column;
+        this.file = file;
     }
     
-    public ClassDef(String name, List<String> baseClasses, List<ASTNode> body, int line, int column) {
+    public ClassDef(String file, String name, List<String> baseClasses, List<ASTNode> body, int line, int column) {
         this.name = name;
         this.body = body;
         this.baseClasses = new ArrayList<>(baseClasses);
         this.line = line;
         this.column = column;
+        this.file = file;
     }
 
     @Override

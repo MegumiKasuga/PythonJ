@@ -2,6 +2,7 @@ package edu.carole.ast.statements;
 
 import edu.carole.ast.ASTNode;
 import edu.carole.ast.ast.ASTVisitor;
+import lombok.Getter;
 
 /**
  * continue语句
@@ -9,9 +10,14 @@ import edu.carole.ast.ast.ASTVisitor;
 public class ContinueStatement extends ASTNode {
 
     private final int line, column;
-    public ContinueStatement(int line, int column) {
+
+    @Getter
+    private final String file;
+
+    public ContinueStatement(String file, int line, int column) {
         this.column = column;
         this.line = line;
+        this.file = file;
     }
 
     @Override

@@ -2,6 +2,7 @@ package edu.carole.ast.expressions;
 
 import edu.carole.ast.ASTNode;
 import edu.carole.ast.ast.ASTVisitor;
+import lombok.Getter;
 
 /**
  * F-String literal for formatted string expressions
@@ -11,18 +12,22 @@ public class FStringLiteral extends ASTNode {
     private final boolean isRaw;
     private final boolean isTriple;
     private final int line, column;
+
+    @Getter
+    private final String file;
     
-    public FStringLiteral(String value, int line, int column) {
-        this(value, false, false, line, column);
+    public FStringLiteral(String file, String value, int line, int column) {
+        this(file, value, false, false, line, column);
     }
     
-    public FStringLiteral(String value, boolean isRaw, boolean isTriple,
+    public FStringLiteral(String file, String value, boolean isRaw, boolean isTriple,
                           int line, int column) {
         this.value = value;
         this.isRaw = isRaw;
         this.isTriple = isTriple;
         this.line = line;
         this.column = column;
+        this.file = file;
     }
 
     @Override

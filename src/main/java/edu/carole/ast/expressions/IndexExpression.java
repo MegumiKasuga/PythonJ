@@ -2,6 +2,7 @@ package edu.carole.ast.expressions;
 
 import edu.carole.ast.ASTNode;
 import edu.carole.ast.ast.ASTVisitor;
+import lombok.Getter;
 
 /**
  * 索引访问表达式 (supports both simple indexing and slicing)
@@ -10,12 +11,16 @@ public class IndexExpression extends ASTNode {
     private final ASTNode object;
     private final ASTNode index;  // 可以是简单表达式或 SliceExpression
     private final int line, column;
+
+    @Getter
+    private final String file;
     
-    public IndexExpression(ASTNode object, ASTNode index, int line, int column) {
+    public IndexExpression(String file, ASTNode object, ASTNode index, int line, int column) {
         this.object = object;
         this.index = index;
         this.line = line;
         this.column = column;
+        this.file = file;
     }
 
     @Override

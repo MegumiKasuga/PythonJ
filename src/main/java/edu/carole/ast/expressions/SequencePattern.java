@@ -2,6 +2,8 @@ package edu.carole.ast.expressions;
 
 import edu.carole.ast.ASTNode;
 import edu.carole.ast.ast.ASTVisitor;
+import lombok.Getter;
+
 import java.util.List;
 
 /**
@@ -11,13 +13,17 @@ public class SequencePattern extends ASTNode {
     private final List<ASTNode> patterns;
     private final boolean isTuple; // true for tuple patterns, false for list patterns
     private final int line, column;
+
+    @Getter
+    private final String file;
     
-    public SequencePattern(List<ASTNode> patterns, boolean isTuple,
+    public SequencePattern(String file, List<ASTNode> patterns, boolean isTuple,
                            int line, int column) {
         this.patterns = patterns;
         this.isTuple = isTuple;
         this.line = line;
         this.column = column;
+        this.file = file;
     }
 
     @Override

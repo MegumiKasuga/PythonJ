@@ -2,6 +2,7 @@ package edu.carole.ast.expressions;
 
 import edu.carole.ast.ASTNode;
 import edu.carole.ast.ast.ASTVisitor;
+import lombok.Getter;
 
 /**
  * 标识符
@@ -9,11 +10,15 @@ import edu.carole.ast.ast.ASTVisitor;
 public class Identifier extends ASTNode {
     private final String name;
     private final int line, column;
-    
-    public Identifier(String name, int line, int column) {
+
+    @Getter
+    private final String file;
+
+    public Identifier(String file, String name, int line, int column) {
         this.name = name;
         this.line = line;
         this.column = column;
+        this.file = file;
     }
 
     @Override

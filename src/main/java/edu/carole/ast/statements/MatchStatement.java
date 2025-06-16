@@ -2,6 +2,8 @@ package edu.carole.ast.statements;
 
 import edu.carole.ast.ASTNode;
 import edu.carole.ast.ast.ASTVisitor;
+import lombok.Getter;
+
 import java.util.List;
 
 /**
@@ -12,14 +14,18 @@ public class MatchStatement extends ASTNode {
     private final List<CaseClause> cases;
     private final List<ASTNode> defaultBody; // optional "default" case body, if any
     private final int line, column;
+
+    @Getter
+    private final String file;
     
-    public MatchStatement(ASTNode subject, List<CaseClause> cases, List<ASTNode> defaultBody,
+    public MatchStatement(String file, ASTNode subject, List<CaseClause> cases, List<ASTNode> defaultBody,
                           int line, int column) {
         this.subject = subject;
         this.cases = cases;
         this.defaultBody = defaultBody; // 可以是null或空列表，表示没有default分支
         this.line = line;
         this.column = column;
+        this.file = file;
     }
 
     @Override

@@ -2,6 +2,7 @@ package edu.carole.ast.expressions;
 
 import edu.carole.ast.ASTNode;
 import edu.carole.ast.ast.ASTVisitor;
+import lombok.Getter;
 
 /**
  * Super表达式: super() 或 super(ClassName)
@@ -10,17 +11,22 @@ import edu.carole.ast.ast.ASTVisitor;
 public class SuperExpression extends ASTNode {
     private final String className; // 可选，用于指定特定的父类
     private final int line, column;
-    
-    public SuperExpression(int line, int column) {
+
+    @Getter
+    private final String file;
+
+    public SuperExpression(String file, int line, int column) {
         this.className = null; // super() - 自动使用最近的父类
         this.line = line;
         this.column = column;
+        this.file = file;
     }
     
-    public SuperExpression(String className, int line, int column) {
+    public SuperExpression(String file, String className, int line, int column) {
         this.className = className; // super(ClassName) - 指定特定父类
         this.line = line;
         this.column = column;
+        this.file = file;
     }
 
     @Override

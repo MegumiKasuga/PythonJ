@@ -1,6 +1,7 @@
 package edu.carole.runtime.exception;
 
 import edu.carole.ast.ASTNode;
+import edu.carole.interpreter.Interpreter;
 import edu.carole.runtime.*;
 import lombok.Getter;
 
@@ -37,15 +38,15 @@ public class ExceptionWrapper extends RuntimeException {
         }
     }
 
-    public void setCause(PyInstance cause) {
-        if (!isException(cause))
+    public void setCause(Interpreter interpreter, PyInstance cause) {
+        if (!isException(interpreter, cause))
             throw new RuntimeException("cause must be an exception");
         exception.setAttribute("__cause__", cause);
         exception.setAttribute("__suppress_context__", PyBool.TRUE);
     }
 
-    public static boolean isException(PyInstance instance) {
-        return instance.getPyClass().getMRO().contains(BaseException.getInstance());
+    public static boolean isException(Interpreter interpreter, PyInstance instance) {
+        return interpreter.getExceptions().isException(instance);
     }
 
     @Override

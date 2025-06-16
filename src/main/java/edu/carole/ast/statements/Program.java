@@ -2,6 +2,8 @@ package edu.carole.ast.statements;
 
 import edu.carole.ast.ASTNode;
 import edu.carole.ast.ast.ASTVisitor;
+import lombok.Getter;
+
 import java.util.List;
 
 /**
@@ -9,8 +11,12 @@ import java.util.List;
  */
 public class Program extends ASTNode {
     private final List<ASTNode> statements;
+
+    @Getter
+    private final String file;
     
-    public Program(List<ASTNode> statements) {
+    public Program(String file, List<ASTNode> statements) {
+        this.file = file;
         this.statements = statements;
     }
     

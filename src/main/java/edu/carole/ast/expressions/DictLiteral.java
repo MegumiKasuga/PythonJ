@@ -2,6 +2,8 @@ package edu.carole.ast.expressions;
 
 import edu.carole.ast.ASTNode;
 import edu.carole.ast.ast.ASTVisitor;
+import lombok.Getter;
+
 import java.util.Map;
 
 /**
@@ -10,11 +12,15 @@ import java.util.Map;
 public class DictLiteral extends ASTNode {
     private final Map<ASTNode, ASTNode> entries;
     private final int line, column;
+
+    @Getter
+    private final String file;
     
-    public DictLiteral(Map<ASTNode, ASTNode> entries, int line, int column) {
+    public DictLiteral(String file, Map<ASTNode, ASTNode> entries, int line, int column) {
         this.entries = entries;
         this.line = line;
         this.column = column;
+        this.file = file;
     }
 
     @Override

@@ -15,6 +15,7 @@ import java.util.Map;
 public class PyTraceback extends PyObject {
 
     private final int line, column;
+    private final String fileName;
 
     @Setter
     private PyTraceback next;
@@ -22,6 +23,7 @@ public class PyTraceback extends PyObject {
     private final PyFrame frame;
 
     private final HashMap<String, PyObject> attributes;
+
     public PyTraceback(ASTNode frame, PyObject... params) {
         this.line = frame.getLine();
         this.column = frame.getColumn();
@@ -29,6 +31,7 @@ public class PyTraceback extends PyObject {
         next = null;
         this.attributes = new HashMap<>();
         addAttributes(attributes);
+        this.fileName = frame.getFile();
     }
 
     private void addAttributes(Map<String, PyObject> attribute) {

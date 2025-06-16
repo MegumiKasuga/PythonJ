@@ -2,6 +2,7 @@ package edu.carole.ast.statements;
 
 import edu.carole.ast.ASTNode;
 import edu.carole.ast.ast.ASTVisitor;
+import lombok.Getter;
 
 /**
  * 复合赋值语句 (e.g., i += 1, j -= 2)
@@ -27,13 +28,17 @@ public class CompoundAssignmentStatement extends ASTNode {
     private final ASTNode value;
 
     private final int line, column;
+
+    @Getter
+    private final String file;
     
-    public CompoundAssignmentStatement(String target, Operator operator, ASTNode value, int line, int column) {
+    public CompoundAssignmentStatement(String file, String target, Operator operator, ASTNode value, int line, int column) {
         this.target = target;
         this.operator = operator;
         this.value = value;
         this.line = line;
         this.column = column;
+        this.file = file;
     }
 
     @Override

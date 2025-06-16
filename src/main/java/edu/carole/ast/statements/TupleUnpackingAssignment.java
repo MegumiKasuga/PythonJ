@@ -2,6 +2,8 @@ package edu.carole.ast.statements;
 
 import edu.carole.ast.ASTNode;
 import edu.carole.ast.ast.ASTVisitor;
+import lombok.Getter;
+
 import java.util.List;
 
 /**
@@ -11,12 +13,16 @@ public class TupleUnpackingAssignment extends ASTNode {
     private final List<String> targets;
     private final ASTNode value;
     private final int line, column;
+
+    @Getter
+    private final String file;
     
-    public TupleUnpackingAssignment(List<String> targets, ASTNode value, int line, int column) {
+    public TupleUnpackingAssignment(String file, List<String> targets, ASTNode value, int line, int column) {
         this.targets = targets;
         this.value = value;
         this.line = line;
         this.column = column;
+        this.file = file;
     }
 
     @Override

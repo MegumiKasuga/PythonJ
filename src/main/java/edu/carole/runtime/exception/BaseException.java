@@ -13,29 +13,48 @@ import java.util.function.Consumer;
 
 public class BaseException extends PyClass {
 
-    private static final BaseException instance = new BaseException("BaseException");
-
-    public static BaseException getInstance() {
-        return instance;
-    }
-
     private boolean suppressContext = false;
     private PyObject cause = PyNone.INSTANCE;
     private PyObject context = PyNone.INSTANCE;
 
     private final Consumer<PyInstance> instanceConsumer;
+    private final Consumer<Map<String, PyObject>> methodCustomizer;
 
-    private BaseException(String name) {
+    public BaseException(String name) {
         super(name, new HashMap<>());
+        initMethods(getMethods());
         initProperties(getClassAttributes());
         instanceConsumer = null;
+        this.methodCustomizer = null;
     }
 
-    private BaseException(String name, Consumer<PyInstance> instanceCustomizer, PyClass... baseClasses) {
-        super(name, new HashMap<>());
+    public BaseException(String name, Consumer<Map<String, PyObject>> methodCustomizer,
+                          Consumer<PyInstance> instanceCustomizer, PyClass... baseClasses) {
+        super(name, new HashMap<>(), baseClasses == null ? new ArrayList<>() : new ArrayList<>(List.of(baseClasses)));
         this.instanceConsumer = instanceCustomizer;
-        for (PyClass clazz : baseClasses) {
-            this.getBaseClasses().add(clazz);
+        this.methodCustomizer = methodCustomizer;
+    }
+
+    public void initMethods(Map<String, PyObject> methods) {
+        methods.put("add_note", new PyBuiltinFunction("add_note", (args, kwargs, inter) -> {
+            if (args.size() != 2)
+                throw new RuntimeException("must has one arg");
+            PyObject instance = args.get(0);
+            PyList list = (PyList) instance.getAttribute("__notes__");
+            list.getElements().add(args.get(1));
+            return PyNone.INSTANCE;
+        }));
+        methods.put("with_traceback", new PyBuiltinFunction("with_traceback", (args, kwargs, inter) -> {
+            if (args.size() != 2)
+                throw new RuntimeException("must has one arg");
+            PyObject instance = args.get(0);
+            PyInstance ins = (PyInstance) args.get(1);
+            PyObject tb = ins.getAttribute("__traceback__");
+            instance.setAttribute("__traceback__", tb);
+            return instance;
+        }));
+        if (methodCustomizer != null) {
+            methodCustomizer.accept(methods);
         }
     }
 
@@ -50,21 +69,6 @@ public class BaseException extends PyClass {
         instance.setAttribute("__suppress_context__", PyBool.FALSE);
         instance.setAttribute("__traceback__", PyNone.INSTANCE);
         instance.setAttribute("__notes__", new PyList(new ArrayList<>()));
-        instance.setAttribute("add_note", new PyBuiltinFunction("add_note", (args, kwargs, inter) -> {
-            if (args.size() != 1)
-                throw new RuntimeException("must has one arg");
-            PyList list = (PyList) instance.getAttribute("__notes__");
-            list.getElements().add(args.get(0));
-            return PyNone.INSTANCE;
-        }));
-        instance.setAttribute("with_traceback", new PyBuiltinFunction("with_traceback", (args, kwargs, inter) -> {
-            if (args.size() != 1)
-                throw new RuntimeException("must has one arg");
-            PyInstance ins = (PyInstance) args.get(0);
-            PyObject tb = ins.getAttribute("__traceback__");
-            instance.setAttribute("__traceback__", tb);
-            return instance;
-        }));
         if (instanceConsumer != null) {
             instanceConsumer.accept(instance);
         }

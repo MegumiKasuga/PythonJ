@@ -2,6 +2,7 @@ package edu.carole.ast.statements;
 
 import edu.carole.ast.ASTNode;
 import edu.carole.ast.ast.ASTVisitor;
+import lombok.Getter;
 
 /**
  * 装饰器 - 表示一个函数或类的装饰器
@@ -12,8 +13,11 @@ public class Decorator extends ASTNode {
     private Decorator parent = null;
     private ASTNode root = null;
     private final int line, column;
+
+    @Getter
+    private final String file;
     
-    public Decorator(ASTNode expression, ASTNode target, int line, int column) {
+    public Decorator(String file, ASTNode expression, ASTNode target, int line, int column) {
         this.expression = expression;
         this.target = target;
         if (target instanceof ClassDef || target instanceof FunctionDef) {
@@ -25,6 +29,7 @@ public class Decorator extends ASTNode {
         }
         this.line = line;
         this.column = column;
+        this.file = file;
     }
 
     @Override

@@ -2,6 +2,8 @@ package edu.carole.ast.statements;
 
 import edu.carole.ast.ASTNode;
 import edu.carole.ast.ast.ASTVisitor;
+import lombok.Getter;
+
 import java.util.List;
 
 /**
@@ -38,11 +40,21 @@ public class TryExceptStatement extends ASTNode {
     private final List<ASTNode> tryBody;
     private final List<ExceptClause> exceptClauses;
     private final List<ASTNode> finallyBody; // 可选的finally块
+
+    @Getter
+    private final int line, column;
+
+    @Getter
+    private final String file;
     
-    public TryExceptStatement(List<ASTNode> tryBody, List<ExceptClause> exceptClauses, List<ASTNode> finallyBody) {
+    public TryExceptStatement(String file, List<ASTNode> tryBody, List<ExceptClause> exceptClauses,
+                              List<ASTNode> finallyBody, int line, int column) {
         this.tryBody = tryBody;
         this.exceptClauses = exceptClauses;
         this.finallyBody = finallyBody;
+        this.file = file;
+        this.line = line;
+        this.column = column;
     }
     
     public List<ASTNode> getTryBody() { return tryBody; }
