@@ -1,4 +1,4 @@
-package edu.carole.runtime;
+package edu.carole.runtime.func;
 
 import edu.carole.ast.ASTNode;
 import edu.carole.ast.expressions.ListComprehension.ComprehensionClause;
@@ -7,6 +7,8 @@ import edu.carole.ast.statements.TryExceptStatement;
 import edu.carole.ast.statements.WithStatement;
 import edu.carole.interpreter.Environment;
 import edu.carole.interpreter.Interpreter;
+import edu.carole.runtime.PyObject;
+import edu.carole.runtime.exception.ExceptionWrapper;
 import edu.carole.runtime.file_context.PyTextFileContext;
 
 import java.util.Iterator;
@@ -85,7 +87,7 @@ public class PyGenerator extends PyObject implements Iterable<PyObject> {
     }
     
     @Override
-    public PyObject getAttribute(String name) {
+    public PyObject getAttribute(Interpreter interpreter, String name) {
         return switch (name) {
             case "__iter__" -> new PyBuiltinFunction("__iter__", (args, kwargs, inter) -> {
                 if (args.size() != 0) {
@@ -105,7 +107,7 @@ public class PyGenerator extends PyObject implements Iterable<PyObject> {
                     throw new RuntimeException("StopIteration");
                 }
             });
-            default -> super.getAttribute(name);
+            default -> super.getAttribute(interpreter, name);
         };
     }
     
@@ -326,11 +328,11 @@ public class PyGenerator extends PyObject implements Iterable<PyObject> {
                     // 如果是函数体，说明已经执行完毕
                     exhausted = true;
                     yieldingPoint = null;
-                    dealWithWithExit(lower, null);
+                    dealWithWithExit(lower);
                     throw new PyFunction.ReturnException(null);
                 }
                 try {
-                    dealWithWithExit(upper, null);
+                    dealWithWithExit(upper);
                     dealWithTryCatchFinally(upper);
                 } catch (PyFunction.YieldException finallyYield) {
                     ASTNode upperNode = upper.self();
@@ -367,7 +369,7 @@ public class PyGenerator extends PyObject implements Iterable<PyObject> {
                         if (e instanceof PyFunction.YieldException y) {
                             throw y;
                         }
-                        dealWithWithExit(upper, e);
+                        dealWithWithExit(upper);
                         throw e;
                     }
                 } else {
@@ -389,12 +391,12 @@ public class PyGenerator extends PyObject implements Iterable<PyObject> {
             }
         }
 
-        private void dealWithWithExit(PyFunction.YieldingClause clause, Throwable exception) {
+        private void dealWithWithExit(PyFunction.YieldingClause clause) {
             if (!(clause.self() instanceof WithStatement)) return;
             PyObject obj = clause.iterableCache();
             if (!(obj instanceof PyTextFileContext context)) return;
             if (!context.isOpen()) return;
-            interpreter.exit(obj, exception);
+            interpreter.exit(obj);
         }
 
         private void dealWithTryCatchFinally(PyFunction.YieldingClause upper) {
@@ -415,14 +417,14 @@ public class PyGenerator extends PyObject implements Iterable<PyObject> {
             if (e instanceof PyFunction.YieldException ||
                     e instanceof PyFunction.ReturnException)
                 throw e;
-            PyException except;
-            if (!(e instanceof Interpreter.PyExceptionWrapper wrapper)) {
-                except = interpreter.convertRuntimeExceptionToPyException(e);
+            ExceptionWrapper wrapper;
+            if (!(e instanceof ExceptionWrapper wrp)) {
+                wrapper = interpreter.getExceptions().fromJavaException(interpreter, e);
             } else {
-                except = wrapper.getPyException();
+                wrapper = wrp;
             }
             try {
-                interpreter.handlePyException(tryExcept, except);
+                interpreter.handlePyException(tryExcept, wrapper.getException());
             } catch (PyFunction.YieldException yield) {
                 yieldingPoint.getFrom().remove(upper);
                 throw yield;

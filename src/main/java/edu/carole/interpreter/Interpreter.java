@@ -5,11 +5,18 @@ import edu.carole.ast.ast.ASTVisitor;
 import edu.carole.ast.statements.*;
 import edu.carole.ast.expressions.*;
 import edu.carole.runtime.*;
+import edu.carole.runtime.clazz.PyClass;
 import edu.carole.runtime.exception.BuiltinExceptions;
+import edu.carole.runtime.exception.ExceptionWrapper;
+import edu.carole.runtime.func.PyFunction;
+import edu.carole.runtime.func.PyGenerator;
+import edu.carole.runtime.instance.BuiltinInstance;
+import edu.carole.runtime.instance.PyInstance;
 import edu.carole.runtime.io.IOManager;
 import edu.carole.runtime.property.PyProperty;
 import lombok.Getter;
 
+import javax.lang.model.type.NullType;
 import java.util.*;
 import java.util.Set;
 import java.util.HashSet;
@@ -28,14 +35,78 @@ public class Interpreter implements ASTVisitor<PyObject> {
     private final IOManager io;
 
     @Getter
+    private final MemoryModel memoryModel;
+
+    @Getter
     private final BuiltinExceptions exceptions;
     
     public Interpreter(IOManager io) {
         this.io = io;
         this.moduleLoader = new ModuleLoader(this, io);
+        this.memoryModel = new MemoryModel(this);
         this.globals = BuiltinFunctions.createGlobalEnvironment(this, io, moduleLoader);
         this.environment = globals;
         this.exceptions = new BuiltinExceptions(this);
+    }
+
+    public BuiltinInstance<NullType> none() {
+        return memoryModel.none();
+    }
+
+    public BuiltinInstance<Boolean> boolFalse() {
+        return memoryModel.boolFalse();
+    }
+
+    public BuiltinInstance<Boolean> boolTrue() {
+        return memoryModel.boolTrue();
+    }
+
+    public BuiltinInstance<Boolean> boolValue(boolean bool) {
+        return memoryModel.boolValue(bool);
+    }
+
+    public BuiltinInstance<Long> getInteger(long integer) {
+        return memoryModel.getInteger(integer);
+    }
+
+    public BuiltinInstance<String> createString(String value) {
+        return memoryModel.createString(value);
+    }
+
+    public BuiltinInstance<Double> getFloat(Double value) {
+        return memoryModel.getFloat(value);
+    }
+
+    public boolean isNone(PyObject obj) {
+        return memoryModel.isNone(obj);
+    }
+
+    public boolean isInt(PyObject value) {
+        return memoryModel.isInt(value);
+    }
+
+    public boolean isFloat(PyObject value) {
+        return memoryModel.isFloat(value);
+    }
+
+    public boolean isBool(PyObject value) {
+        return memoryModel.isBool(value);
+    }
+
+    public boolean isStr(PyObject value) {
+        return memoryModel.isStr(value);
+    }
+
+    public boolean isStopIteration(Exception exception) {
+        if (!(exception instanceof ExceptionWrapper wrapper)) return false;
+        return wrapper.getException().getPyClass().equals(exceptions.getStopIteration());
+    }
+
+    public boolean isExceptionTypeOf(RuntimeException exception, String baseExceptionName) {
+        if (!(exception instanceof ExceptionWrapper wrapper)) return false;
+        PyClass e = exceptions.get(baseExceptionName);
+        if (e == null) return false;
+        return wrapper.getException().getPyClass().equals(e);
     }
     
     // Getter and setter for environment access
@@ -143,33 +214,7 @@ public class Interpreter implements ASTVisitor<PyObject> {
         // Get the right-hand side value
         PyObject rightValue = statement.getValue().accept(this);
           // Perform the compound operation
-        PyObject newValue = switch (statement.getOperator()) {
-            case PLUS_ASSIGN ->
-                    callMagicMethod(currentValue, "__add__", rightValue, () -> add(currentValue, rightValue));
-            case MINUS_ASSIGN ->
-                    callMagicMethod(currentValue, "__sub__", rightValue, () -> subtract(currentValue, rightValue));
-            case MULTIPLY_ASSIGN ->
-                    callMagicMethod(currentValue, "__mul__", rightValue, () -> multiply(currentValue, rightValue));
-            case DIVIDE_ASSIGN ->
-                    callMagicMethod(currentValue, "__truediv__", rightValue, () -> divide(currentValue, rightValue));
-            case MODULO_ASSIGN ->
-                    callMagicMethod(currentValue, "__mod__", rightValue, () -> modulo(currentValue, rightValue));
-            case POWER_ASSIGN ->
-                    callMagicMethod(currentValue, "__pow__", rightValue, () -> power(currentValue, rightValue));
-            case FLOOR_DIVIDE_ASSIGN ->
-                    callMagicMethod(currentValue, "__floordiv__", rightValue, () -> floorDivide(currentValue, rightValue));
-            case AND_ASSIGN ->
-                    callMagicMethod(currentValue, "__and__", rightValue, () -> bitwiseAnd(currentValue, rightValue));
-            case OR_ASSIGN ->
-                    callMagicMethod(currentValue, "__or__", rightValue, () -> bitwiseOr(currentValue, rightValue));
-            case XOR_ASSIGN ->
-                    callMagicMethod(currentValue, "__xor__", rightValue, () -> bitwiseXor(currentValue, rightValue));
-            case LEFT_SHIFT_ASSIGN ->
-                    callMagicMethod(currentValue, "__lshift__", rightValue, () -> leftShift(currentValue, rightValue));
-            case RIGHT_SHIFT_ASSIGN ->
-                    callMagicMethod(currentValue, "__rshift__", rightValue, () -> rightShift(currentValue, rightValue));
-            default -> throw new RuntimeException("Unknown compound assignment operator: " + statement.getOperator());
-        };
+        PyObject newValue = calculate(statement, statement.getBinaryOperator(), currentValue, rightValue);
 
         // Store the new value respecting global/nonlocal declarations
         String target = statement.getTarget();
@@ -188,7 +233,7 @@ public class Interpreter implements ASTVisitor<PyObject> {
     public PyObject visitAttributeAssignmentStatement(AttributeAssignmentStatement statement) {
         PyObject object = statement.getObject().accept(this);
         PyObject value = statement.getValue().accept(this);
-        object.setAttribute(statement.getAttribute(), value);
+        object.setAttribute(this, statement.getAttribute(), value);
         return value;
     }
 
@@ -198,8 +243,7 @@ public class Interpreter implements ASTVisitor<PyObject> {
         PyObject value = statement.getValue().accept(this);
         
         // Check if this is a slice assignment
-        if (statement.getIndex() instanceof SliceExpression) {
-            SliceExpression slice = (SliceExpression) statement.getIndex();
+        if (statement.getIndex() instanceof SliceExpression slice) {
             PyObject start = slice.getStart() != null ? slice.getStart().accept(this) : PyNone.INSTANCE;
             PyObject stop = slice.getStop() != null ? slice.getStop().accept(this) : PyNone.INSTANCE;
             PyObject step = slice.getStep() != null ? slice.getStep().accept(this) : PyNone.INSTANCE;
@@ -234,16 +278,22 @@ public class Interpreter implements ASTVisitor<PyObject> {
                     elements.add(iterator.next());
                 }
             } catch (RuntimeException e) {
-                throw new RuntimeException("cannot unpack non-sequence " + value.getTypeName());
+                throw  ExceptionWrapper.consumeWrapper(e, wrapper -> {
+                    wrapper.addTraceback(statement);
+                });
             }
         }
         
         if (elements.size() != targets.size()) {
+            PyInstance ins = (PyInstance) exceptions.createExceptionInstance("ValueError", List.of());
+            ExceptionWrapper wrapper = new ExceptionWrapper(ins);
+            wrapper.addTraceback(statement, elements.toArray(new PyObject[0]));
             if (elements.size() < targets.size()) {
-                throw new RuntimeException("not enough values to unpack (expected " + targets.size() + ", got " + elements.size() + ")");
+                wrapper.addNote(this, "not enough values to unpack (expected " + targets.size() + ", got " + elements.size() + ")");
             } else {
-                throw new RuntimeException("too many values to unpack (expected " + targets.size() + ")");
+                wrapper.addNote(this, "too many values to unpack (expected " + targets.size() + ")");
             }
+            throw wrapper;
         }
         
         // Assign each element to corresponding target variable
@@ -278,6 +328,9 @@ public class Interpreter implements ASTVisitor<PyObject> {
                         );
                         e.addFrom(clause);
                         throw e;
+                    } catch (ExceptionWrapper r) {
+                        r.addTraceback(statement, condition);
+                        throw r;
                     }
                 }
                 return PyNone.INSTANCE; // Exit after executing the first true branch
@@ -297,6 +350,9 @@ public class Interpreter implements ASTVisitor<PyObject> {
                     );
                     e.addFrom(clause);
                     throw e;
+                } catch (ExceptionWrapper wrapper) {
+                    wrapper.addTraceback(statement);
+                    throw wrapper;
                 }
             }
         }
@@ -322,6 +378,9 @@ public class Interpreter implements ASTVisitor<PyObject> {
                             );
                             yieldStat.addFrom(clause);
                             throw yieldStat;
+                        } catch (ExceptionWrapper wrapper) {
+                            wrapper.addTraceback(statement);
+                            throw wrapper;
                         }
                     }
                 } catch (ContinueException e) {
@@ -347,6 +406,9 @@ public class Interpreter implements ASTVisitor<PyObject> {
                     );
                     yieldStat.addFrom(clause);
                     throw yieldStat;
+                } catch (ExceptionWrapper wrapper) {
+                    wrapper.addTraceback(statement);
+                    throw wrapper;
                 }
             }
         }
@@ -370,11 +432,11 @@ public class Interpreter implements ASTVisitor<PyObject> {
                     try {
                         value = iterator.next();
                     } catch (RuntimeException e) {
-                        if (e.getMessage().equals("StopIteration")) {
+                        if (isStopIteration(e)) {
                             break Circle;
-                        } else {
-                            throw e;
                         }
+                        throw ExceptionWrapper.consumeWrapper(e,
+                                wrapper -> wrapper.addTraceback(statement));
                     }
                     environment.define(statement.getVariable(), value);
 
@@ -390,6 +452,9 @@ public class Interpreter implements ASTVisitor<PyObject> {
                             );
                             yieldStat.addFrom(clause);
                             throw yieldStat;
+                        }  catch (ExceptionWrapper wrapper) {
+                            wrapper.addTraceback(statement);
+                            throw wrapper;
                         }
                     }
                 } catch (ContinueException e) {
@@ -415,6 +480,9 @@ public class Interpreter implements ASTVisitor<PyObject> {
                     );
                     yieldStat.addFrom(clause);
                     throw yieldStat;
+                } catch (ExceptionWrapper e) {
+                    e.addTraceback(statement);
+                    throw e;
                 }
             }
         }
@@ -448,7 +516,11 @@ public class Interpreter implements ASTVisitor<PyObject> {
             if (baseObj instanceof PyClass) {
                 baseClasses.add((PyClass) baseObj);
             } else {
-                throw new RuntimeException("Base class '" + baseClassName + "' is not a class");
+                PyInstance ins = (PyInstance) exceptions.createExceptionInstance("TypeError", List.of());
+                ExceptionWrapper wrapper = new ExceptionWrapper(ins);
+                wrapper.addNote(this, "Base class '" + baseClassName + "' is not a class");
+                wrapper.addTraceback(classDef, new PyString(baseClassName));
+                throw wrapper;
             }
         }
         
@@ -478,7 +550,12 @@ public class Interpreter implements ASTVisitor<PyObject> {
                         if (func.isSetterMethod()) {
                             String funcName = func.getName();
                             if (!properties.containsKey(funcName)) {
-                                throw new RuntimeException("No property found for setter method '" + funcName + "'");
+                                PyInstance ins = (PyInstance) exceptions.
+                                        createExceptionInstance("KeyError", List.of());
+                                ExceptionWrapper wrapper = new ExceptionWrapper(ins);
+                                wrapper.addNote(this, "No property found for setter method '" + funcName + "'");
+                                wrapper.addTraceback(statement);
+                                throw wrapper;
                             }
                             PyProperty property = properties.get(funcName);
                             property.setSetter(func);
@@ -511,7 +588,12 @@ public class Interpreter implements ASTVisitor<PyObject> {
                 sb.append(methodName).append(", ");
             }
             sb.setLength(sb.length() - 2); // 去掉最后的逗号和空格
-            throw new PyExceptionWrapper(PyException.typeError(sb.toString()));
+            PyInstance ins = (PyInstance) exceptions.
+                    createExceptionInstance("TypeError", List.of());
+            ExceptionWrapper wrapper = new ExceptionWrapper(ins);
+            wrapper.addTraceback(classDef, pyClass);
+            wrapper.addNote(this, sb.toString());
+            throw wrapper;
         }
         return pyClass;
     }
@@ -559,9 +641,7 @@ public class Interpreter implements ASTVisitor<PyObject> {
     @Override
     public PyObject visitGlobalStatement(GlobalStatement statement) {
         // Mark variables as global in the current scope
-        for (String variable : statement.getVariables()) {
-            globalVariables.add(variable);
-        }
+        globalVariables.addAll(statement.getVariables());
         return PyNone.INSTANCE;
     }
     
@@ -571,7 +651,12 @@ public class Interpreter implements ASTVisitor<PyObject> {
         for (String variable : statement.getVariables()) {
             Environment nonlocalEnv = environment.findNonlocalEnvironment(variable);
             if (nonlocalEnv == null) {
-                throw new RuntimeException("no binding for nonlocal '" + variable + "' found");
+                PyInstance ins = (PyInstance) exceptions.createExceptionInstance("UnboundLocalError",
+                        List.of());
+                ExceptionWrapper wrapper = new ExceptionWrapper(ins);
+                wrapper.addTraceback(statement, new PyString(variable));
+                wrapper.addNote(this, "no binding for nonlocal '" + variable + "' found");
+                throw wrapper;
             }
             nonlocalVariables.put(variable, nonlocalEnv);
         }
@@ -583,12 +668,12 @@ public class Interpreter implements ASTVisitor<PyObject> {
         for (ImportStatement.ImportClause importClause : statement.getImports()) {
             String moduleName = importClause.getModuleName();
             String effectiveName = importClause.getEffectiveName();
-            
             try {
                 PyModule module = moduleLoader.importModule(moduleName);
                 environment.define(effectiveName, module);
-            } catch (Exception e) {
-                throw new RuntimeException("ImportError: No module named '" + moduleName + "'");
+            } catch (ExceptionWrapper e) {
+                e.addTraceback(statement, new PyString(moduleName), new PyString(effectiveName));
+                throw e;
             }
         }
         
@@ -613,13 +698,22 @@ public class Interpreter implements ASTVisitor<PyObject> {
                     
                     PyObject item = moduleLoader.importFromModule(module, itemName);
                     if (item == null) {
-                        throw new RuntimeException("ImportError: cannot import name '" + itemName + "' from '" + moduleName + "'");
+                        PyInstance ins = (PyInstance) exceptions.
+                                createExceptionInstance("ImportError", List.of());
+                        ExceptionWrapper wrapper = new ExceptionWrapper(ins);
+                        wrapper.addTraceback(statement, new PyString(itemName), new PyString(effectiveName));
+                        wrapper.addNote(this, "ImportError: cannot import name '" + itemName + "' from '" + moduleName + "'");
+                        throw wrapper;
                     }
                     environment.define(effectiveName, item);
                 }
             }
-        } catch (Exception e) {
-            throw new RuntimeException("ImportError: No module named '" + moduleName + "'");
+        } catch (ExceptionWrapper e) {
+            if (e.getException().getPyClass().equals(exceptions.get("ImportError"))) {
+                throw e;
+            }
+            e.addTraceback(statement, new PyString(moduleName));
+            throw e;
         }
         
         return PyNone.INSTANCE;
@@ -648,14 +742,14 @@ public class Interpreter implements ASTVisitor<PyObject> {
                     throw e;
                 }
             }
-        } catch (PyExceptionWrapper pyExceptionWrapper) {
-            // Python异常处理
-            PyException pyException = pyExceptionWrapper.getPyException();
-            exceptionCaught = handlePyException(statement, pyException);
+        } catch (ExceptionWrapper wrapper) {
+            PyInstance exception = wrapper.getException();
+            exceptionCaught = handlePyException(statement, exception);
             
             if (!exceptionCaught) {
                 // 没有匹配的except子句，重新抛出异常
-                throw pyExceptionWrapper;
+                wrapper.addTraceback(statement);
+                throw wrapper;
             }
         } catch (RuntimeException runtimeException) {
             if (runtimeException instanceof PyFunction.YieldException y) {
@@ -665,16 +759,17 @@ public class Interpreter implements ASTVisitor<PyObject> {
                     return r.getValue(); // 如果是return语句，直接返回值
                 }
                 // Java运行时异常转换为Python异常
-                PyException pyException = convertRuntimeExceptionToPyException(runtimeException);
+                ExceptionWrapper wrapper = exceptions.fromJavaException(this, runtimeException);
                 try {
-                    exceptionCaught = handlePyException(statement, pyException);
+                    exceptionCaught = handlePyException(statement, wrapper.getException());
                 } catch (PyFunction.YieldException yieldException) {
                     yieldCaught = yieldException;
                 }
 
                 if (!exceptionCaught) {
+                    wrapper.addTraceback(statement);
                     // 没有匹配的except子句，重新抛出原始异常
-                    throw runtimeException;
+                    throw wrapper;
                 }
             }
         } finally {
@@ -696,6 +791,9 @@ public class Interpreter implements ASTVisitor<PyObject> {
                         );
                         e.addFrom(clause);
                         throw e;
+                    } catch (ExceptionWrapper wrapper) {
+                        wrapper.addTraceback(statement);
+                        throw wrapper;
                     }
                 }
             }
@@ -704,11 +802,22 @@ public class Interpreter implements ASTVisitor<PyObject> {
         return result;
     }
     
-    public boolean handlePyException(TryExceptStatement statement, PyException pyException) {
+    public boolean handlePyException(TryExceptStatement statement, PyInstance pyException) {
         for (TryExceptStatement.ExceptClause exceptClause : statement.getExceptClauses()) {
             // 检查异常类型是否匹配
-            if (exceptClause.getExceptionType() == null || 
-                exceptClause.getExceptionType().equals(pyException.getExceptionType())) {
+            boolean flag = exceptClause.getExceptionType() == null;
+            if (!flag) {
+                PyObject clazz = environment.get(exceptClause.getExceptionType(), false);
+                if (!(clazz instanceof PyClass)) {
+                    PyInstance ins = (PyInstance) exceptions.createExceptionInstance("TypeError", List.of());
+                    ExceptionWrapper wrapper = new ExceptionWrapper(ins);
+                    wrapper.addNote(this, "'" + clazz.toString() + "' is not a class.");
+                    wrapper.addTraceback(statement, clazz);
+                    throw wrapper;
+                }
+                flag = clazz.equals(pyException.getPyClass());
+            }
+            if (flag) {
                 
                 // 如果有变量名，将异常绑定到变量
                 if (exceptClause.getVariable() != null) {
@@ -738,35 +847,36 @@ public class Interpreter implements ASTVisitor<PyObject> {
         return false; // 没有匹配的except子句
     }
     
-    public PyException convertRuntimeExceptionToPyException(RuntimeException runtimeException) {
-        String message = runtimeException.getMessage();
-        if (message == null) {
-            message = runtimeException.getClass().getSimpleName();
-        }
-          // 根据异常类型和消息内容推断Python异常类型
-        if (message.contains("division by zero") || message.contains("modulo by zero")) {
-            return PyException.zeroDivisionError(message);
-        } else if (message.contains("invalid literal for int()")) {
-            return PyException.valueError(message);
-        } else if (message.contains("not defined") || message.contains("name") || 
-                   message.contains("undefined")) {
-            return PyException.nameError(message);
-        } else if (message.contains("type") || message.contains("operand")) {
-            return PyException.typeError(message);
-        } else if (message.contains("index") || message.contains("out of range")) {
-            return PyException.indexError(message);
-        } else if (message.contains("key")) {
-            return PyException.keyError(message);
-        } else if (message.contains("value")) {
-            return PyException.valueError(message);
-        } else if (message.contains("attribute")) {
-            return PyException.attributeError(message);
-        } else {
-            return PyException.runtimeError(message);
-        }
-    }
+//    public PyException convertRuntimeExceptionToPyException(RuntimeException runtimeException) {
+//        String message = runtimeException.getMessage();
+//        if (message == null) {
+//            message = runtimeException.getClass().getSimpleName();
+//        }
+//          // 根据异常类型和消息内容推断Python异常类型
+//        if (message.contains("division by zero") || message.contains("modulo by zero")) {
+//            return PyException.zeroDivisionError(message);
+//        } else if (message.contains("invalid literal for int()")) {
+//            return PyException.valueError(message);
+//        } else if (message.contains("not defined") || message.contains("name") ||
+//                   message.contains("undefined")) {
+//            return PyException.nameError(message);
+//        } else if (message.contains("type") || message.contains("operand")) {
+//            return PyException.typeError(message);
+//        } else if (message.contains("index") || message.contains("out of range")) {
+//            return PyException.indexError(message);
+//        } else if (message.contains("key")) {
+//            return PyException.keyError(message);
+//        } else if (message.contains("value")) {
+//            return PyException.valueError(message);
+//        } else if (message.contains("attribute")) {
+//            return PyException.attributeError(message);
+//        } else {
+//            return PyException.runtimeError(message);
+//        }
+//    }
     
     // Python异常包装器，用于区分Python异常和Java异常
+    @Deprecated
     public static class PyExceptionWrapper extends RuntimeException {
         private final PyException pyException;
         
@@ -803,29 +913,39 @@ public class Interpreter implements ASTVisitor<PyObject> {
         PyObject right = expression.getRight().accept(this);
         
         // 使用运算符重载系统
-        return switch (expression.getOperator()) {
-            case PLUS -> callMagicMethod(left, "__add__", right, () -> add(left, right));
-            case MINUS -> callMagicMethod(left, "__sub__", right, () -> subtract(left, right));
-            case MULTIPLY -> callMagicMethod(left, "__mul__", right, () -> multiply(left, right));
-            case DIVIDE -> callMagicMethod(left, "__truediv__", right, () -> divide(left, right));
-            case MODULO -> callMagicMethod(left, "__mod__", right, () -> modulo(left, right));
-            case POWER -> callMagicMethod(left, "__pow__", right, () -> power(left, right));
+        return calculate(expression, expression.getOperator(), left, right);
+    }
+
+    public PyObject calculate(ASTNode expression, BinaryExpression.Operator operator, PyObject left, PyObject right) {
+        return switch (operator) {
+            case PLUS -> callMagicMethod(left, "__add__", right, () -> add(expression, left, right));
+            case MINUS -> callMagicMethod(left, "__sub__", right, () -> subtract(expression, left, right));
+            case MULTIPLY -> callMagicMethod(left, "__mul__", right, () -> multiply(expression, left, right));
+            case DIVIDE -> callMagicMethod(left, "__truediv__", right, () -> divide(expression, left, right));
+            case MODULO -> callMagicMethod(left, "__mod__", right, () -> modulo(expression, left, right));
+            case POWER -> callMagicMethod(left, "__pow__", right, () -> power(expression, left, right));
             case EQUAL -> callMagicMethod(left, "__eq__", right, () -> PyBool.valueOf(left.equals(right)));
             case NOT_EQUAL -> callMagicMethod(left, "__ne__", right, () -> PyBool.valueOf(!left.equals(right)));
-            case LESS -> callMagicMethod(left, "__lt__", right, () -> PyBool.valueOf(compare(left, right) < 0));
-            case LESS_EQUAL -> callMagicMethod(left, "__le__", right, () -> PyBool.valueOf(compare(left, right) <= 0));
-            case GREATER -> callMagicMethod(left, "__gt__", right, () -> PyBool.valueOf(compare(left, right) > 0));
+            case LESS -> callMagicMethod(left, "__lt__", right, () -> PyBool.valueOf(compare(expression, left, right) < 0));
+            case LESS_EQUAL -> callMagicMethod(left, "__le__", right, () -> PyBool.valueOf(compare(expression, left, right) <= 0));
+            case GREATER -> callMagicMethod(left, "__gt__", right, () -> PyBool.valueOf(compare(expression, left, right) > 0));
             case GREATER_EQUAL ->
-                    callMagicMethod(left, "__ge__", right, () -> PyBool.valueOf(compare(left, right) >= 0));
-            case IN -> PyBool.valueOf(isIn(left, right));
+                    callMagicMethod(left, "__ge__", right, () -> PyBool.valueOf(compare(expression, left, right) >= 0));
+            case IN -> PyBool.valueOf(isIn(expression, left, right));
             case IS -> PyBool.valueOf(left == right);
-            case FLOOR_DIVIDE -> callMagicMethod(left, "__floordiv__", right, () -> floorDivide(left, right));
-            case BITWISE_AND -> callMagicMethod(left, "__and__", right, () -> bitwiseAnd(left, right));
-            case BITWISE_OR -> callMagicMethod(left, "__or__", right, () -> bitwiseOr(left, right));
-            case BITWISE_XOR -> callMagicMethod(left, "__xor__", right, () -> bitwiseXor(left, right));
-            case LEFT_SHIFT -> callMagicMethod(left, "__lshift__", right, () -> leftShift(left, right));
-            case RIGHT_SHIFT -> callMagicMethod(left, "__rshift__", right, () -> rightShift(left, right));
-            default -> throw new RuntimeException("Unknown binary operator: " + expression.getOperator());
+            case FLOOR_DIVIDE -> callMagicMethod(left, "__floordiv__", right, () -> floorDivide(expression, left, right));
+            case BITWISE_AND -> callMagicMethod(left, "__and__", right, () -> bitwiseAnd(expression, left, right));
+            case BITWISE_OR -> callMagicMethod(left, "__or__", right, () -> bitwiseOr(expression, left, right));
+            case BITWISE_XOR -> callMagicMethod(left, "__xor__", right, () -> bitwiseXor(expression, left, right));
+            case LEFT_SHIFT -> callMagicMethod(left, "__lshift__", right, () -> leftShift(expression, left, right));
+            case RIGHT_SHIFT -> callMagicMethod(left, "__rshift__", right, () -> rightShift(expression, left, right));
+            default -> {
+                PyInstance ins = (PyInstance) exceptions.createExceptionInstance("SyntaxError", List.of());
+                ExceptionWrapper wrapper = new ExceptionWrapper(ins);
+                wrapper.addNote(this, "Unknown binary operator: " + operator);
+                wrapper.addTraceback(expression, left, right);
+                throw wrapper;
+            }
         };
     }
 
@@ -840,11 +960,21 @@ public class Interpreter implements ASTVisitor<PyObject> {
                 } else if (operand instanceof PyFloat) {
                     return new PyFloat(-((PyFloat) operand).getValue());
                 } else {
-                    throw new PyExceptionWrapper(PyException.typeError("bad operand type for unary -: '" + operand.getTypeName() + "'"));
+                    PyInstance ins = (PyInstance) exceptions.createExceptionInstance("SyntaxError", List.of());
+                    ExceptionWrapper wrapper = new ExceptionWrapper(ins);
+                    wrapper.addNote(this, "bad operand type for unary -: '" + operand.getTypeName() + "'");
+                    wrapper.addTraceback(expression, operand);
+                    throw wrapper;
                 }
             });
             case NOT -> PyBool.valueOf(!operand.isTruthy());
-            default -> throw new RuntimeException("Unknown unary operator: " + expression.getOperator());
+            default -> {
+                PyInstance ins = (PyInstance) exceptions.createExceptionInstance("SyntaxError", List.of());
+                ExceptionWrapper wrapper = new ExceptionWrapper(ins);
+                wrapper.addNote(this, "Unknown unary operator: " + expression.getOperator());
+                wrapper.addTraceback(expression, operand);
+                throw wrapper;
+            }
         };
     }
     
@@ -853,18 +983,17 @@ public class Interpreter implements ASTVisitor<PyObject> {
      */
     private PyObject callMagicMethod(PyObject obj, String methodName, PyObject arg, java.util.function.Supplier<PyObject> fallback) {
         try {
-            PyObject method = obj.getAttribute(methodName);
+            PyObject method = obj.getAttribute(this, methodName);
             List<PyObject> args = new ArrayList<>();
             if (arg != null) {
                 args.add(arg);
             }
             return method.call(args, this);
-        } catch (RuntimeException e) {
-            // 如果魔术方法不存在或调用失败，使用回退实现
-            if (e.getMessage().contains("has no attribute")) {
+        } catch (ExceptionWrapper wrapper) {
+            if (isExceptionTypeOf(wrapper, "SyntaxError")) {
                 return fallback.get();
             }
-            throw e;
+            throw wrapper;
         }
     }
 
@@ -893,21 +1022,23 @@ public class Interpreter implements ASTVisitor<PyObject> {
         // 处理位置参数，包括*args展开
         List<PyObject> positionalArguments = new ArrayList<>();
         for (ASTNode arg : expression.getPositionalArguments()) {
-            if (arg instanceof StarredExpression) {
+            if (arg instanceof StarredExpression starred) {
                 // Handle *args unpacking
-                StarredExpression starred = (StarredExpression) arg;
                 PyObject starredValue = starred.getExpression().accept(this);
                 
                 // Unpack the starred argument
-                if (starredValue instanceof PyList) {
-                    PyList list = (PyList) starredValue;
+                if (starredValue instanceof PyList list) {
                     positionalArguments.addAll(list.getElements());
-                } else if (starredValue instanceof PyTuple) {
-                    PyTuple tuple = (PyTuple) starredValue;
+                } else if (starredValue instanceof PyTuple tuple) {
                     positionalArguments.addAll(tuple.getElements());
                 } else {
+                    PyInstance instance = (PyInstance) exceptions.
+                            createExceptionInstance("ValueError", List.of());
+                    ExceptionWrapper wrapper = new ExceptionWrapper(instance);
+                    wrapper.addNote(this, "Cannot unpack non-sequence object in function call");
+                    wrapper.addTraceback(expression, function, starredValue);
                     // Try to iterate over the object
-                    throw new RuntimeException("Cannot unpack non-sequence object in function call");
+                    throw wrapper;
                 }
             } else {
                 positionalArguments.add(arg.accept(this));
@@ -923,16 +1054,19 @@ public class Interpreter implements ASTVisitor<PyObject> {
                     // Handle **kwargs unpacking
                     String kwargName = key.substring(2);
                     PyObject kwargsValue = entry.getValue().accept(this);
-                        if (kwargsValue instanceof PyDict) {
-                            PyDict dict = (PyDict) kwargsValue;
-                            // Add all key-value pairs from the dict to keyword arguments
-                            for (Map.Entry<PyObject, PyObject> dictEntry : dict.getEntries().entrySet()) {
-                                // Convert PyObject key to String for keyword arguments
-                                String keyStr = dictEntry.getKey().toString();
-                                keywordArguments.put(keyStr, dictEntry.getValue());
-                            }
+                    if (kwargsValue instanceof PyDict dict) {
+                        // Add all key-value pairs from the dict to keyword arguments
+                        for (Map.Entry<PyObject, PyObject> dictEntry : dict.getEntries().entrySet()) {
+                            // Convert PyObject key to String for keyword arguments
+                            String keyStr = dictEntry.getKey().toString();
+                            keywordArguments.put(keyStr, dictEntry.getValue());
+                        }
                     } else {
-                        throw new RuntimeException("Cannot unpack non-dict object as keyword arguments");
+                        PyInstance ins = (PyInstance) exceptions.createExceptionInstance("ValueError", List.of());
+                        ExceptionWrapper wrapper = new ExceptionWrapper(ins);
+                        wrapper.addNote(this, "Cannot unpack non-dict object as keyword arguments");
+                        wrapper.addTraceback(expression, kwargsValue);
+                        throw wrapper;
                     }
                 } else {
                     keywordArguments.put(key, entry.getValue().accept(this));
@@ -951,7 +1085,7 @@ public class Interpreter implements ASTVisitor<PyObject> {
     @Override
     public PyObject visitAttributeExpression(AttributeExpression expression) {
         PyObject object = expression.getObject().accept(this);
-        return object.getAttribute(expression.getAttribute());
+        return object.getAttribute(this, expression.getAttribute());
     }
 
     @Override
@@ -963,12 +1097,7 @@ public class Interpreter implements ASTVisitor<PyObject> {
         if (expression.isSlice()) {
             // Handle slice operation
             SliceExpression slice = (SliceExpression) expression.getIndex();
-            PyObject start = slice.getStart() != null ? slice.getStart().accept(this) : PyNone.INSTANCE;
-            PyObject stop = slice.getStop() != null ? slice.getStop().accept(this) : PyNone.INSTANCE;
-            PyObject step = slice.getStep() != null ? slice.getStep().accept(this) : PyNone.INSTANCE;
-            
-            // Call __getslice__ or __getitem__ with slice object
-            return object.getSlice(start, stop, step);
+            return visitSliceExpression(slice);
         } else {
             // Regular index operation
             return object.getItem(index);
@@ -1025,7 +1154,12 @@ public class Interpreter implements ASTVisitor<PyObject> {
         } else if (value instanceof String) {
             return new PyString((String) value);
         } else {
-            throw new RuntimeException("Unknown literal type: " + value.getClass());
+            PyInstance ins = (PyInstance) exceptions.
+                    createExceptionInstance("SyntaxError", List.of());
+            ExceptionWrapper wrapper = new ExceptionWrapper(ins);
+            wrapper.addNote(this, "Unknown literal type: " + value.getClass());
+            wrapper.addTraceback(literal);
+            throw wrapper;
         }
     }
 
@@ -1078,7 +1212,7 @@ public class Interpreter implements ASTVisitor<PyObject> {
     
     // 辅助方法
     
-    private PyObject add(PyObject left, PyObject right) {
+    private PyObject add(ASTNode statement, PyObject left, PyObject right) {
         if (left instanceof PyInt && right instanceof PyInt) {
             return new PyInt(((PyInt) left).getValue() + ((PyInt) right).getValue());
         } else if (left instanceof PyFloat && right instanceof PyFloat) {
@@ -1094,12 +1228,57 @@ public class Interpreter implements ASTVisitor<PyObject> {
             combined.addAll(((PyList) right).getElements());
             return new PyList(combined);
         } else {
-            throw new PyExceptionWrapper(PyException.typeError("unsupported operand type(s) for +: '" + 
-                left.getTypeName() + "' and '" + right.getTypeName() + "'"));
+            throw unsupportedOperandType(statement, "+", left, right);
         }
     }
+
+    private ExceptionWrapper unsupportedOperandType(ASTNode statement, String operator, PyObject left, PyObject right) {
+        PyInstance ins = (PyInstance) exceptions.
+                createExceptionInstance("SyntaxError", List.of());
+        ExceptionWrapper wrapper = new ExceptionWrapper(ins);
+        wrapper.addNote(this, "unsupported operand type(s) for " + operator + ": '" +
+                left.getTypeName() + "' and '" + right.getTypeName() + "'");
+        wrapper.addTraceback(statement, left, right);
+        return wrapper;
+    }
+
+    private ExceptionWrapper zeroDivisionError(ASTNode statement, PyObject left, PyObject right) {
+        PyInstance ins = (PyInstance) exceptions.
+                createExceptionInstance("ZeroDivisionError", List.of());
+        ExceptionWrapper wrapper = new ExceptionWrapper(ins);
+        wrapper.addNote(this, "division by zero");
+        wrapper.addTraceback(statement, left, right);
+        return wrapper;
+    }
+
+    private ExceptionWrapper zeroModError(ASTNode statement, PyObject left, PyObject right) {
+        PyInstance ins = (PyInstance) exceptions.
+                createExceptionInstance("ZeroDivisionError", List.of());
+        ExceptionWrapper wrapper = new ExceptionWrapper(ins);
+        wrapper.addNote(this, "modulo by zero");
+        wrapper.addTraceback(statement, left, right);
+        return wrapper;
+    }
+
+    private ExceptionWrapper valueError(ASTNode expression, String note, PyObject left, PyObject right) {
+        PyInstance ins = (PyInstance) exceptions.
+                createExceptionInstance("ValueError", List.of());
+        ExceptionWrapper wrapper = new ExceptionWrapper(ins);
+        wrapper.addNote(this, note);
+        wrapper.addTraceback(expression, left, right);
+        return wrapper;
+    }
+
+    private ExceptionWrapper typeError(ASTNode expression, String note, PyObject left, PyObject right) {
+        PyInstance ins = (PyInstance) exceptions.
+                createExceptionInstance("TypeError", List.of());
+        ExceptionWrapper wrapper = new ExceptionWrapper(ins);
+        wrapper.addNote(this, note);
+        wrapper.addTraceback(expression, left, right);
+        return wrapper;
+    }
     
-    private PyObject subtract(PyObject left, PyObject right) {
+    private PyObject subtract(ASTNode expression, PyObject left, PyObject right) {
         if (left instanceof PyInt && right instanceof PyInt) {
             return new PyInt(((PyInt) left).getValue() - ((PyInt) right).getValue());
         } else if (left instanceof PyFloat && right instanceof PyFloat) {
@@ -1108,12 +1287,11 @@ public class Interpreter implements ASTVisitor<PyObject> {
             return new PyFloat(((PyInt) left).getValue() - ((PyFloat) right).getValue());
         } else if (left instanceof PyFloat && right instanceof PyInt) {
             return new PyFloat(((PyFloat) left).getValue() - ((PyInt) right).getValue());        } else {
-            throw new PyExceptionWrapper(PyException.typeError("unsupported operand type(s) for -: '" + 
-                left.getTypeName() + "' and '" + right.getTypeName() + "'"));
+            throw unsupportedOperandType(expression, "-", left, right);
         }
     }
     
-    private PyObject multiply(PyObject left, PyObject right) {
+    private PyObject multiply(ASTNode expression, PyObject left, PyObject right) {
         if (left instanceof PyInt && right instanceof PyInt) {
             return new PyInt(((PyInt) left).getValue() * ((PyInt) right).getValue());
         } else if (left instanceof PyFloat && right instanceof PyFloat) {
@@ -1129,58 +1307,66 @@ public class Interpreter implements ASTVisitor<PyObject> {
         } else if (left instanceof PyInt && right instanceof PyString) {
             String str = ((PyString) right).getValue();
             int times = (int) ((PyInt) left).getValue();
-            return new PyString(str.repeat(Math.max(0, times)));        } else {
-            throw new PyExceptionWrapper(PyException.typeError("unsupported operand type(s) for *: '" + 
-                left.getTypeName() + "' and '" + right.getTypeName() + "'"));
+            return new PyString(str.repeat(Math.max(0, times)));
+        } else {
+            throw unsupportedOperandType(expression, "*", left, right);
         }
     }
     
-    private PyObject divide(PyObject left, PyObject right) {
+    private PyObject divide(ASTNode expression, PyObject left, PyObject right) {
         if (left instanceof PyInt && right instanceof PyInt) {
-            long rightValue = ((PyInt) right).getValue();            if (rightValue == 0) {
-                throw new PyExceptionWrapper(PyException.zeroDivisionError("division by zero"));
+            long rightValue = ((PyInt) right).getValue();
+            if (rightValue == 0) {
+                throw zeroDivisionError(expression, left, right);
             }
-            return new PyFloat(((PyInt) left).getValue() / (double) rightValue);        } else if (left instanceof PyFloat && right instanceof PyFloat) {
+            return new PyFloat(((PyInt) left).getValue() / (double) rightValue);
+        } else if (left instanceof PyFloat && right instanceof PyFloat) {
             double rightValue = ((PyFloat) right).getValue();
             if (rightValue == 0.0) {
-                throw new PyExceptionWrapper(PyException.zeroDivisionError("float division by zero"));
+                throw zeroDivisionError(expression, left, right);
             }
             return new PyFloat(((PyFloat) left).getValue() / rightValue);
         } else if (left instanceof PyInt && right instanceof PyFloat) {
             double rightValue = ((PyFloat) right).getValue();
             if (rightValue == 0.0) {
-                throw new PyExceptionWrapper(PyException.zeroDivisionError("float division by zero"));
+                throw zeroDivisionError(expression, left, right);
             }
             return new PyFloat(((PyInt) left).getValue() / rightValue);
         } else if (left instanceof PyFloat && right instanceof PyInt) {
             long rightValue = ((PyInt) right).getValue();
             if (rightValue == 0) {
-                throw new PyExceptionWrapper(PyException.zeroDivisionError("float division by zero"));
+                throw zeroDivisionError(expression, left, right);
             }
             return new PyFloat(((PyFloat) left).getValue() / rightValue);
         } else {
-            throw new PyExceptionWrapper(PyException.typeError("unsupported operand type(s) for /: '" + 
-                left.getTypeName() + "' and '" + right.getTypeName() + "'"));
+            throw unsupportedOperandType(expression, "/", left, right);
         }
     }
     
-    private PyObject modulo(PyObject left, PyObject right) {
+    private PyObject modulo(ASTNode expression, PyObject left, PyObject right) {
         if (left instanceof PyInt && right instanceof PyInt) {
-            long rightValue = ((PyInt) right).getValue();            if (rightValue == 0) {
-                throw new PyExceptionWrapper(PyException.zeroDivisionError("integer division or modulo by zero"));
+            long rightValue = ((PyInt) right).getValue();
+            if (rightValue == 0) {
+                throw zeroModError(expression, left, right);
             }
             return new PyInt(((PyInt) left).getValue() % rightValue);
         } else if (left instanceof PyFloat && right instanceof PyFloat) {
-            double rightValue = ((PyFloat) right).getValue();            if (rightValue == 0.0) {
-                throw new PyExceptionWrapper(PyException.zeroDivisionError("float modulo"));
+            double rightValue = ((PyFloat) right).getValue();
+            if (rightValue == 0.0) {
+                PyInstance instance = (PyInstance) exceptions.
+                        createExceptionInstance("TypeError", List.of());
+                ExceptionWrapper wrapper = new ExceptionWrapper(instance);
+                wrapper.addNote(this, "Float modulo");
+                wrapper.addTraceback(expression, left, right);
+                throw wrapper;
             }
-            return new PyFloat(((PyFloat) left).getValue() % rightValue);        } else {
-            throw new PyExceptionWrapper(PyException.typeError("unsupported operand type(s) for %: '" + 
-                left.getTypeName() + "' and '" + right.getTypeName() + "'"));
+            return new PyFloat(((PyFloat) left).getValue() % rightValue);
+        } else {
+            throw unsupportedOperandType(expression, "%", left, right);
         }
     }
 
-    private PyObject power(PyObject left, PyObject right) {
+    private PyObject power(ASTNode expression, PyObject left, PyObject right) {
         if (left instanceof PyInt && right instanceof PyInt) {
             long base = ((PyInt) left).getValue();
             long exp = ((PyInt) right).getValue();
@@ -1190,89 +1376,84 @@ public class Interpreter implements ASTVisitor<PyObject> {
             double exp = right instanceof PyFloat ? ((PyFloat) right).getValue() : ((PyInt) right).getValue();
             return new PyFloat(Math.pow(base, exp));
         } else {
-            throw new PyExceptionWrapper(PyException.typeError("unsupported operand type(s) for **: '" + 
-                left.getTypeName() + "' and '" + right.getTypeName() + "'"));
+            throw unsupportedOperandType(expression, "**", left, right);
         }
     }
     
-    private PyObject floorDivide(PyObject left, PyObject right) {
+    private PyObject floorDivide(ASTNode expression, PyObject left, PyObject right) {
         if (left instanceof PyInt && right instanceof PyInt) {
             long rightValue = ((PyInt) right).getValue();
             if (rightValue == 0) {
-                throw new PyExceptionWrapper(PyException.zeroDivisionError("integer division or modulo by zero"));
+                throw zeroDivisionError(expression, left, right);
             }
             return new PyInt(Math.floorDiv(((PyInt) left).getValue(), rightValue));
         } else if (left instanceof PyFloat && right instanceof PyFloat) {
             double rightValue = ((PyFloat) right).getValue();
             if (rightValue == 0.0) {
-                throw new PyExceptionWrapper(PyException.zeroDivisionError("float floor division by zero"));
+                throw zeroDivisionError(expression, left, right);
             }
             return new PyFloat(Math.floor(((PyFloat) left).getValue() / rightValue));
         } else if (left instanceof PyInt && right instanceof PyFloat) {
             double rightValue = ((PyFloat) right).getValue();
             if (rightValue == 0.0) {
-                throw new PyExceptionWrapper(PyException.zeroDivisionError("float floor division by zero"));
+                throw zeroDivisionError(expression, left, right);
             }
             return new PyFloat(Math.floor(((PyInt) left).getValue() / rightValue));
         } else if (left instanceof PyFloat && right instanceof PyInt) {
             long rightValue = ((PyInt) right).getValue();
             if (rightValue == 0) {
-                throw new PyExceptionWrapper(PyException.zeroDivisionError("float floor division by zero"));
+                throw zeroDivisionError(expression, left, right);
             }
             return new PyFloat(Math.floor(((PyFloat) left).getValue() / rightValue));
         } else {
-            throw new PyExceptionWrapper(PyException.typeError("unsupported operand type(s) for //: '" + 
-                left.getTypeName() + "' and '" + right.getTypeName() + "'"));
+            throw unsupportedOperandType(expression, "//", left, right);
         }
     }
     
-    private PyObject bitwiseAnd(PyObject left, PyObject right) {
+    private PyObject bitwiseAnd(ASTNode expression, PyObject left, PyObject right) {
         if (left instanceof PyInt && right instanceof PyInt) {
             return new PyInt(((PyInt) left).getValue() & ((PyInt) right).getValue());
         } else {
-            throw new PyExceptionWrapper(PyException.typeError("unsupported operand type(s) for &: '" + 
-                left.getTypeName() + "' and '" + right.getTypeName() + "'"));
+            throw unsupportedOperandType(expression, "&", left, right);
         }
     }
     
-    private PyObject bitwiseOr(PyObject left, PyObject right) {
+    private PyObject bitwiseOr(ASTNode expression, PyObject left, PyObject right) {
         if (left instanceof PyInt && right instanceof PyInt) {
             return new PyInt(((PyInt) left).getValue() | ((PyInt) right).getValue());
         } else {
-            throw new PyExceptionWrapper(PyException.typeError("unsupported operand type(s) for |: '" + 
-                left.getTypeName() + "' and '" + right.getTypeName() + "'"));
+            throw unsupportedOperandType(expression, "|", left, right);
         }
     }
     
-    private PyObject bitwiseXor(PyObject left, PyObject right) {
+    private PyObject bitwiseXor(ASTNode expression, PyObject left, PyObject right) {
         if (left instanceof PyInt && right instanceof PyInt) {
             return new PyInt(((PyInt) left).getValue() ^ ((PyInt) right).getValue());
         } else {
-            throw new PyExceptionWrapper(PyException.typeError("unsupported operand type(s) for ^: '" + 
-                left.getTypeName() + "' and '" + right.getTypeName() + "'"));
+            throw unsupportedOperandType(expression, "^", left, right);
         }
     }
     
-    private PyObject leftShift(PyObject left, PyObject right) {
+    private PyObject leftShift(ASTNode expression, PyObject left, PyObject right) {
         if (left instanceof PyInt && right instanceof PyInt) {
             long shiftCount = ((PyInt) right).getValue();
             if (shiftCount < 0) {
-                throw new PyExceptionWrapper(PyException.valueError("negative shift count"));
-            }            if (shiftCount >= 64) {
-                throw new PyExceptionWrapper(PyException.valueError("shift count too large"));
+                throw valueError(expression, "negative shift count", left, right);
+            }
+            if (shiftCount >= 64) {
+                throw valueError(expression, "shift count too large", left, right);
             }
             return new PyInt(((PyInt) left).getValue() << shiftCount);
         } else {
-            throw new PyExceptionWrapper(PyException.typeError("unsupported operand type(s) for <<: '" + 
-                left.getTypeName() + "' and '" + right.getTypeName() + "'"));
+            throw unsupportedOperandType(expression, "<<", left, right);
         }
     }
     
-    private PyObject rightShift(PyObject left, PyObject right) {
+    private PyObject rightShift(ASTNode expression, PyObject left, PyObject right) {
         if (left instanceof PyInt && right instanceof PyInt) {
             long shiftCount = ((PyInt) right).getValue();
             if (shiftCount < 0) {
-                throw new PyExceptionWrapper(PyException.valueError("negative shift count"));
+                throw valueError(expression, "negative shift count", left, right);
             }
             if (shiftCount >= 64) {
                 long leftValue = ((PyInt) left).getValue();
@@ -1280,12 +1461,11 @@ public class Interpreter implements ASTVisitor<PyObject> {
             }
             return new PyInt(((PyInt) left).getValue() >> shiftCount);
         } else {
-            throw new PyExceptionWrapper(PyException.typeError("unsupported operand type(s) for >>: '" + 
-                left.getTypeName() + "' and '" + right.getTypeName() + "'"));
+            throw unsupportedOperandType(expression, ">>", left, right);
         }
     }
     
-    private int compare(PyObject left, PyObject right) {
+    private int compare(ASTNode expression, PyObject left, PyObject right) {
         if (left instanceof PyInt && right instanceof PyInt) {
             return Long.compare(((PyInt) left).getValue(), ((PyInt) right).getValue());
         } else if (left instanceof PyFloat && right instanceof PyFloat) {
@@ -1297,11 +1477,12 @@ public class Interpreter implements ASTVisitor<PyObject> {
         } else if (left instanceof PyString && right instanceof PyString) {
             return ((PyString) left).getValue().compareTo(((PyString) right).getValue());
         } else {
-            throw new RuntimeException("unorderable types: " + left.getTypeName() + " and " + right.getTypeName());
+            throw typeError(expression, "unorderable types: " + left.getTypeName() + " and " + right.getTypeName(),
+                    left, right);
         }
     }
     
-    private boolean isIn(PyObject item, PyObject container) {
+    private boolean isIn(ASTNode expression, PyObject item, PyObject container) {
         if (container instanceof PyString && item instanceof PyString) {
             return ((PyString) container).getValue().contains(((PyString) item).getValue());
         } else if (container instanceof PyList) {
@@ -1314,7 +1495,8 @@ public class Interpreter implements ASTVisitor<PyObject> {
         } else if (container instanceof PyDict) {
             return ((PyDict) container).getEntries().containsKey(item);
         } else {
-            throw new RuntimeException("argument of type '" + container.getTypeName() + "' is not iterable");        }
+            throw typeError(expression, "argument of type '" + container.getTypeName() + "' is not iterable", item, container);
+        }
     }
     
     @Override
@@ -1329,7 +1511,11 @@ public class Interpreter implements ASTVisitor<PyObject> {
         PyInstance currentInstance = environment.getCurrentInstance();
         
         if (currentClass == null || currentInstance == null) {
-            throw new RuntimeException("super() can only be used inside a method");
+            PyInstance ins = (PyInstance) exceptions.createExceptionInstance("SyntaxError", List.of());
+            ExceptionWrapper wrapper = new ExceptionWrapper(ins);
+            wrapper.addNote(this, "super() can only be used inside a method");
+            wrapper.addTraceback(superExpression, currentClass);
+            throw wrapper;
         }
         
         // Create a super object that knows how to resolve methods from parent classes
@@ -1340,11 +1526,10 @@ public class Interpreter implements ASTVisitor<PyObject> {
     public PyObject visitStarredExpression(StarredExpression starredExpression) {
         // For starred expressions (*args), we need to evaluate the expression
         // and mark it as a starred argument for function calls
-        PyObject value = starredExpression.getExpression().accept(this);
-        
+
         // For now, return the value directly - the CallExpression visitor
         // should handle the unpacking logic
-        return value;
+        return starredExpression.getExpression().accept(this);
     }
 
     @Override
@@ -1400,7 +1585,7 @@ public class Interpreter implements ASTVisitor<PyObject> {
                 }
                 iterator = strs.iterator();
             } else {
-                PyObject iterMethod = iterable.getAttribute("__iter__");
+                PyObject iterMethod = iterable.getAttribute(this, "__iter__");
                 PyObject iterResult = iterMethod.call(Collections.emptyList(), this);
                 iterator = iterResult.iterator(this);
             }
@@ -1415,8 +1600,14 @@ public class Interpreter implements ASTVisitor<PyObject> {
                 }
                 executeComprehension(element, clauses, clauseIndex + 1, result);
             }
-        } catch (Exception e) {
-            throw new PyExceptionWrapper(PyException.typeError("'" + iterable.getTypeName() + "' object is not iterable"));
+        } catch (RuntimeException e) {
+            if (e instanceof ExceptionWrapper wrapper) {
+                wrapper.addTraceback(element, iterable);
+                throw wrapper;
+            }
+            ExceptionWrapper wrapper = exceptions.fromJavaException(this, e);
+            wrapper.addTraceback(element, iterable);
+            throw wrapper;
         } finally {
             this.environment = previous;
         }
@@ -1465,8 +1656,6 @@ public class Interpreter implements ASTVisitor<PyObject> {
         } else if (decorator.getTarget() instanceof ClassDef) {
             String name = ((ClassDef) decorator.getTarget()).getName();
             environment.define(name, decorated);
-        } else if (decorator.getTarget() instanceof Decorator) {
-            // For nested decorators, the name binding will be handled by the outermost decorator
         }
         
         return decorated;
@@ -1478,7 +1667,7 @@ public class Interpreter implements ASTVisitor<PyObject> {
         PyObject contextManager = statement.getContextExpression().accept(this);
         
         // Call __enter__ method
-        PyObject contextValue = contextManager.contextEnter();
+        PyObject contextValue = contextManager.contextEnter(this);
         
         // If there's a target variable, assign the context value to it
         if (statement.getTargetVariable() != null) {
@@ -1486,7 +1675,6 @@ public class Interpreter implements ASTVisitor<PyObject> {
         }
         
         PyObject result = PyNone.INSTANCE;
-        Throwable exception = null;
         boolean yieldCaught = false;
 
         try {
@@ -1506,32 +1694,23 @@ public class Interpreter implements ASTVisitor<PyObject> {
                 yieldCaught = true;
                 throw y;
             }
-            if (!(e instanceof PyFunction.ReturnException)) {
-                exception = e;
-            }
             throw e;
         } finally {
             if (!yieldCaught) {
                 // Always call __exit__, even if an exception occurred
-                exit(contextManager, exception);
+                exit(contextManager);
             }
         }
         
         return result;
     }
 
-    public void exit(PyObject contextManager, Throwable exception) {
+    public void exit(PyObject context) {
         try {
-            PyObject excType = exception != null ? new PyString(exception.getClass().getSimpleName()) : PyNone.INSTANCE;
-            PyObject excValue = exception != null ? new PyString(exception.getMessage()) : PyNone.INSTANCE;
-            PyObject excTraceback = PyNone.INSTANCE; // Simplified for now
-
-            contextManager.contextExit(excType, excValue, excTraceback);
+            context.contextExit(this);
         } catch (Exception exitException) {
             // If __exit__ raises an exception, it replaces the original exception
-            if (exception == null) {
-                throw new RuntimeException(exitException);
-            }
+            throw exceptions.fromJavaException(this, exitException);
             // If there was already an exception, the exit exception is ignored
         }
     }
@@ -1618,7 +1797,11 @@ public class Interpreter implements ASTVisitor<PyObject> {
         }
         
         // No case matched - this is a runtime error in Python
-        throw new RuntimeException("No matching case in match statement");
+        PyInstance ins = (PyInstance) exceptions.createExceptionInstance("RuntimeError", List.of());
+        ExceptionWrapper wrapper = new ExceptionWrapper(ins);
+        wrapper.addNote(this, "No matching case in match statement");
+        wrapper.addTraceback(statement, subject);
+        throw wrapper;
     }
     
     /**
@@ -1636,7 +1819,11 @@ public class Interpreter implements ASTVisitor<PyObject> {
         } else if (pattern instanceof OrPattern) {
             return matchOrPattern((OrPattern) pattern, subject);
         } else {
-            throw new RuntimeException("Unknown pattern type: " + pattern.getClass().getSimpleName());
+            PyInstance ins = (PyInstance) exceptions.createExceptionInstance("TypeError", List.of());
+            ExceptionWrapper wrapper = new ExceptionWrapper(ins);
+            wrapper.addNote(this, "Unknown pattern type: " + pattern.getClass().getSimpleName());
+            wrapper.addTraceback(pattern, subject);
+            throw wrapper;
         }
     }
       /**
@@ -1674,7 +1861,8 @@ public class Interpreter implements ASTVisitor<PyObject> {
         // Evaluate the literal value and compare with subject
         PyObject literalValue = pattern.getValue().accept(this);
         // Use Python equality semantics instead of Java equals()
-        PyObject result = callMagicMethod(literalValue, "__eq__", subject, () -> PyBool.valueOf(literalValue.equals(subject)));
+        PyObject result = callMagicMethod(literalValue, "__eq__", subject,
+                () -> PyBool.valueOf(literalValue.equals(subject)));
         return ((PyBool) result).getValue();
     }
     
@@ -1745,40 +1933,48 @@ public class Interpreter implements ASTVisitor<PyObject> {
         // Neither pattern matched
         return false;
     }
+
+    private ExceptionWrapper syntaxError(ASTNode expression, String note) {
+        PyInstance ins = (PyInstance) exceptions.createExceptionInstance("SyntaxError", List.of());
+        ExceptionWrapper wrapper = new ExceptionWrapper(ins);
+        wrapper.addTraceback(expression);
+        wrapper.addNote(this, note);
+        return wrapper;
+    }
     
     @Override
     public PyObject visitWildcardPattern(WildcardPattern pattern) {
         // This method should not be called directly during matching
         // Pattern matching is handled by matchPattern() method
-        throw new RuntimeException("Wildcard pattern should not be visited directly");
+        throw syntaxError(pattern, "Wildcard pattern should not be visited directly");
     }
     
     @Override
     public PyObject visitCapturePattern(CapturePattern pattern) {
         // This method should not be called directly during matching
         // Pattern matching is handled by matchPattern() method
-        throw new RuntimeException("Capture pattern should not be visited directly");
+        throw syntaxError(pattern, "Capture pattern should not be visited directly");
     }
     
     @Override
     public PyObject visitLiteralPattern(LiteralPattern pattern) {
         // This method should not be called directly during matching
         // Pattern matching is handled by matchPattern() method
-        throw new RuntimeException("Literal pattern should not be visited directly");
+        throw syntaxError(pattern, "Literal pattern should not be visited directly");
     }
     
     @Override
     public PyObject visitSequencePattern(SequencePattern pattern) {
         // This method should not be called directly during matching
         // Pattern matching is handled by matchPattern() method
-        throw new RuntimeException("Sequence pattern should not be visited directly");
+        throw syntaxError(pattern, "Sequence pattern should not be visited directly");
     }
     
     @Override
     public PyObject visitOrPattern(OrPattern pattern) {
         // This method should not be called directly during matching
         // Pattern matching is handled by matchPattern() method
-        throw new RuntimeException("Or pattern should not be visited directly");
+        throw syntaxError(pattern, "Or pattern should not be visited directly");
     }
     
     // 控制流异常

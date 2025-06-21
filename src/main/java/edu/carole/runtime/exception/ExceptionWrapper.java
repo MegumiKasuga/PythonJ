@@ -3,9 +3,11 @@ package edu.carole.runtime.exception;
 import edu.carole.ast.ASTNode;
 import edu.carole.interpreter.Interpreter;
 import edu.carole.runtime.*;
+import edu.carole.runtime.instance.PyInstance;
 import lombok.Getter;
 
 import java.util.Map;
+import java.util.function.Consumer;
 
 public class ExceptionWrapper extends RuntimeException {
 
@@ -38,11 +40,16 @@ public class ExceptionWrapper extends RuntimeException {
         }
     }
 
+    public void addNote(Interpreter interpreter, String note) {
+        PyList notes = (PyList) exception.getAttribute(interpreter, "__notes__");
+        notes.getElements().add(new PyString(note));
+    }
+
     public void setCause(Interpreter interpreter, PyInstance cause) {
         if (!isException(interpreter, cause))
             throw new RuntimeException("cause must be an exception");
-        exception.setAttribute("__cause__", cause);
-        exception.setAttribute("__suppress_context__", PyBool.TRUE);
+        exception.setAttribute(interpreter, "__cause__", cause);
+        exception.setAttribute(interpreter, "__suppress_context__", PyBool.TRUE);
     }
 
     public static boolean isException(Interpreter interpreter, PyInstance instance) {
@@ -54,5 +61,26 @@ public class ExceptionWrapper extends RuntimeException {
         return super.getStackTrace();
     }
 
+    public static ExceptionWrapper getWrapper(RuntimeException e) {
+        return (e instanceof ExceptionWrapper wrapper) ? wrapper : null;
+    }
+
+    public static RuntimeException consumeWrapper(RuntimeException e, Consumer<ExceptionWrapper> consumer) {
+        ExceptionWrapper wrapper = getWrapper(e);
+        if (wrapper == null) return e;
+        consumer.accept(wrapper);
+        return wrapper;
+    }
+
+    public static RuntimeException consumeWrapper(RuntimeException e, Consumer<ExceptionWrapper> onWrapper,
+                                         Consumer<RuntimeException> onNotWrapper) {
+        ExceptionWrapper wrapper = getWrapper(e);
+        if (wrapper == null) {
+            onNotWrapper.accept(e);
+            return e;
+        }
+        onWrapper.accept(wrapper);
+        return wrapper;
+    }
 
 }

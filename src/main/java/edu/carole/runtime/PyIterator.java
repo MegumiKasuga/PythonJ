@@ -1,6 +1,7 @@
 package edu.carole.runtime;
 
 import edu.carole.interpreter.Interpreter;
+import edu.carole.runtime.func.PyBuiltinFunction;
 
 import java.util.Iterator;
 import java.util.List;
@@ -34,7 +35,7 @@ public class PyIterator extends PyObject implements Iterator<PyObject> {
     private PyObject runIterMethod(PyObject obj, Interpreter interpreter) {
         PyObject iterMethod;
         try {
-            iterMethod = obj.getAttribute("__iter__");
+            iterMethod = obj.getAttribute(interpreter, "__iter__");
         } catch (RuntimeException e) {
             throw new RuntimeException("Object does not have an __iter__ method");
         }
@@ -57,7 +58,7 @@ public class PyIterator extends PyObject implements Iterator<PyObject> {
     }
     
     @Override
-    public PyObject getAttribute(String name) {
+    public PyObject getAttribute(Interpreter inter, String name) {
         return switch (name) {
             case "__iter__" -> new PyBuiltinFunction("__iter__", (args, kwargs, interpreter) -> {
                 if (!args.isEmpty()) {
@@ -72,7 +73,7 @@ public class PyIterator extends PyObject implements Iterator<PyObject> {
                 if (iterator == null) {
                     PyObject nextMethod;
                     try {
-                        nextMethod = pyObject.getAttribute("__next__");
+                        nextMethod = pyObject.getAttribute(interpreter, "__next__");
                     } catch (RuntimeException e) {
                         throw new RuntimeException("Iterator object does not have a __next__ method");
                     }
@@ -93,7 +94,7 @@ public class PyIterator extends PyObject implements Iterator<PyObject> {
                     }
                 }
             });
-            default -> super.getAttribute(name);
+            default -> super.getAttribute(interpreter, name);
         };
     }
     
@@ -130,7 +131,7 @@ public class PyIterator extends PyObject implements Iterator<PyObject> {
                     throw new RuntimeException("StopIteration");
                 }
             } else {
-                PyObject nextMethod = pyObject.getAttribute("__next__");
+                PyObject nextMethod = pyObject.getAttribute(interpreter, "__next__");
                 try {
                     return nextMethod.call(List.of(), interpreter); // Call the __next__ method on the PyObject
                 } catch (RuntimeException e) {

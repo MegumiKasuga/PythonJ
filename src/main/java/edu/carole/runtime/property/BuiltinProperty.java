@@ -1,7 +1,7 @@
 package edu.carole.runtime.property;
 
 import edu.carole.interpreter.Interpreter;
-import edu.carole.runtime.PyBuiltinFunction;
+import edu.carole.runtime.func.PyBuiltinFunction;
 import edu.carole.runtime.PyObject;
 
 import java.util.ArrayList;
@@ -20,7 +20,7 @@ public class BuiltinProperty extends AbstractProperty {
     }
 
     @Override
-    public AbstractProperty boundToInstance(PyObject instance) {
+    public AbstractProperty boundToInstance(Interpreter interpreter, PyObject instance) {
         return this;
     }
 

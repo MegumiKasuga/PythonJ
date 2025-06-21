@@ -1,10 +1,10 @@
-package edu.carole.runtime;
+package edu.carole.runtime.func;
 
 import edu.carole.ast.ASTNode;
-import edu.carole.ast.statements.Decorator;
 import edu.carole.ast.statements.FunctionParameter;
 import edu.carole.interpreter.Environment;
 import edu.carole.interpreter.Interpreter;
+import edu.carole.runtime.*;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -185,13 +185,13 @@ public class PyFunction extends PyObject implements InstanceBindable {
                 attributes.get("__isabstractmethod__").isTruthy();
     }
 
+    public void setAbstractMethod(boolean isAbstract) {
+        attributes.put("__isabstractmethod__", PyBool.fromValue(isAbstract));
+    }
+
     public boolean isSetterMethod() {
         return attributes.containsKey("__ispropertysetter__") &&
                 attributes.get("__ispropertysetter__").isTruthy();
-    }
-
-    public void setAbstractMethod(boolean isAbstract) {
-        attributes.put("__isabstractmethod__", PyBool.fromValue(isAbstract));
     }
 
     @Override
@@ -214,7 +214,7 @@ public class PyFunction extends PyObject implements InstanceBindable {
     public Environment getClosure() { return closure; }
 
     @Override
-    public PyObject getAttribute(String attributeName) {
+    public PyObject getAttribute(Interpreter interpreter, String attributeName) {
         if (attributes.containsKey(attributeName)) {
             return attributes.get(attributeName);
         } else if ("__name__".equals(attributeName)) {
@@ -226,11 +226,11 @@ public class PyFunction extends PyObject implements InstanceBindable {
             // Return None if no module is set
             return PyNone.INSTANCE;
         }
-        return super.getAttribute(attributeName);
+        return super.getAttribute(interpreter, attributeName);
     }
     
     @Override
-    public void setAttribute(String attributeName, PyObject value) {
+    public void setAttribute(Interpreter interpreter, String attributeName, PyObject value) {
         attributes.put(attributeName, value);
     }
     
@@ -560,7 +560,7 @@ public class PyFunction extends PyObject implements InstanceBindable {
      * @return A new PyFunction that is bound to the specified instance
      */
     @Override
-    public PyFunction bindToInstance(PyObject instance) {
+    public PyFunction bindToInstance(Interpreter interpreter, PyObject instance) {
         PyFunction boundFunction = new PyFunction(
                 name,
                 functionParameters,
@@ -577,7 +577,7 @@ public class PyFunction extends PyObject implements InstanceBindable {
 
         // Copy attributes to the bound function
         for (Map.Entry<String, PyObject> entry : attributes.entrySet()) {
-            boundFunction.setAttribute(entry.getKey(), entry.getValue());
+            boundFunction.setAttribute(interpreter, entry.getKey(), entry.getValue());
         }
 
         return boundFunction;

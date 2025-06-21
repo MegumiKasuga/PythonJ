@@ -2,6 +2,7 @@ package edu.carole.ast.statements;
 
 import edu.carole.ast.ASTNode;
 import edu.carole.ast.ast.ASTVisitor;
+import edu.carole.ast.expressions.BinaryExpression;
 import lombok.Getter;
 
 /**
@@ -53,6 +54,23 @@ public class CompoundAssignmentStatement extends ASTNode {
 
     public String getTarget() { return target; }
     public Operator getOperator() { return operator; }
+
+    public BinaryExpression.Operator getBinaryOperator() {
+        return switch (operator) {
+            case OR_ASSIGN -> BinaryExpression.Operator.OR;
+            case PLUS_ASSIGN -> BinaryExpression.Operator.PLUS;
+            case AND_ASSIGN -> BinaryExpression.Operator.AND;
+            case MINUS_ASSIGN -> BinaryExpression.Operator.MINUS;
+            case MULTIPLY_ASSIGN -> BinaryExpression.Operator.MULTIPLY;
+            case DIVIDE_ASSIGN -> BinaryExpression.Operator.DIVIDE;
+            case MODULO_ASSIGN -> BinaryExpression.Operator.MODULO;
+            case POWER_ASSIGN -> BinaryExpression.Operator.POWER;
+            case FLOOR_DIVIDE_ASSIGN -> BinaryExpression.Operator.FLOOR_DIVIDE;
+            case XOR_ASSIGN -> BinaryExpression.Operator.BITWISE_XOR;
+            case LEFT_SHIFT_ASSIGN -> BinaryExpression.Operator.LEFT_SHIFT;
+            case RIGHT_SHIFT_ASSIGN -> BinaryExpression.Operator.RIGHT_SHIFT;
+        };
+    }
     public ASTNode getValue() { return value; }
     
     @Override

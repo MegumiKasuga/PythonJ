@@ -1,5 +1,9 @@
 package edu.carole.runtime;
 
+import edu.carole.interpreter.Interpreter;
+import edu.carole.runtime.clazz.PyClass;
+import edu.carole.runtime.instance.PyInstance;
+
 import java.util.*;
 
 /**
@@ -60,15 +64,15 @@ public class PySuper extends PyObject {
     }
     
     @Override
-    public PyObject getAttribute(String name) {
+    public PyObject getAttribute(Interpreter interpreter, String name) {
         // 从startIndex开始在MRO中查找方法
         for (int i = startIndex; i < mro.size(); i++) {
             PyClass cls = mro.get(i);
             PyObject method = cls.getMethods().get(name);
-            if (method != null) {
-                // 返回绑定到原实例的方法
-                return new PyBoundMethod(instance, method);
+            if (method instanceof InstanceBindable bindable) {
+                return bindable.bindToInstance(interpreter, instance);
             }
+            if (method != null) return method;
         }
         
         throw new RuntimeException("'super' object has no attribute '" + name + "'");

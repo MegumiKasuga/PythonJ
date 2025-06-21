@@ -1,5 +1,7 @@
 package edu.carole.runtime;
 
+import edu.carole.runtime.clazz.PyClass;
+
 import java.util.*;
 
 /**

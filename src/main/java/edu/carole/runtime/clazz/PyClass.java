@@ -1,7 +1,11 @@
-package edu.carole.runtime;
+package edu.carole.runtime.clazz;
 
 import edu.carole.interpreter.Interpreter;
+import edu.carole.runtime.*;
+import edu.carole.runtime.func.PyFunction;
+import edu.carole.runtime.instance.PyInstance;
 import edu.carole.runtime.property.PyProperty;
+import lombok.Getter;
 
 import java.util.*;
 
@@ -15,19 +19,23 @@ public class PyClass extends PyObject {
     private List<PyClass> mro; // 方法解析顺序 (Method Resolution Order)
     private PyClasspath classpath; // Class path information
     private final Map<String, PyObject> classAttributes; // Class attributes
+
+    @Getter
     private final Map<String, PyProperty> properties = new HashMap<>(); // Class properties
     
     public PyClass(String name, Map<String, PyObject> methods) {
+        super();
         this.name = name;
         this.methods = new HashMap<>(methods);
         this.baseClasses = new ArrayList<>();
         computeMRO();
         // Create default classpath in __main__ module
         this.classpath = new PyClasspath(this, name);
-        classAttributes = new HashMap<>();
+        classAttributes = attributes;
     }
     
     public PyClass(String name, Map<String, PyObject> methods, List<PyClass> baseClasses) {
+        super();
         this.name = name;
         this.methods = new HashMap<>(methods);
         this.baseClasses = new ArrayList<>(baseClasses);
@@ -40,7 +48,7 @@ public class PyClass extends PyObject {
         for (PyClass baseClass : baseClasses) {
             this.classpath.addParentClasspath(baseClass.getClasspath());
         }
-        classAttributes = new HashMap<>();
+        classAttributes = attributes;
     }
     
     /**
@@ -51,12 +59,13 @@ public class PyClass extends PyObject {
      * @param methods Class methods
      */
     public PyClass(String name, String modulePath, Map<String, PyObject> methods) {
+        super();
         this.name = name;
         this.methods = new HashMap<>(methods);
         this.baseClasses = new ArrayList<>();
         computeMRO();
         this.classpath = new PyClasspath(this, modulePath, name);
-        classAttributes = new HashMap<>();
+        classAttributes = attributes;
     }
     
     /**
@@ -68,6 +77,7 @@ public class PyClass extends PyObject {
      * @param baseClasses Base classes
      */
     public PyClass(String name, String modulePath, Map<String, PyObject> methods, List<PyClass> baseClasses) {
+        super();
         this.name = name;
         this.methods = new HashMap<>(methods);
         this.baseClasses = new ArrayList<>(baseClasses);
@@ -79,7 +89,7 @@ public class PyClass extends PyObject {
             parentPaths.add(baseClass.getClasspath());
         }
         this.classpath = new PyClasspath(this, modulePath, name, parentPaths);
-        classAttributes = new HashMap<>();
+        classAttributes = attributes;
     }
 
     public void addClassAttribute(String name, PyObject value) {
@@ -135,7 +145,7 @@ public class PyClass extends PyObject {
             // 如果已经加载了abc模块，直接使用其中的ABC类
             PyObject abcModule = interpreter.getModuleLoader().getLoadedModules().get("abc");
             if (abcModule instanceof PyModule pyModule) {
-                PyObject abcClass = pyModule.getAttribute("ABC");
+                PyObject abcClass = pyModule.getAttribute(interpreter, "ABC");
                 return this == abcClass || baseClasses.contains(abcClass);
             }
         }
@@ -191,7 +201,7 @@ public class PyClass extends PyObject {
     public boolean isTruthy() { return true; }
 
     @Override
-    public PyObject getAttribute(String attributeName) {
+    public PyObject getAttribute(Interpreter interpreter, String attributeName) {
         // 按MRO顺序查找方法
         for (PyClass cls : mro) {
             PyObject method = cls.methods.get(attributeName);
@@ -243,7 +253,7 @@ public class PyClass extends PyObject {
         PyInstance instance = new PyInstance(this);
         properties.forEach(
                 (name, prop) -> {
-                    instance.setAttribute(name, prop.boundToInstance(instance));
+                    instance.setAttribute(interpreter, name, prop.boundToInstance(interpreter, instance));
                 }
         );
 
@@ -251,16 +261,18 @@ public class PyClass extends PyObject {
         PyObject initMethod = findMethod("__init__");
         if (initMethod != null) {
             // Create a bound method to ensure proper context setting
-            PyBoundMethod boundInit = new PyBoundMethod(instance, initMethod);
+            if (initMethod instanceof InstanceBindable bindable) {
+                initMethod = bindable.bindToInstance(interpreter, instance);
+            }
 
             // Use interpreter-aware call if available
             if (keywordArguments != null && !keywordArguments.isEmpty()) {
-                boundInit.call(arguments, keywordArguments, interpreter);
+                initMethod.call(arguments, keywordArguments, interpreter);
             }
             if (interpreter != null) {
-                boundInit.call(arguments, interpreter);
+                initMethod.call(arguments, interpreter);
             } else {
-                boundInit.call(arguments, interpreter);
+                initMethod.call(arguments, interpreter);
             }
         }
 

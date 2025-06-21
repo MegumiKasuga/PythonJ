@@ -1,6 +1,9 @@
 package edu.carole.interpreter;
 
 import edu.carole.runtime.*;
+import edu.carole.runtime.clazz.PyClass;
+import edu.carole.runtime.func.PyFunction;
+import edu.carole.runtime.instance.PyInstance;
 import edu.carole.runtime.property.PyProperty;
 
 import java.util.ArrayList;
@@ -117,7 +120,7 @@ public class Environment {
             if (i == path.length - 1) {
                 return currentValues;
             } else if (obj instanceof PyModule module) {
-                if (module.getAttribute(path[i + 1]) != null) {
+                if (module.getAttribute(interpreter, path[i + 1]) != null) {
                     currentValues = module.getAttributes();
                 }
             } else if (obj instanceof PyClass cls) {
@@ -166,7 +169,7 @@ public class Environment {
                                             );
                                         }
                                     }
-                                    PyObject rst = ib.bindToInstance(instance);
+                                    PyObject rst = ib.bindToInstance(interpreter, instance);
                                     return Map.of(path[i + 1], rst);
                                 }
                             }
@@ -182,7 +185,7 @@ public class Environment {
                 }
             } else {
                 try {
-                    PyObject value = obj.getAttribute(path[i + 1]);
+                    PyObject value = obj.getAttribute(interpreter, path[i + 1]);
                     currentValues = new HashMap<>();
                     currentValues.put(path[i + 1], value);
                 } catch (Exception e) {

@@ -2,6 +2,7 @@ package edu.carole.runtime.file_context;
 
 import edu.carole.interpreter.Interpreter;
 import edu.carole.runtime.*;
+import edu.carole.runtime.func.PyBuiltinFunction;
 import edu.carole.runtime.io.IOManager;
 import edu.carole.runtime.property.BuiltinProperty;
 
@@ -64,7 +65,7 @@ public class PyBinaryFileContext extends PyFileContext {
 
     // TODO: finish this context
     @Override
-    public PyObject contextEnter() {
+    public PyObject contextEnter(Interpreter interpreter) {
         try {
             setOpen(true);
             if (readingMode()) {
@@ -84,7 +85,7 @@ public class PyBinaryFileContext extends PyFileContext {
     }
 
     @Override
-    public PyObject contextExit(PyObject exceptionType, PyObject exceptionValue, PyObject traceback) {
+    public PyObject contextExit(Interpreter inter) {
         try {
             if (isOpen()) {
                 setOpen(false);

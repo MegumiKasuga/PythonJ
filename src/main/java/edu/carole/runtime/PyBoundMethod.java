@@ -1,6 +1,7 @@
 package edu.carole.runtime;
 
 import edu.carole.interpreter.Interpreter;
+import edu.carole.runtime.instance.PyInstance;
 
 import java.util.*;
 

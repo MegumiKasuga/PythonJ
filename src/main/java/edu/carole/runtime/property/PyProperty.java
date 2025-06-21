@@ -1,12 +1,10 @@
 package edu.carole.runtime.property;
 
 import edu.carole.interpreter.Interpreter;
-import edu.carole.runtime.PyFunction;
-import edu.carole.runtime.PyNone;
+import edu.carole.runtime.func.PyFunction;
 import edu.carole.runtime.PyObject;
 
 import java.util.List;
-import java.util.Map;
 
 public class PyProperty extends AbstractProperty {
 

@@ -2,13 +2,14 @@ package edu.carole.runtime;
 
 import edu.carole.interpreter.Interpreter;
 import edu.carole.interpreter.Environment;
-import edu.carole.interpreter.BuiltinFunctions;
 import edu.carole.lexer.Lexer;
 import edu.carole.parser.Parser;
 import edu.carole.ast.statements.Program;
+import edu.carole.runtime.exception.ExceptionWrapper;
+import edu.carole.runtime.func.PyBuiltinFunction;
+import edu.carole.runtime.instance.PyInstance;
 import edu.carole.runtime.io.IOManager;
-import lombok.NonNull;
-import lombok.Setter;
+import lombok.Getter;
 
 import java.io.*;
 import java.nio.charset.Charset;
@@ -25,6 +26,7 @@ public class ModuleLoader {
     private final Map<String, PyModule> builtinModules;
     private final IOManager io;
 
+    @Getter
     private final Interpreter interpreter;
     
     public ModuleLoader(Interpreter interpreter, IOManager io) {
@@ -67,8 +69,12 @@ public class ModuleLoader {
             loadedModules.put(moduleName, module);
             return module;
         }
-        
-        throw new RuntimeException("No module named '" + moduleName + "'");
+
+        PyInstance ins = (PyInstance) interpreter.getExceptions()
+                .createExceptionInstance("ModuleNotFoundError", List.of());
+        ExceptionWrapper wrapper = new ExceptionWrapper(ins);
+        wrapper.addNote(interpreter, "No module named '" + moduleName + "'");
+        throw wrapper;
     }
     
     /**
@@ -95,7 +101,7 @@ public class ModuleLoader {
      * @return The imported item, or null if not found
      */
     public PyObject importFromModule(PyModule module, String itemName) {
-        return module.getAttribute(itemName);
+        return module.getAttribute(interpreter, itemName);
     }
     
     /**

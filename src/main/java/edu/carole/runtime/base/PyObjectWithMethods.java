@@ -1,5 +1,6 @@
 package edu.carole.runtime.base;
 
+import edu.carole.interpreter.Interpreter;
 import edu.carole.runtime.PyObject;
 import edu.carole.runtime.registry.MethodRegistry;
 
@@ -20,14 +21,14 @@ public abstract class PyObjectWithMethods extends PyObject {
     protected abstract void registerMethods();
     
     @Override
-    public PyObject getAttribute(String name) {
+    public PyObject getAttribute(Interpreter interpreter, String name) {
         // 首先尝试从方法注册表中获取
         if (methodRegistry.hasMethod(name)) {
             return methodRegistry.getMethod(name);
         }
         
         // 如果注册表中没有，则调用父类方法
-        return super.getAttribute(name);
+        return super.getAttribute(interpreter, name);
     }
     
     /**

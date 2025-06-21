@@ -1,6 +1,7 @@
 package edu.carole.runtime;
 
 import edu.carole.runtime.base.PyObjectWithMethods;
+import edu.carole.runtime.func.PyBuiltinFunction;
 import edu.carole.runtime.registry.MethodBuilder;
 
 /**

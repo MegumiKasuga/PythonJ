@@ -1,6 +1,7 @@
 package edu.carole.runtime;
 
 import edu.carole.interpreter.Interpreter;
+import edu.carole.runtime.func.PyBuiltinFunction;
 
 import java.util.Map;
 import java.util.function.Function;

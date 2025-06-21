@@ -1,11 +1,11 @@
 package edu.carole.runtime.file_context;
 
+import edu.carole.interpreter.Interpreter;
 import edu.carole.runtime.PyBool;
-import edu.carole.runtime.PyBuiltinFunction;
+import edu.carole.runtime.func.PyBuiltinFunction;
 import edu.carole.runtime.PyObject;
 import edu.carole.runtime.PyString;
 import edu.carole.runtime.property.BuiltinProperty;
-import edu.carole.runtime.property.PyProperty;
 import edu.carole.runtime.io.IOManager;
 
 import java.io.IOException;
@@ -55,12 +55,12 @@ public abstract class PyFileContext extends PyObject {
                 (args, kwargs, inter) -> new PyString(path)));
         attributes.put("close", new PyBuiltinFunction("close",
                 (args, kwargs, inter) ->
-                this.contextExit(null, null, null)));
+                this.contextExit(inter)));
     }
 
-    public abstract PyObject contextEnter();
+    public abstract PyObject contextEnter(Interpreter interpreter);
 
-    public abstract PyObject contextExit(PyObject exceptionType, PyObject exceptionValue, PyObject traceback);
+    public abstract PyObject contextExit(Interpreter interpreter);
 
     public HashMap<String, PyObject> getAttributes() {
         return attributes;
@@ -75,9 +75,9 @@ public abstract class PyFileContext extends PyObject {
     }
 
     @Override
-    public PyObject getAttribute(String name) {
+    public PyObject getAttribute(Interpreter interpreter, String name) {
         if (!attributes.containsKey(name)) {
-            return super.getAttribute(name);
+            return super.getAttribute(interpreter, name);
         }
         return attributes.get(name);
     }

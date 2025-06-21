@@ -1,6 +1,10 @@
 package edu.carole.runtime.BuiltinModules;
 
+import edu.carole.interpreter.Interpreter;
 import edu.carole.runtime.*;
+import edu.carole.runtime.clazz.PyClass;
+import edu.carole.runtime.func.PyBuiltinFunction;
+import edu.carole.runtime.func.PyFunction;
 import edu.carole.runtime.property.PyProperty;
 
 import java.util.HashMap;
@@ -8,14 +12,14 @@ import java.util.Map;
 
 public class abc {
 
-    public static PyModule createModule() {
+    public static PyModule createModule(Interpreter inter) {
         PyModule module = new PyModule("abc", "Abstract Base Classes (ABCs) for Python");
 
         // Add ABC class
-        module.setAttribute("ABC", new ABC("ABC", new HashMap<>()));
+        module.setAttribute(inter, "ABC", new ABC("ABC", new HashMap<>()));
 
         // Add abstractmethod decorator
-        module.setAttribute("abstractmethod", new PyBuiltinFunction("abstractmethod",
+        module.setAttribute(inter, "abstractmethod", new PyBuiltinFunction("abstractmethod",
                 (args, kwargs, interpreter) -> {
                     if (args.size() != 1) {
                         throw new RuntimeException("@abstractmethod takes exactly 1 argument");
@@ -32,7 +36,7 @@ public class abc {
         }));
 
         // Add abstractproperty decorator
-        module.setAttribute("abstractproperty", new PyBuiltinFunction("abstractproperty",
+        module.setAttribute(inter, "abstractproperty", new PyBuiltinFunction("abstractproperty",
                 (args, kwargs, interpreter) -> {
                     if (args.size() != 1) {
                         throw new RuntimeException("@abstractproperty takes exactly 1 argument");
@@ -45,7 +49,7 @@ public class abc {
                     if (func.isStaticMethod()) {
                         throw new RuntimeException("@abstractproperty cannot be applied to static methods");
                     }
-                    func.setAttribute("__isproperty__", PyBool.TRUE);
+                    func.setAttribute(interpreter, "__isproperty__", PyBool.TRUE);
                     return new PyProperty(func);
         }));
 
@@ -54,7 +58,7 @@ public class abc {
 
     public static void registerModule(ModuleLoader loader) {
         // modules.put("abc", createModule());
-        loader.getLoadedModules().put("abc", createModule());
+        loader.getLoadedModules().put("abc", createModule(loader.getInterpreter()));
     }
 
     public static class ABC extends PyClass {

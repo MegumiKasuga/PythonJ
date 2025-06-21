@@ -1,6 +1,9 @@
 package edu.carole.runtime;
 
 import edu.carole.interpreter.Interpreter;
+import edu.carole.runtime.exception.ExceptionWrapper;
+import edu.carole.runtime.func.PyBuiltinFunction;
+import edu.carole.runtime.instance.PyInstance;
 
 import java.util.*;
 
@@ -12,23 +15,40 @@ public abstract class PyObject {
     public abstract String getTypeName();
     public abstract String toString();
     public abstract boolean isTruthy();
+
+    public Map<String, PyObject> attributes;
+
+    public PyObject() {
+        attributes = new HashMap<>();
+        initAttributes(attributes);
+    }
+
+    public void initAttributes(Map<String, PyObject> attr) {
+        attr.put("__str__", new PyBuiltinFunction("__str__", (args, kwargs, interpreter) -> new PyString(this.toString())));
+        attr.put("__repr__", new PyBuiltinFunction("__repr__", (args, kwargs, interpreter) -> new PyString(this.toString())));
+        attr.put("__bool__", new PyBuiltinFunction("__bool__", (args, kwargs, interpreter) -> PyBool.valueOf(this.isTruthy())));
+    }
+
       /**
      * 获取属性
      */
-    public PyObject getAttribute(String name) {
+    public PyObject getAttribute(Interpreter interpreter, String name) {
         // 提供一些默认的魔术方法
-        return switch (name) {
-            case "__str__" -> new PyBuiltinFunction("__str__", (args, kwargs, interpreter) -> new PyString(this.toString()));
-            case "__repr__" -> new PyBuiltinFunction("__repr__", (args, kwargs, interpreter) -> new PyString(this.toString()));
-            case "__bool__" -> new PyBuiltinFunction("__bool__", (args, kwargs, interpreter) -> PyBool.valueOf(this.isTruthy()));
-            default -> throw new RuntimeException("'" + getTypeName() + "' object has no attribute '" + name + "'");
-        };
+        PyObject result = attributes.getOrDefault(name, null);
+        if (result == null) {
+            PyInstance ins = (PyInstance) interpreter.getExceptions().
+                    createExceptionInstance("KeyError", List.of());
+            ExceptionWrapper wrapper = new ExceptionWrapper(ins);
+            wrapper.addNote(interpreter, "'" + getTypeName() + "' object has no attribute '" + name + "'");
+            throw wrapper;
+        }
+        return result;
     }
     
     /**
      * 设置属性
      */
-    public void setAttribute(String name, PyObject value) {
+    public void setAttribute(Interpreter interpreter, String name, PyObject value) {
         throw new RuntimeException("'" + getTypeName() + "' object has no attribute '" + name + "'");
     }
     
@@ -86,11 +106,15 @@ public abstract class PyObject {
      */
     public Iterator<PyObject> iterator(Interpreter interpreter) {
         try {
-            getAttribute("__iter__");
-            getAttribute("__next__");
+            getAttribute(interpreter, "__iter__");
+            getAttribute(interpreter, "__next__");
         } catch (RuntimeException e) {
             // 如果没有__iter__或__next__方法，抛出异常
-            throw new RuntimeException("'" + getTypeName() + "' object is not iterable");
+            PyInstance ins = (PyInstance) interpreter.getExceptions().
+                    createExceptionInstance("TypeError", List.of());
+            ExceptionWrapper wrapper = new ExceptionWrapper(ins);
+            wrapper.addNote(interpreter, "'" + getTypeName() + "' object is not iterable");
+            throw wrapper;
         }
         return new PyIterator(interpreter, this, getTypeName());
     }
@@ -104,18 +128,13 @@ public abstract class PyObject {
     /**
      * 上下文管理器协议：进入上下文
      */
-    public PyObject contextEnter() {
-        throw new RuntimeException("'" + getTypeName() + "' object does not support the context manager protocol");
+    public PyObject contextEnter(Interpreter interpreter) {
+        PyObject enterFunc = getAttribute(interpreter, "__enter__");
+        return enterFunc.call(List.of(), interpreter);
     }
-    
-    /**
-     * 上下文管理器协议：退出上下文
-     * @param exceptionType 异常类型（如果有）
-     * @param exceptionValue 异常值（如果有）
-     * @param traceback 异常追踪（如果有）
-     * @return 是否抑制异常（True表示抑制，False表示传播）
-     */
-    public PyObject contextExit(PyObject exceptionType, PyObject exceptionValue, PyObject traceback) {
+
+
+    public PyObject contextExit(Interpreter interpreter) {
         throw new RuntimeException("'" + getTypeName() + "' object does not support the context manager protocol");
     }
 }

@@ -268,7 +268,8 @@ public class PyFloat extends PyObjectWithMethods {
         // Reduce to lowest terms using GCD
         long gcd = gcd(Math.abs(numerator), denominator);
         numerator /= gcd;
-        denominator /= gcd;        java.util.List<PyObject> result = new java.util.ArrayList<>();
+        denominator /= gcd;
+        java.util.List<PyObject> result = new java.util.ArrayList<>();
         result.add(new PyInt(numerator));
         result.add(new PyInt(denominator));
         return new PyTuple(result);

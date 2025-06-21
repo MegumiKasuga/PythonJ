@@ -2,8 +2,9 @@ package edu.carole.runtime.exception;
 
 import edu.carole.interpreter.Interpreter;
 import edu.carole.runtime.*;
-import edu.carole.runtime.property.BuiltinProperty;
-import edu.carole.runtime.property.PyProperty;
+import edu.carole.runtime.clazz.PyClass;
+import edu.carole.runtime.func.PyBuiltinFunction;
+import edu.carole.runtime.instance.PyInstance;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -40,7 +41,7 @@ public class BaseException extends PyClass {
             if (args.size() != 2)
                 throw new RuntimeException("must has one arg");
             PyObject instance = args.get(0);
-            PyList list = (PyList) instance.getAttribute("__notes__");
+            PyList list = (PyList) instance.getAttribute(inter, "__notes__");
             list.getElements().add(args.get(1));
             return PyNone.INSTANCE;
         }));
@@ -49,8 +50,8 @@ public class BaseException extends PyClass {
                 throw new RuntimeException("must has one arg");
             PyObject instance = args.get(0);
             PyInstance ins = (PyInstance) args.get(1);
-            PyObject tb = ins.getAttribute("__traceback__");
-            instance.setAttribute("__traceback__", tb);
+            PyObject tb = ins.getAttribute(inter, "__traceback__");
+            instance.setAttribute(inter, "__traceback__", tb);
             return instance;
         }));
         if (methodCustomizer != null) {
@@ -64,11 +65,11 @@ public class BaseException extends PyClass {
     @Override
     public PyObject call(List<PyObject> arguments, Map<String, PyObject> keywordArguments, Interpreter interpreter) {
         final PyInstance instance = (PyInstance) super.call(arguments, keywordArguments, interpreter);
-        instance.setAttribute("__cause__", PyNone.INSTANCE);
-        instance.setAttribute("__context__", PyNone.INSTANCE);
-        instance.setAttribute("__suppress_context__", PyBool.FALSE);
-        instance.setAttribute("__traceback__", PyNone.INSTANCE);
-        instance.setAttribute("__notes__", new PyList(new ArrayList<>()));
+        instance.setAttribute(interpreter, "__cause__", PyNone.INSTANCE);
+        instance.setAttribute(interpreter, "__context__", PyNone.INSTANCE);
+        instance.setAttribute(interpreter, "__suppress_context__", PyBool.FALSE);
+        instance.setAttribute(interpreter, "__traceback__", PyNone.INSTANCE);
+        instance.setAttribute(interpreter, "__notes__", new PyList(new ArrayList<>()));
         if (instanceConsumer != null) {
             instanceConsumer.accept(instance);
         }

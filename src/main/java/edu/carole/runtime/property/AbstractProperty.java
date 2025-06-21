@@ -31,15 +31,15 @@ public abstract class AbstractProperty extends PyObject {
         this.listener = listener;
     }
 
-    public AbstractProperty boundToInstance(PyObject instance) {
+    public AbstractProperty boundToInstance(Interpreter interpreter, PyObject instance) {
         PyObject neoGetter, neoSetter;
         if (getter instanceof InstanceBindable pyFunc) {
-            neoGetter = pyFunc.bindToInstance(instance);
+            neoGetter = pyFunc.bindToInstance(interpreter, instance);
         } else {
             neoGetter = getter;
         }
         if (setter instanceof InstanceBindable pyFunc) {
-            neoSetter = pyFunc.bindToInstance(instance);
+            neoSetter = pyFunc.bindToInstance(interpreter, instance);
         } else {
             neoSetter = setter;
         }

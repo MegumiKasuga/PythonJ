@@ -1,13 +1,12 @@
 package edu.carole.runtime.registry;
 
 import edu.carole.interpreter.Interpreter;
-import edu.carole.runtime.PyBuiltinFunction;
+import edu.carole.runtime.func.PyBuiltinFunction;
 import edu.carole.runtime.PyObject;
 import edu.carole.runtime.PyStaticMethod;
-import edu.carole.runtime.PyAbstractMethod;
+
 import java.util.HashMap;
 import java.util.Map;
-import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.List;
 

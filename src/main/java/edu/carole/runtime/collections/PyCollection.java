@@ -1,7 +1,8 @@
 package edu.carole.runtime.collections;
 
+import edu.carole.interpreter.Interpreter;
 import edu.carole.runtime.PyObject;
-import edu.carole.runtime.PyBuiltinFunction;
+import edu.carole.runtime.func.PyBuiltinFunction;
 import edu.carole.runtime.PyBool;
 
 /**
@@ -24,7 +25,7 @@ public abstract class PyCollection extends PyIterable {
     public abstract boolean contains(PyObject item);
     
     @Override
-    public PyObject getAttribute(String name) {
+    public PyObject getAttribute(Interpreter interpreter, String name) {
         switch (name) {
             case "__len__":
                 return new PyBuiltinFunction("__len__", (args, kwargs, inter) -> {
@@ -43,7 +44,7 @@ public abstract class PyCollection extends PyIterable {
                 });
                 
             default:
-                return super.getAttribute(name);
+                return super.getAttribute(interpreter, name);
         }
     }
     

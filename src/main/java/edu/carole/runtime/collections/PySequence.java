@@ -1,7 +1,8 @@
 package edu.carole.runtime.collections;
 
+import edu.carole.interpreter.Interpreter;
 import edu.carole.runtime.PyObject;
-import edu.carole.runtime.PyBuiltinFunction;
+import edu.carole.runtime.func.PyBuiltinFunction;
 
 /**
  * Python Sequence abstract base class
@@ -40,7 +41,7 @@ public abstract class PySequence extends PyCollection {
     public abstract PyObject index(PyObject item, PyObject start, PyObject end);
     
     @Override
-    public PyObject getAttribute(String name) {
+    public PyObject getAttribute(Interpreter interpreter, String name) {
         switch (name) {
             case "__getitem__":
                 return new PyBuiltinFunction("__getitem__", (args, kwargs, inter) -> {
@@ -73,7 +74,7 @@ public abstract class PySequence extends PyCollection {
                 });
                 
             default:
-                return super.getAttribute(name);
+                return super.getAttribute(interpreter, name);
         }
     }
     

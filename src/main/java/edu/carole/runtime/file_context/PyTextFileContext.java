@@ -2,13 +2,14 @@ package edu.carole.runtime.file_context;
 
 import edu.carole.interpreter.Interpreter;
 import edu.carole.runtime.*;
+import edu.carole.runtime.exception.ExceptionWrapper;
+import edu.carole.runtime.func.PyBuiltinFunction;
+import edu.carole.runtime.instance.PyInstance;
 import edu.carole.runtime.io.IOManager;
 import edu.carole.runtime.property.BuiltinProperty;
-import lombok.Getter;
 
 import java.io.*;
 import java.nio.charset.Charset;
-import java.nio.charset.StandardCharsets;
 import java.nio.charset.UnsupportedCharsetException;
 import java.util.List;
 import java.util.ArrayList;
@@ -46,18 +47,19 @@ public class PyTextFileContext extends PyFileContext {
         super.setBufferSize(bufferSize);
     }
 
-    public Charset getCharSet() {
+    public Charset getCharSet(Interpreter interpreter) {
         if (charSetCache != null) {
             return charSetCache;
         } else {
             try {
                 charSetCache = Charset.forName(charSet);
             } catch (UnsupportedCharsetException unsupported) {
-                PyException pyException = PyException.typeError("Unsupported charset '" + charSet + "'");
-                contextExit(pyException, new PyString(charSet), null);
-                throw new Interpreter.PyExceptionWrapper(
-                    pyException
-                );
+                PyInstance ins = (PyInstance) interpreter.getExceptions().
+                        createExceptionInstance("UnicodeError", List.of());
+                ExceptionWrapper wrapper = new ExceptionWrapper(ins);
+                wrapper.addNote(interpreter, "Unsupported charset '" + charSet + "'");
+                contextExit(interpreter);
+                throw wrapper;
             }
             return charSetCache;
         }
@@ -111,14 +113,14 @@ public class PyTextFileContext extends PyFileContext {
 
 
     @Override
-    public PyObject contextEnter() {
+    public PyObject contextEnter(Interpreter interpreter) {
         try {
             setOpen(true);
             
             if (readingMode()) {
                 // Read mode - open file for reading using IOManager
                 InputStream inputStream = createInputStream();
-                reader = new BufferedReader(new InputStreamReader(inputStream, getCharSet()), getBufferSize());
+                reader = new BufferedReader(new InputStreamReader(inputStream, getCharSet(interpreter)), getBufferSize());
 //                System.out.println("Opening file for reading: " + filename);
                 
                 // Pre-read content for Python-like file operations
@@ -130,12 +132,12 @@ public class PyTextFileContext extends PyFileContext {
                 
                 // Reopen for reading operations
                 inputStream = createInputStream();
-                reader = new BufferedReader(new InputStreamReader(inputStream, getCharSet()), getBufferSize());
+                reader = new BufferedReader(new InputStreamReader(inputStream, getCharSet(interpreter)), getBufferSize());
                 
             } else if (writingMode() || appendMode()) {
                 // Write mode - open file for writing (truncate) using IOManager
                 OutputStream outputStream = createOutputStream();
-                writer = new BufferedWriter(new OutputStreamWriter(outputStream, getCharSet()), getBufferSize());
+                writer = new BufferedWriter(new OutputStreamWriter(outputStream, getCharSet(interpreter)), getBufferSize());
 //                System.out.println("Opening file for writing: " + filename);
             } else {
                 throw new RuntimeException("Unsupported file mode: " + getMode());
@@ -150,7 +152,7 @@ public class PyTextFileContext extends PyFileContext {
     }
 
     @Override
-    public PyObject contextExit(PyObject exceptionType, PyObject exceptionValue, PyObject traceback) {
+    public PyObject contextExit(Interpreter inter) {
         try {
             if (isOpen()) {
                 setOpen(false);

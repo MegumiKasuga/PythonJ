@@ -1,10 +1,8 @@
 package edu.carole.runtime.collections;
 
+import edu.carole.interpreter.Interpreter;
 import edu.carole.runtime.PyObject;
-import edu.carole.runtime.PyBuiltinFunction;
-import edu.carole.runtime.PyIterator;
-import java.util.Iterator;
-import java.util.Set;
+import edu.carole.runtime.func.PyBuiltinFunction;
 
 /**
  * Python Mapping abstract base class
@@ -46,7 +44,7 @@ public abstract class PyMapping extends PyCollection {
     public abstract PyObject get(PyObject key, PyObject defaultValue);
     
     @Override
-    public PyObject getAttribute(String name) {
+    public PyObject getAttribute(Interpreter interpreter, String name) {
         switch (name) {
             case "__getitem__":
                 return new PyBuiltinFunction("__getitem__", (args, kwargs, inter) -> {
@@ -90,7 +88,7 @@ public abstract class PyMapping extends PyCollection {
                 });
                 
             default:
-                return super.getAttribute(name);
+                return super.getAttribute(interpreter, name);
         }
     }
     

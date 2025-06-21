@@ -1,6 +1,7 @@
 package edu.carole.runtime.exception;
 
 import edu.carole.ast.ASTNode;
+import edu.carole.interpreter.Interpreter;
 import edu.carole.runtime.PyInt;
 import edu.carole.runtime.PyNone;
 import edu.carole.runtime.PyObject;
@@ -38,7 +39,8 @@ public class PyTraceback extends PyObject {
         attribute.put("tb_frame", frame);
         attribute.put("tb_lineno", new PyInt(line));
         attribute.put("tb_lasti", PyNone.INSTANCE);
-        attribute.put("tb_next", new BuiltinProperty("tb_next", (args, kwargs, inter) -> {
+        attribute.put("tb_next", new BuiltinProperty("tb_next",
+        (args, kwargs, inter) -> {
             return next == null ? PyNone.INSTANCE : next;
         }, (args, kwargs, inter) -> {
             if (args.size() != 1)
@@ -51,10 +53,10 @@ public class PyTraceback extends PyObject {
     }
 
     @Override
-    public PyObject getAttribute(String name) {
+    public PyObject getAttribute(Interpreter interpreter, String name) {
         if (attributes.containsKey(name))
             return attributes.get(name);
-        return super.getAttribute(name);
+        return super.getAttribute(interpreter, name);
     }
 
     @Override

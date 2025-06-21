@@ -1,7 +1,8 @@
 package edu.carole.runtime.collections;
 
+import edu.carole.interpreter.Interpreter;
 import edu.carole.runtime.PyObject;
-import edu.carole.runtime.PyBuiltinFunction;
+import edu.carole.runtime.func.PyBuiltinFunction;
 import edu.carole.runtime.PyIterator;
 import java.util.Iterator;
 
@@ -18,7 +19,7 @@ public abstract class PyIterable extends PyObject {
     public abstract Iterator<PyObject> iterator();
     
     @Override
-    public PyObject getAttribute(String name) {
+    public PyObject getAttribute(Interpreter interpreter, String name) {
         switch (name) {
             case "__iter__":
                 return new PyBuiltinFunction("__iter__", (args, kwargs, inter) -> {
@@ -29,7 +30,7 @@ public abstract class PyIterable extends PyObject {
                 });
                 
             default:
-                return super.getAttribute(name);
+                return super.getAttribute(interpreter, name);
         }
     }
     

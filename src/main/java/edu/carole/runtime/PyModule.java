@@ -1,6 +1,7 @@
 package edu.carole.runtime;
 
 import edu.carole.interpreter.Environment;
+import edu.carole.interpreter.Interpreter;
 import edu.carole.runtime.base.PyObjectWithMethods;
 import edu.carole.runtime.registry.MethodRegistry;
 
@@ -101,18 +102,18 @@ public class PyModule extends PyObjectWithMethods {
     }
     
     @Override
-    public PyObject getAttribute(String name) {
+    public PyObject getAttribute(Interpreter interpreter, String name) {
         // 首先检查属性字典
         if (attributes.containsKey(name)) {
             return attributes.get(name);
         }
         
         // 然后检查方法注册表
-        return super.getAttribute(name);
+        return super.getAttribute(interpreter, name);
     }
     
     @Override
-    public void setAttribute(String name, PyObject value) {
+    public void setAttribute(Interpreter interpreter, String name, PyObject value) {
         attributes.put(name, value);
     }
     

@@ -1,4 +1,10 @@
-package edu.carole.runtime;
+package edu.carole.runtime.instance;
+
+import edu.carole.interpreter.Interpreter;
+import edu.carole.runtime.InstanceBindable;
+import edu.carole.runtime.clazz.PyClass;
+import edu.carole.runtime.PyObject;
+import lombok.Getter;
 
 import java.util.*;
 
@@ -6,12 +12,12 @@ import java.util.*;
  * Python实例对象
  */
 public class PyInstance extends PyObject {
+
     private final PyClass pyClass;
-    private final Map<String, PyObject> attributes;
     
     public PyInstance(PyClass pyClass) {
+        super();
         this.pyClass = pyClass;
-        this.attributes = new HashMap<>();
     }
     
     @Override
@@ -34,7 +40,7 @@ public class PyInstance extends PyObject {
     }
 
     @Override
-    public PyObject getAttribute(String name) {
+    public PyObject getAttribute(Interpreter interpreter, String name) {
         // 首先检查实例属性
         PyObject attribute = attributes.get(name);
         if (attribute != null) {
@@ -46,17 +52,16 @@ public class PyInstance extends PyObject {
         if (method != null) {
             // If it's a function, bind it to this instance
             if (method instanceof InstanceBindable pf) {
-                return pf.bindToInstance(this);
+                return pf.bindToInstance(interpreter, this);
             }
-            // For other method types (including decorated methods)
-            return new PyBoundMethod(this, method);
+            return method;
         }
         
         throw new RuntimeException("'" + pyClass.getName() + "' object has no attribute '" + name + "'");
     }
     
     @Override
-    public void setAttribute(String name, PyObject value) {
+    public void setAttribute(Interpreter interpreter, String name, PyObject value) {
         attributes.put(name, value);
     }
     

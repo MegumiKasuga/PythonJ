@@ -1,13 +1,15 @@
 package edu.carole.runtime.exception;
 
 import edu.carole.interpreter.Interpreter;
-import edu.carole.runtime.PyClass;
-import edu.carole.runtime.PyInstance;
+import edu.carole.runtime.clazz.PyClass;
+import edu.carole.runtime.instance.PyInstance;
 import edu.carole.runtime.PyObject;
 import lombok.Getter;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.function.Consumer;
 
 @Getter
@@ -126,8 +128,39 @@ public class BuiltinExceptions {
         }
     }
 
+    public ExceptionWrapper fromJavaException(Interpreter interpreter, Exception e) {
+        if (e instanceof ExceptionWrapper wrapper) return wrapper;
+        PyInstance instance = (PyInstance) createExceptionInstance(systemError, List.of());
+        ExceptionWrapper wrapper = new ExceptionWrapper(instance);
+        wrapper.addNote(interpreter, e.getLocalizedMessage());
+        for (StackTraceElement element : e.getStackTrace()) {
+            wrapper.addNote(interpreter, element.toString());
+        }
+        return wrapper;
+    }
+
     public PyClass get(String name) {
         return exceptions.getOrDefault(name, null);
+    }
+
+    public PyObject createExceptionInstance(PyClass exceptionClazz, List<PyObject> arg) {
+        return exceptionClazz.call(arg, null, interpreter);
+    }
+
+    public PyObject createExceptionInstance(PyClass exceptionClazz, List<PyObject> arg, Map<String, PyObject> kwArgs) {
+        return exceptionClazz.call(arg, kwArgs, interpreter);
+    }
+
+    public PyObject createExceptionInstance(String exceptionClazz, List<PyObject> arg) {
+        PyClass clazz = get(exceptionClazz);
+        Objects.requireNonNull(clazz);
+        return createExceptionInstance(clazz, arg);
+    }
+
+    public PyObject createExceptionInstance(String exceptionClazz, List<PyObject> args, Map<String, PyObject> kwArgs) {
+        PyClass clazz = get(exceptionClazz);
+        Objects.requireNonNull(clazz);
+        return createExceptionInstance(clazz, args, kwArgs);
     }
 
 //    public ExceptionWrapper packJavaException(Exception e) {

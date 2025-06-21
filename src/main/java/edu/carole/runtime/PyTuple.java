@@ -169,7 +169,7 @@ public class PyTuple extends PyObjectWithMethods {
         int hash = 1;
         for (PyObject element : elements) {
             // Call the __hash__ method on each element
-            PyObject hashMethod = element.getAttribute("__hash__");
+            PyObject hashMethod = element.getAttribute(interpreter, "__hash__");
             PyObject elementHash = hashMethod.call(java.util.List.of(), interpreter);
             if (elementHash instanceof PyInt) {
                 hash = 31 * hash + (int)((PyInt) elementHash).getValue();
@@ -331,7 +331,7 @@ public class PyTuple extends PyObjectWithMethods {
               // Try to use Python comparison methods if available
             try {
                 // Check if elements are equal
-                PyObject eqMethod = elem1.getAttribute("__eq__");
+                PyObject eqMethod = elem1.getAttribute(interpreter, "__eq__");
                 PyObject eqResult = eqMethod.call(java.util.List.of(elem2), interpreter);
                 if (eqResult instanceof PyBool && ((PyBool) eqResult).getValue()) {
                     continue; // Elements are equal, continue with next elements
@@ -339,7 +339,7 @@ public class PyTuple extends PyObjectWithMethods {
                 
                 // Try to use less than comparison
                 try {
-                    PyObject ltMethod = elem1.getAttribute("__lt__");
+                    PyObject ltMethod = elem1.getAttribute(interpreter, "__lt__");
                     PyObject ltResult = ltMethod.call(java.util.List.of(elem2), interpreter);
                     if (ltResult instanceof PyBool) {
                         boolean isLess = ((PyBool) ltResult).getValue();

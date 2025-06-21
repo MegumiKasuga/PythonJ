@@ -153,7 +153,8 @@ public class PyString extends PyObjectWithMethods {
         methodRegistry.registerMethod("rsplit", MethodBuilder.varArgs(this::rsplit));
         methodRegistry.registerMethod("splitlines", MethodBuilder.varArgs(this::splitlines));
         methodRegistry.registerMethod("join", MethodBuilder.oneArg(this::join));
-          // 替换方法
+
+        // 替换方法
         methodRegistry.registerMethod("replace", MethodBuilder.rangeArgs(2, 3, this::replace));
         
         // 编码和格式化方法
@@ -217,7 +218,7 @@ public class PyString extends PyObjectWithMethods {
 
     private PyObject __mod__(PyObject other, Interpreter interpreter) {
         try {
-            PyObject iterator = other.getAttribute("__iter__");
+            PyObject iterator = other.getAttribute(interpreter, "__iter__");
             PyObject iterResult = iterator.call(List.of(), interpreter);
             Iterator<PyObject> iter = iterResult.iterator(interpreter);
             List<Object> strList = new ArrayList<>();
@@ -477,7 +478,7 @@ public class PyString extends PyObjectWithMethods {
         if (args.isEmpty() || args.size() > 3) {
             throw new RuntimeException("find() takes from 1 to 3 positional arguments but " + args.size() + " were given");
         }
-          String sub = MethodBuilder.requireType(args.get(0), PyString.class, "substring").value;
+        String sub = MethodBuilder.requireType(args.get(0), PyString.class, "substring").value;
         int start = 0;
         int end = value.length();
         
@@ -736,7 +737,8 @@ public class PyString extends PyObjectWithMethods {
                 sep = MethodBuilder.requireType(sepObj, PyString.class, "sep").value;
             }
         }
-          if (args.size() >= 2) {
+
+        if (args.size() >= 2) {
             maxsplit = (int) MethodBuilder.requireType(args.get(1), PyInt.class, "maxsplit").getValue();
         }
         
@@ -842,7 +844,7 @@ public class PyString extends PyObjectWithMethods {
         String old = MethodBuilder.requireType(args.get(0), PyString.class, "old").value;
         String newStr = MethodBuilder.requireType(args.get(1), PyString.class, "new").value;
         int count = -1;
-          if (args.size() == 3) {
+        if (args.size() == 3) {
             count = (int) MethodBuilder.requireType(args.get(2), PyInt.class, "count").getValue();
         }
         
@@ -872,7 +874,8 @@ public class PyString extends PyObjectWithMethods {
                 int index = result.indexOf(old);
                 if (index == -1) break;
                 result = result.substring(0, index) + newStr + result.substring(index + old.length());
-            }        }
+            }
+        }
         
         return new PyString(result);
     }

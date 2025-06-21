@@ -1,9 +1,9 @@
 package edu.carole.runtime.collections;
 
+import edu.carole.interpreter.Interpreter;
 import edu.carole.runtime.PyObject;
-import edu.carole.runtime.PyBuiltinFunction;
+import edu.carole.runtime.func.PyBuiltinFunction;
 import edu.carole.runtime.PyNone;
-import java.util.Iterator;
 
 /**
  * Python MutableSequence abstract base class
@@ -67,7 +67,7 @@ public abstract class PyMutableSequence extends PySequence {
     public abstract void reverse();
     
     @Override
-    public PyObject getAttribute(String name) {
+    public PyObject getAttribute(Interpreter interpreter, String name) {
         switch (name) {
             case "__setitem__":
                 return new PyBuiltinFunction("__setitem__", (args, kwargs, inter) -> {
@@ -151,7 +151,7 @@ public abstract class PyMutableSequence extends PySequence {
                 });
                 
             default:
-                return super.getAttribute(name);
+                return super.getAttribute(interpreter, name);
         }
     }
     
