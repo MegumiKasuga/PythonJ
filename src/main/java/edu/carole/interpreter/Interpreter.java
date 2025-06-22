@@ -77,6 +77,23 @@ public class Interpreter implements ASTVisitor<PyObject> {
         return memoryModel.getFloat(value);
     }
 
+    public BuiltinInstance<ArrayList> createList(ArrayList<PyObject> value) {
+        return memoryModel.createList(value);
+    }
+
+    public BuiltinInstance<PyObject[]> createTuple(PyObject[] value) {
+        return memoryModel.createTuple(value);
+    }
+
+    public BuiltinInstance<HashSet> createSet(HashSet<PyObject> set) {
+        return memoryModel.createSet(set);
+    }
+
+    public BuiltinInstance<HashMap> createDict(HashMap<PyObject, PyObject> dict) {
+        return memoryModel.createDict(dict);
+    }
+
+
     public boolean isNone(PyObject obj) {
         return memoryModel.isNone(obj);
     }
@@ -95,6 +112,16 @@ public class Interpreter implements ASTVisitor<PyObject> {
 
     public boolean isStr(PyObject value) {
         return memoryModel.isStr(value);
+    }
+
+    public boolean isList(PyObject value) {return memoryModel.isList(value);}
+
+    public boolean isTuple(PyObject value) {return memoryModel.isTuple(value);}
+
+    public boolean isSet(PyObject value) {return memoryModel.isSet(value);}
+
+    public boolean isDict(PyObject value) {
+        return memoryModel.isDict(value);
     }
 
     public boolean isStopIteration(Exception exception) {

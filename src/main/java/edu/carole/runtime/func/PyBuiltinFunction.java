@@ -63,18 +63,23 @@ public class PyBuiltinFunction extends PyObject implements InstanceBindable {
     public PyObject call(List<PyObject> posArgs, Map<String, PyObject> kwargs, Interpreter interpreter) {
         Environment previous = interpreter.getEnvironment();
         try {
-            ArrayList<PyObject> args = new ArrayList<>();
-            Environment environment = new Environment(interpreter);
-            interpreter.setEnvironment(environment);
-            // add 'self' to this func
-            if (boundInstance != null) {
-                args.add(0, boundInstance);
-                if (boundInstance instanceof PyInstance ins) {
-                    environment.setCurrentClass(ins.getPyClass());
-                    environment.setCurrentInstance(ins);
+            List<PyObject> args;
+            if (!isStaticMethod()) {
+                args = new ArrayList<>();
+                Environment environment = new Environment(interpreter);
+                interpreter.setEnvironment(environment);
+                // add 'self' to this func
+                if (boundInstance != null) {
+                    args.add(0, boundInstance);
+                    if (boundInstance instanceof PyInstance ins) {
+                        environment.setCurrentClass(ins.getPyClass());
+                        environment.setCurrentInstance(ins);
+                    }
                 }
+                args.addAll(posArgs);
+            } else {
+                args = posArgs;
             }
-            args.addAll(posArgs);
             return function.call(args, kwargs, interpreter);
         } finally {
             interpreter.setEnvironment(previous);
@@ -83,6 +88,7 @@ public class PyBuiltinFunction extends PyObject implements InstanceBindable {
 
     @Override
     public PyBuiltinFunction bindToInstance(Interpreter interpreter, PyObject instance) {
+        if (isStaticMethod()) return this;
         PyBuiltinFunction func = new PyBuiltinFunction(name, function);
         func.boundInstance = instance;
         return func;

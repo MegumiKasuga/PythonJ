@@ -54,6 +54,18 @@ public abstract class BuiltinClass<T> extends PyClass {
         method.put(name, createMethod(name, func));
     }
 
+    public static void registerStaticMethod(Map<String, PyObject> method, String name, PyBuiltinFunction.BuiltinFunction func) {
+        PyBuiltinFunction function = createMethod(name, func);
+        function.setStaticMethod(true);
+        method.put(name, function);
+    }
+
+    public static void registerAbstractMethod(Map<String, PyObject> method, String name) {
+        PyBuiltinFunction func = createMethod(name, (args, kwargs, inter) -> inter.none());
+        func.setAbstractMethod(true);
+        method.put(name, func);
+    }
+
     public boolean is(PyObject obj) {
         return (obj instanceof BuiltinInstance ins) && ins.is(this);
     }

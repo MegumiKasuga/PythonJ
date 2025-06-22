@@ -7,8 +7,7 @@ import edu.carole.runtime.instance.BuiltinInstance;
 import lombok.Getter;
 
 import javax.lang.model.type.NullType;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 
 public class MemoryModel {
 
@@ -32,6 +31,18 @@ public class MemoryModel {
     @Getter
     private BuiltinClass<String> STR;
 
+    @Getter
+    private BuiltinClass<ArrayList> LIST;
+
+    @Getter
+    private BuiltinClass<PyObject[]> TUPLE;
+
+    @Getter
+    private BuiltinClass<HashSet> SET;
+
+    @Getter
+    private BuiltinClass<HashMap> DICT;
+
     private BuiltinInstance<Boolean> BOOL_FALSE, BOOL_TRUE;
     private BuiltinInstance<NullType> NONE;
 
@@ -39,6 +50,7 @@ public class MemoryModel {
         this.interpreter = interpreter;
         integers = new HashMap<>();
         builtinClasses = new HashMap<>();
+        initBuiltinClass();
     }
 
     private void initBuiltinClass() {
@@ -52,10 +64,26 @@ public class MemoryModel {
         NONE_TYPE = new PyNone("NoneType", new HashMap<>());
         builtinClasses.put("NoneType", NONE_TYPE);
         NONE = NONE_TYPE.fromValue(interpreter, null);
-
         INTEGER = new PyInt("int", new HashMap<>());
+        builtinClasses.put("int", INTEGER);
+        
         FLOAT = new PyFloat("float", new HashMap<>());
+        builtinClasses.put("float", FLOAT);
+        
         STR = new PyString("str", new HashMap<>());
+        builtinClasses.put("str", STR);
+        
+        LIST = new PyList("list", new HashMap<>());
+        builtinClasses.put("list", LIST);
+
+        TUPLE = new PyTuple("tuple", new HashMap<>());
+        builtinClasses.put("tuple", TUPLE);
+
+        SET = new PySet("set", new HashMap<>());
+        builtinClasses.put("set", SET);
+
+        DICT = new PyDict("dict", new HashMap<>());
+        builtinClasses.put("dict", DICT);
     }
 
     public boolean isNone(PyObject value) {
@@ -78,12 +106,36 @@ public class MemoryModel {
         return STR.is(value);
     }
 
+    public boolean isList(PyObject value) {return LIST.is(value);}
+
+    public boolean isTuple(PyObject value) {return TUPLE.is(value);}
+
+    public boolean isSet(PyObject value) {return SET.is(value);}
+
+    public boolean isDict(PyObject value) {return DICT.is(value);}
+
     public BuiltinInstance<String> createString(String str) {
         return STR.fromValue(interpreter, str);
     }
 
     public BuiltinInstance<Double> getFloat(Double value) {
         return FLOAT.fromValue(interpreter, value);
+    }
+
+    public BuiltinInstance<ArrayList> createList(ArrayList<PyObject> value) {
+        return LIST.fromValue(interpreter, value);
+    }
+
+    public BuiltinInstance<PyObject[]> createTuple(PyObject[] value) {
+        return TUPLE.fromValue(interpreter, value);
+    }
+
+    public BuiltinInstance<HashSet> createSet(HashSet<PyObject> value) {
+        return SET.fromValue(interpreter, value);
+    }
+
+    public BuiltinInstance<HashMap> createDict(HashMap<PyObject, PyObject> value) {
+        return DICT.fromValue(interpreter, value);
     }
 
     public BuiltinInstance<NullType> none() {
